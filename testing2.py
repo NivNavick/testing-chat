@@ -2,9 +2,6 @@ class HelloWorld:
     def __init__(self, name="World"):
         self.name = name
 
-    def say_hello(self):
-        return f"Hello, {self.name}!"
-
     def say_hello3(self):
         return f"Hello, {self.name}!2"
 
