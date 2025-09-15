@@ -22,3 +22,6 @@ class HelloWorld:
 
     def say_hello10(self, param4: bool):
         return f"Hello, {self.name}!2"
+
+    def say_hello11(self, param4: bool, params4: int):
+        return f"Hello, {self.name}!2"
