@@ -18,7 +18,7 @@ class HelloWorld:
         return f"Hello, {self.name}!2"
 
     def say_hello8(self, param: int, param2: float, param3: float):
-        return f"Hello, {self.name}!2"
+        return f"Hello, {self.name}!42"
 
     def say_hello10(self, param4: bool):
         return f"Hello, {self.name}!2"
