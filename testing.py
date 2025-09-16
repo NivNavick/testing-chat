@@ -11,6 +11,9 @@ class HelloWorld:
     def say_hello4(self):
         return f"Hello, {self.name}!2"
 
+    def say_hello5(self, param1: bool, new_param: float):
+        return f"Hello, {self.name}!2"
+
     def say_hello6(self, param: int):
         return f"Hello, {self.name}!2"
 
