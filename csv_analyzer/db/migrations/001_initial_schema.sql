@@ -94,14 +94,20 @@ CREATE TABLE IF NOT EXISTS column_mappings_kb (
     UNIQUE(vertical_id, document_type_id, source_column_name, target_field)
 );
 
--- Indexes for vector similarity search (IVFFlat for approximate nearest neighbor)
--- Note: IVFFlat requires data to be present first, so we use a smaller lists value
--- For production with more data, increase lists to sqrt(n) where n is row count
-CREATE INDEX IF NOT EXISTS idx_ground_truth_embedding 
-    ON ground_truth USING ivfflat (embedding vector_cosine_ops) WITH (lists = 10);
-
-CREATE INDEX IF NOT EXISTS idx_column_mappings_embedding 
-    ON column_mappings_kb USING ivfflat (embedding vector_cosine_ops) WITH (lists = 10);
+-- Vector similarity indexes
+-- IMPORTANT: IVFFlat indexes require sufficient data (100+ rows) to work correctly.
+-- For small datasets (<100 rows), exact search is faster and more accurate.
+-- Uncomment these when you have enough ground truth records:
+--
+-- CREATE INDEX IF NOT EXISTS idx_ground_truth_embedding 
+--     ON ground_truth USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+--
+-- CREATE INDEX IF NOT EXISTS idx_column_mappings_embedding 
+--     ON column_mappings_kb USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+--
+-- Alternative: HNSW indexes work better for small datasets but use more memory:
+-- CREATE INDEX IF NOT EXISTS idx_ground_truth_embedding 
+--     ON ground_truth USING hnsw (embedding vector_cosine_ops);
 
 -- Standard indexes for filtering
 CREATE INDEX IF NOT EXISTS idx_ground_truth_doc_type ON ground_truth(document_type_id);
