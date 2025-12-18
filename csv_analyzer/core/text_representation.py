@@ -99,8 +99,8 @@ def column_to_embedding_text(column_profile: Dict[str, Any]) -> str:
     """
     Convert a single column profile to text optimized for column-level embedding.
     
-    This is used for the column_mappings_kb table where we embed individual columns
-    to learn column name → target field associations.
+    This is used for matching columns to schema fields.
+    The COLUMN NAME is the most important signal - it should be emphasized.
     
     Args:
         column_profile: Column profile dict
@@ -110,21 +110,29 @@ def column_to_embedding_text(column_profile: Dict[str, Any]) -> str:
     """
     col_name = column_profile.get("column_name", "unknown")
     col_type = column_profile.get("detected_type", "unknown")
-    samples = column_profile.get("sample_values", [])[:5]
+    samples = column_profile.get("sample_values", [])[:3]
     
-    parts = [
-        f"column named {col_name}",
-        f"type {col_type}",
-    ]
+    # Column name is repeated to increase its weight in the embedding
+    # This helps the semantic model focus on the name rather than metadata
+    parts = [col_name, col_name]  # Repeat name for emphasis
     
-    if samples:
-        parts.append(f"sample values: {', '.join(str(s) for s in samples)}")
+    # Add semantic type hint (simplified)
+    type_hints = {
+        "time_of_day": "time",
+        "datetime": "datetime timestamp",
+        "date": "date",
+        "integer": "number count",
+        "float": "number decimal",
+        "id_like": "identifier ID",
+        "text": "",
+        "boolean": "flag yes no",
+    }
+    hint = type_hints.get(col_type, "")
+    if hint:
+        parts.append(hint)
     
-    # Add cardinality context
-    unique_ratio = column_profile.get("unique_ratio", 0)
-    if unique_ratio > 0.9:
-        parts.append("unique identifier field")
-    elif unique_ratio < 0.1:
-        parts.append("categorical field with few values")
+    # Add sample values only if they add semantic meaning (not just times/numbers)
+    if samples and col_type in ["text", "id_like"]:
+        parts.append(f"examples: {', '.join(str(s) for s in samples)}")
     
-    return "; ".join(parts)
+    return " ".join(parts)
