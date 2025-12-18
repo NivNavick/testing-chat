@@ -253,12 +253,25 @@ class ScoringEngine:
         
         return coverage
     
+    # Minimum confidence to suggest a mapping (below this = "no mapping")
+    MIN_CONFIDENCE_THRESHOLD = 0.82
+    
+    # Minimum gap between best and 2nd best match to be confident
+    # If best=83% and 2nd=82%, the match is ambiguous
+    MIN_CONFIDENCE_GAP = 0.02
+    
     def _build_suggested_mappings(
         self,
         column_matches: Dict[str, List[Dict]],
         winning_doc_type: Optional[str],
     ) -> Dict[str, Dict[str, Any]]:
-        """Build suggested column mappings for the winning document type."""
+        """
+        Build suggested column mappings for the winning document type.
+        
+        Uses confidence thresholds to avoid bad mappings:
+        1. If best match < MIN_CONFIDENCE_THRESHOLD → no mapping
+        2. If gap between best and 2nd best < MIN_CONFIDENCE_GAP → ambiguous, no mapping
+        """
         suggestions = {}
         
         for col_name, matches in column_matches.items():
@@ -271,23 +284,52 @@ class ScoringEngine:
             else:
                 relevant_matches = matches
             
-            if relevant_matches:
-                best = relevant_matches[0]
-                suggestions[col_name] = {
-                    "target_field": best["field_name"],
-                    "confidence": best["similarity"],
-                    "field_type": best["field_type"],
-                    "required": best["required"],
-                }
-            else:
-                suggestions[col_name] = {
-                    "target_field": None,
-                    "confidence": 0.0,
-                    "field_type": None,
-                    "required": False,
-                }
+            if not relevant_matches:
+                suggestions[col_name] = self._no_mapping()
+                continue
+            
+            best = relevant_matches[0]
+            best_confidence = best["similarity"]
+            
+            # Check 1: Is confidence high enough?
+            if best_confidence < self.MIN_CONFIDENCE_THRESHOLD:
+                logger.debug(f"Column '{col_name}': best match '{best['field_name']}' "
+                           f"below threshold ({best_confidence:.1%} < {self.MIN_CONFIDENCE_THRESHOLD:.0%})")
+                suggestions[col_name] = self._no_mapping()
+                continue
+            
+            # Check 2: Is there a clear winner? (sufficient gap to 2nd best)
+            if len(relevant_matches) > 1:
+                second_best = relevant_matches[1]
+                gap = best_confidence - second_best["similarity"]
+                
+                # If both match to DIFFERENT fields and gap is too small, it's ambiguous
+                if (second_best["field_name"] != best["field_name"] and 
+                    gap < self.MIN_CONFIDENCE_GAP):
+                    logger.debug(f"Column '{col_name}': ambiguous match between "
+                               f"'{best['field_name']}' ({best_confidence:.1%}) and "
+                               f"'{second_best['field_name']}' ({second_best['similarity']:.1%})")
+                    suggestions[col_name] = self._no_mapping()
+                    continue
+            
+            # Good match!
+            suggestions[col_name] = {
+                "target_field": best["field_name"],
+                "confidence": best_confidence,
+                "field_type": best["field_type"],
+                "required": best["required"],
+            }
         
         return suggestions
+    
+    def _no_mapping(self) -> Dict[str, Any]:
+        """Return a 'no mapping' result."""
+        return {
+            "target_field": None,
+            "confidence": 0.0,
+            "field_type": None,
+            "required": False,
+        }
     
     def _convert_column_matches(
         self,

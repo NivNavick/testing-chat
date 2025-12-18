@@ -1,0 +1,401 @@
+shift_id,shift_date,employee_id,employee_name,role,department,location,shift_type,shift_start,shift_end,break_minutes,supervisor,notes
+S000001,2026-01-04,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Night,23:00,07:00,45,No,Night shift ends next day
+S000002,2026-01-04,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Short,08:00,14:00,45,Yes,
+S000003,2026-01-04,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Evening,15:00,23:00,15,Yes,
+S000004,2026-01-04,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000005,2026-01-04,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Evening,15:00,23:00,0,Yes,
+S000006,2026-01-04,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Day,07:00,15:00,15,Yes,
+S000007,2026-01-04,E0007,Noam Bar,Physician,Surgery,ER Wing,Day,07:00,15:00,30,Yes,
+S000008,2026-01-04,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Evening,15:00,23:00,30,No,
+S000009,2026-01-04,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Evening,15:00,23:00,15,No,
+S000010,2026-01-04,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Evening,15:00,23:00,45,No,
+S000011,2026-01-04,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Evening,15:00,23:00,0,Yes,
+S000012,2026-01-04,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Short,08:00,14:00,30,No,
+S000013,2026-01-04,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Short,08:00,14:00,45,Yes,
+S000014,2026-01-04,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,0,No,
+S000015,2026-01-04,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000016,2026-01-04,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Evening,15:00,23:00,15,No,
+S000017,2026-01-04,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Evening,15:00,23:00,45,Yes,
+S000018,2026-01-04,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000019,2026-01-04,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Day,07:00,15:00,45,Yes,
+S000020,2026-01-04,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,0,Yes,
+S000021,2026-01-04,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Evening,15:00,23:00,15,No,
+S000022,2026-01-04,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Short,08:00,14:00,45,Yes,
+S000023,2026-01-04,E0023,Dana Biton,Physician,Emergency,Imaging Center,Short,08:00,14:00,0,Yes,
+S000024,2026-01-04,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Short,08:00,14:00,0,No,
+S000025,2026-01-04,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Night,23:00,07:00,45,No,Night shift ends next day
+S000026,2026-01-04,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Short,08:00,14:00,45,Yes,
+S000027,2026-01-04,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Evening,15:00,23:00,30,Yes,
+S000028,2026-01-04,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Day,07:00,15:00,0,No,
+S000029,2026-01-04,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Day,07:00,15:00,0,No,
+S000030,2026-01-04,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Evening,15:00,23:00,0,Yes,
+S000031,2026-01-04,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Evening,15:00,23:00,0,Yes,
+S000032,2026-01-04,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Evening,15:00,23:00,45,Yes,
+S000033,2026-01-04,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Evening,15:00,23:00,0,Yes,
+S000034,2026-01-04,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Short,08:00,14:00,30,No,
+S000035,2026-01-04,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Evening,15:00,23:00,30,Yes,
+S000036,2026-01-04,E0036,Lior Friedman,Technician,Emergency,Main Campus,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000037,2026-01-04,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Night,23:00,07:00,45,No,Night shift ends next day
+S000038,2026-01-04,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Day,07:00,15:00,0,No,
+S000039,2026-01-04,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Day,07:00,15:00,0,Yes,
+S000040,2026-01-04,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Night,23:00,07:00,15,No,Night shift ends next day
+S000041,2026-01-05,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Day,07:00,15:00,15,No,
+S000042,2026-01-05,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Night,23:00,07:00,15,No,Night shift ends next day
+S000043,2026-01-05,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Night,23:00,07:00,0,No,Night shift ends next day
+S000044,2026-01-05,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Day,07:00,15:00,15,No,
+S000045,2026-01-05,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Day,07:00,15:00,0,Yes,
+S000046,2026-01-05,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000047,2026-01-05,E0007,Noam Bar,Physician,Surgery,ER Wing,Night,23:00,07:00,15,No,Night shift ends next day
+S000048,2026-01-05,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Short,08:00,14:00,30,Yes,
+S000049,2026-01-05,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Day,07:00,15:00,45,No,
+S000050,2026-01-05,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Day,07:00,15:00,0,No,
+S000051,2026-01-05,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Evening,15:00,23:00,30,Yes,
+S000052,2026-01-05,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Short,08:00,14:00,45,Yes,
+S000053,2026-01-05,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Day,07:00,15:00,0,Yes,
+S000054,2026-01-05,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,30,Yes,
+S000055,2026-01-05,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Short,08:00,14:00,15,Yes,
+S000056,2026-01-05,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000057,2026-01-05,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000058,2026-01-05,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Day,07:00,15:00,30,No,
+S000059,2026-01-05,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Evening,15:00,23:00,15,Yes,
+S000060,2026-01-05,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Evening,15:00,23:00,45,Yes,
+S000061,2026-01-05,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Evening,15:00,23:00,30,No,
+S000062,2026-01-05,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Evening,15:00,23:00,30,Yes,
+S000063,2026-01-05,E0023,Dana Biton,Physician,Emergency,Imaging Center,Day,07:00,15:00,45,Yes,
+S000064,2026-01-05,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Short,08:00,14:00,15,Yes,
+S000065,2026-01-05,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Short,08:00,14:00,30,No,
+S000066,2026-01-05,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Evening,15:00,23:00,15,Yes,
+S000067,2026-01-05,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Evening,15:00,23:00,45,No,
+S000068,2026-01-05,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Night,23:00,07:00,0,No,Night shift ends next day
+S000069,2026-01-05,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Night,23:00,07:00,45,No,Night shift ends next day
+S000070,2026-01-05,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Day,07:00,15:00,0,No,
+S000071,2026-01-05,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Evening,15:00,23:00,30,Yes,
+S000072,2026-01-05,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Day,07:00,15:00,45,No,
+S000073,2026-01-05,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000074,2026-01-05,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Short,08:00,14:00,15,No,
+S000075,2026-01-05,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Day,07:00,15:00,45,Yes,
+S000076,2026-01-05,E0036,Lior Friedman,Technician,Emergency,Main Campus,Evening,15:00,23:00,30,No,
+S000077,2026-01-05,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Day,07:00,15:00,30,No,
+S000078,2026-01-05,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Day,07:00,15:00,30,No,
+S000079,2026-01-05,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Short,08:00,14:00,30,No,
+S000080,2026-01-05,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000081,2026-01-06,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Short,08:00,14:00,45,Yes,
+S000082,2026-01-06,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000083,2026-01-06,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000084,2026-01-06,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Short,08:00,14:00,30,No,
+S000085,2026-01-06,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Short,08:00,14:00,45,Yes,
+S000086,2026-01-06,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Short,08:00,14:00,15,Yes,
+S000087,2026-01-06,E0007,Noam Bar,Physician,Surgery,ER Wing,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000088,2026-01-06,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Evening,15:00,23:00,30,Yes,
+S000089,2026-01-06,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Evening,15:00,23:00,15,Yes,
+S000090,2026-01-06,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Day,07:00,15:00,15,No,
+S000091,2026-01-06,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Day,07:00,15:00,45,No,
+S000092,2026-01-06,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Evening,15:00,23:00,45,No,
+S000093,2026-01-06,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Short,08:00,14:00,15,Yes,
+S000094,2026-01-06,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,0,No,
+S000095,2026-01-06,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Evening,15:00,23:00,15,No,
+S000096,2026-01-06,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Day,07:00,15:00,15,Yes,
+S000097,2026-01-06,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Short,08:00,14:00,15,No,
+S000098,2026-01-06,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Night,23:00,07:00,45,No,Night shift ends next day
+S000099,2026-01-06,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Short,08:00,14:00,15,No,
+S000100,2026-01-06,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Short,08:00,14:00,30,Yes,
+S000101,2026-01-06,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000102,2026-01-06,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000103,2026-01-06,E0023,Dana Biton,Physician,Emergency,Imaging Center,Night,23:00,07:00,15,No,Night shift ends next day
+S000104,2026-01-06,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000105,2026-01-06,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Evening,15:00,23:00,15,Yes,
+S000106,2026-01-06,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Short,08:00,14:00,15,Yes,
+S000107,2026-01-06,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Day,07:00,15:00,45,No,
+S000108,2026-01-06,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Night,23:00,07:00,45,No,Night shift ends next day
+S000109,2026-01-06,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Day,07:00,15:00,15,No,
+S000110,2026-01-06,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Short,08:00,14:00,0,No,
+S000111,2026-01-06,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Short,08:00,14:00,0,No,
+S000112,2026-01-06,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Night,23:00,07:00,45,No,Night shift ends next day
+S000113,2026-01-06,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Evening,15:00,23:00,45,Yes,
+S000114,2026-01-06,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Night,23:00,07:00,45,No,Night shift ends next day
+S000115,2026-01-06,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Day,07:00,15:00,45,No,
+S000116,2026-01-06,E0036,Lior Friedman,Technician,Emergency,Main Campus,Short,08:00,14:00,15,No,
+S000117,2026-01-06,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Evening,15:00,23:00,0,No,
+S000118,2026-01-06,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Day,07:00,15:00,0,No,
+S000119,2026-01-06,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Evening,15:00,23:00,45,Yes,
+S000120,2026-01-06,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Day,07:00,15:00,30,No,
+S000121,2026-01-07,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Night,23:00,07:00,15,No,Night shift ends next day
+S000122,2026-01-07,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Night,23:00,07:00,30,No,Night shift ends next day
+S000123,2026-01-07,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Night,23:00,07:00,45,No,Night shift ends next day
+S000124,2026-01-07,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Day,07:00,15:00,45,Yes,
+S000125,2026-01-07,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Day,07:00,15:00,30,Yes,
+S000126,2026-01-07,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Day,07:00,15:00,0,Yes,
+S000127,2026-01-07,E0007,Noam Bar,Physician,Surgery,ER Wing,Evening,15:00,23:00,15,Yes,
+S000128,2026-01-07,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Evening,15:00,23:00,15,Yes,
+S000129,2026-01-07,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Short,08:00,14:00,0,Yes,
+S000130,2026-01-07,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Short,08:00,14:00,30,No,
+S000131,2026-01-07,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Evening,15:00,23:00,0,Yes,
+S000132,2026-01-07,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000133,2026-01-07,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Night,23:00,07:00,45,No,Night shift ends next day
+S000134,2026-01-07,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Evening,15:00,23:00,0,Yes,
+S000135,2026-01-07,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Day,07:00,15:00,30,Yes,
+S000136,2026-01-07,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Day,07:00,15:00,30,No,
+S000137,2026-01-07,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Night,23:00,07:00,0,No,Night shift ends next day
+S000138,2026-01-07,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Day,07:00,15:00,45,No,
+S000139,2026-01-07,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Day,07:00,15:00,45,No,
+S000140,2026-01-07,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Short,08:00,14:00,15,No,
+S000141,2026-01-07,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Evening,15:00,23:00,30,No,
+S000142,2026-01-07,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Short,08:00,14:00,45,No,
+S000143,2026-01-07,E0023,Dana Biton,Physician,Emergency,Imaging Center,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000144,2026-01-07,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000145,2026-01-07,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Short,08:00,14:00,45,No,
+S000146,2026-01-07,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Day,07:00,15:00,45,No,
+S000147,2026-01-07,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Evening,15:00,23:00,45,Yes,
+S000148,2026-01-07,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Night,23:00,07:00,30,No,Night shift ends next day
+S000149,2026-01-07,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000150,2026-01-07,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Evening,15:00,23:00,0,Yes,
+S000151,2026-01-07,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Short,08:00,14:00,45,Yes,
+S000152,2026-01-07,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Short,08:00,14:00,45,No,
+S000153,2026-01-07,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Day,07:00,15:00,0,No,
+S000154,2026-01-07,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Evening,15:00,23:00,45,Yes,
+S000155,2026-01-07,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Night,23:00,07:00,30,No,Night shift ends next day
+S000156,2026-01-07,E0036,Lior Friedman,Technician,Emergency,Main Campus,Night,23:00,07:00,45,No,Night shift ends next day
+S000157,2026-01-07,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Night,23:00,07:00,45,No,Night shift ends next day
+S000158,2026-01-07,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000159,2026-01-07,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Day,07:00,15:00,15,No,
+S000160,2026-01-07,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Day,07:00,15:00,15,Yes,
+S000161,2026-01-08,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Evening,15:00,23:00,45,No,
+S000162,2026-01-08,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000163,2026-01-08,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Night,23:00,07:00,15,No,Night shift ends next day
+S000164,2026-01-08,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Evening,15:00,23:00,30,Yes,
+S000165,2026-01-08,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Evening,15:00,23:00,30,Yes,
+S000166,2026-01-08,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Day,07:00,15:00,30,Yes,
+S000167,2026-01-08,E0007,Noam Bar,Physician,Surgery,ER Wing,Short,08:00,14:00,0,Yes,
+S000168,2026-01-08,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Night,23:00,07:00,45,No,Night shift ends next day
+S000169,2026-01-08,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Short,08:00,14:00,30,Yes,
+S000170,2026-01-08,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Day,07:00,15:00,30,No,
+S000171,2026-01-08,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Day,07:00,15:00,0,No,
+S000172,2026-01-08,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Short,08:00,14:00,0,Yes,
+S000173,2026-01-08,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Evening,15:00,23:00,15,No,
+S000174,2026-01-08,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,15,Yes,
+S000175,2026-01-08,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Short,08:00,14:00,15,No,
+S000176,2026-01-08,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Short,08:00,14:00,45,No,
+S000177,2026-01-08,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Short,08:00,14:00,30,Yes,
+S000178,2026-01-08,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Day,07:00,15:00,15,Yes,
+S000179,2026-01-08,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000180,2026-01-08,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Evening,15:00,23:00,15,Yes,
+S000181,2026-01-08,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Evening,15:00,23:00,0,No,
+S000182,2026-01-08,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Short,08:00,14:00,45,No,
+S000183,2026-01-08,E0023,Dana Biton,Physician,Emergency,Imaging Center,Day,07:00,15:00,15,No,
+S000184,2026-01-08,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000185,2026-01-08,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Evening,15:00,23:00,30,Yes,
+S000186,2026-01-08,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Short,08:00,14:00,0,Yes,
+S000187,2026-01-08,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Evening,15:00,23:00,30,Yes,
+S000188,2026-01-08,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Day,07:00,15:00,0,Yes,
+S000189,2026-01-08,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Night,23:00,07:00,30,No,Night shift ends next day
+S000190,2026-01-08,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Day,07:00,15:00,45,No,
+S000191,2026-01-08,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Short,08:00,14:00,30,No,
+S000192,2026-01-08,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Short,08:00,14:00,0,Yes,
+S000193,2026-01-08,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Short,08:00,14:00,30,No,
+S000194,2026-01-08,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Day,07:00,15:00,0,Yes,
+S000195,2026-01-08,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Day,07:00,15:00,30,Yes,
+S000196,2026-01-08,E0036,Lior Friedman,Technician,Emergency,Main Campus,Evening,15:00,23:00,45,No,
+S000197,2026-01-08,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Night,23:00,07:00,15,No,Night shift ends next day
+S000198,2026-01-08,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Short,08:00,14:00,0,No,
+S000199,2026-01-08,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Night,23:00,07:00,45,No,Night shift ends next day
+S000200,2026-01-08,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000201,2026-01-09,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Night,23:00,07:00,45,No,Night shift ends next day
+S000202,2026-01-09,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000203,2026-01-09,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Short,08:00,14:00,0,No,
+S000204,2026-01-09,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000205,2026-01-09,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Short,08:00,14:00,0,No,
+S000206,2026-01-09,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Short,08:00,14:00,0,Yes,
+S000207,2026-01-09,E0007,Noam Bar,Physician,Surgery,ER Wing,Night,23:00,07:00,45,No,Night shift ends next day
+S000208,2026-01-09,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Day,07:00,15:00,15,No,
+S000209,2026-01-09,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Evening,15:00,23:00,30,No,
+S000210,2026-01-09,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Short,08:00,14:00,0,Yes,
+S000211,2026-01-09,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Evening,15:00,23:00,15,No,
+S000212,2026-01-09,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Day,07:00,15:00,45,Yes,
+S000213,2026-01-09,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Evening,15:00,23:00,0,No,
+S000214,2026-01-09,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,15,No,
+S000215,2026-01-09,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Night,23:00,07:00,30,No,Night shift ends next day
+S000216,2026-01-09,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Short,08:00,14:00,45,Yes,
+S000217,2026-01-09,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Short,08:00,14:00,15,No,
+S000218,2026-01-09,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Evening,15:00,23:00,15,Yes,
+S000219,2026-01-09,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Night,23:00,07:00,45,No,Night shift ends next day
+S000220,2026-01-09,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Night,23:00,07:00,0,No,Night shift ends next day
+S000221,2026-01-09,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000222,2026-01-09,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Short,08:00,14:00,45,No,
+S000223,2026-01-09,E0023,Dana Biton,Physician,Emergency,Imaging Center,Night,23:00,07:00,45,No,Night shift ends next day
+S000224,2026-01-09,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000225,2026-01-09,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Short,08:00,14:00,15,No,
+S000226,2026-01-09,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Day,07:00,15:00,30,No,
+S000227,2026-01-09,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Short,08:00,14:00,45,Yes,
+S000228,2026-01-09,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Short,08:00,14:00,0,Yes,
+S000229,2026-01-09,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Night,23:00,07:00,0,No,Night shift ends next day
+S000230,2026-01-09,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Day,07:00,15:00,45,Yes,
+S000231,2026-01-09,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Evening,15:00,23:00,45,Yes,
+S000232,2026-01-09,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Day,07:00,15:00,45,No,
+S000233,2026-01-09,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000234,2026-01-09,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Night,23:00,07:00,45,No,Night shift ends next day
+S000235,2026-01-09,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Short,08:00,14:00,0,Yes,
+S000236,2026-01-09,E0036,Lior Friedman,Technician,Emergency,Main Campus,Evening,15:00,23:00,30,Yes,
+S000237,2026-01-09,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Day,07:00,15:00,45,Yes,
+S000238,2026-01-09,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Day,07:00,15:00,45,Yes,
+S000239,2026-01-09,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000240,2026-01-09,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Night,23:00,07:00,0,No,Night shift ends next day
+S000241,2026-01-10,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Night,23:00,07:00,30,No,Night shift ends next day
+S000242,2026-01-10,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Evening,15:00,23:00,15,No,
+S000243,2026-01-10,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Evening,15:00,23:00,15,Yes,
+S000244,2026-01-10,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Day,07:00,15:00,45,Yes,
+S000245,2026-01-10,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Short,08:00,14:00,15,Yes,
+S000246,2026-01-10,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Short,08:00,14:00,30,No,
+S000247,2026-01-10,E0007,Noam Bar,Physician,Surgery,ER Wing,Night,23:00,07:00,0,No,Night shift ends next day
+S000248,2026-01-10,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000249,2026-01-10,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Short,08:00,14:00,30,No,
+S000250,2026-01-10,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Short,08:00,14:00,30,No,
+S000251,2026-01-10,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Night,23:00,07:00,15,No,Night shift ends next day
+S000252,2026-01-10,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Short,08:00,14:00,0,Yes,
+S000253,2026-01-10,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Short,08:00,14:00,30,No,
+S000254,2026-01-10,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Night,23:00,07:00,0,No,Night shift ends next day
+S000255,2026-01-10,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000256,2026-01-10,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Short,08:00,14:00,30,Yes,
+S000257,2026-01-10,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000258,2026-01-10,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000259,2026-01-10,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Day,07:00,15:00,30,No,
+S000260,2026-01-10,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,30,Yes,
+S000261,2026-01-10,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Day,07:00,15:00,30,No,
+S000262,2026-01-10,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Short,08:00,14:00,15,Yes,
+S000263,2026-01-10,E0023,Dana Biton,Physician,Emergency,Imaging Center,Evening,15:00,23:00,30,No,
+S000264,2026-01-10,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Evening,15:00,23:00,30,No,
+S000265,2026-01-10,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000266,2026-01-10,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Short,08:00,14:00,0,Yes,
+S000267,2026-01-10,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Evening,15:00,23:00,45,No,
+S000268,2026-01-10,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Day,07:00,15:00,45,Yes,
+S000269,2026-01-10,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Night,23:00,07:00,0,No,Night shift ends next day
+S000270,2026-01-10,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Night,23:00,07:00,30,No,Night shift ends next day
+S000271,2026-01-10,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000272,2026-01-10,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Short,08:00,14:00,0,No,
+S000273,2026-01-10,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Evening,15:00,23:00,0,No,
+S000274,2026-01-10,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000275,2026-01-10,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Evening,15:00,23:00,0,Yes,
+S000276,2026-01-10,E0036,Lior Friedman,Technician,Emergency,Main Campus,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000277,2026-01-10,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Day,07:00,15:00,15,Yes,
+S000278,2026-01-10,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Short,08:00,14:00,45,No,
+S000279,2026-01-10,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Short,08:00,14:00,15,No,
+S000280,2026-01-10,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Day,07:00,15:00,45,No,
+S000281,2026-01-11,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Night,23:00,07:00,0,No,Night shift ends next day
+S000282,2026-01-11,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Evening,15:00,23:00,45,No,
+S000283,2026-01-11,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Evening,15:00,23:00,30,Yes,
+S000284,2026-01-11,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000285,2026-01-11,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Short,08:00,14:00,30,Yes,
+S000286,2026-01-11,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Day,07:00,15:00,45,Yes,
+S000287,2026-01-11,E0007,Noam Bar,Physician,Surgery,ER Wing,Evening,15:00,23:00,0,Yes,
+S000288,2026-01-11,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000289,2026-01-11,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Evening,15:00,23:00,0,Yes,
+S000290,2026-01-11,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Evening,15:00,23:00,15,No,
+S000291,2026-01-11,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Evening,15:00,23:00,0,No,
+S000292,2026-01-11,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Evening,15:00,23:00,15,No,
+S000293,2026-01-11,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Evening,15:00,23:00,0,Yes,
+S000294,2026-01-11,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Evening,15:00,23:00,0,No,
+S000295,2026-01-11,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Evening,15:00,23:00,30,Yes,
+S000296,2026-01-11,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Evening,15:00,23:00,30,Yes,
+S000297,2026-01-11,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Evening,15:00,23:00,45,Yes,
+S000298,2026-01-11,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Day,07:00,15:00,45,No,
+S000299,2026-01-11,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Night,23:00,07:00,0,No,Night shift ends next day
+S000300,2026-01-11,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Evening,15:00,23:00,0,No,
+S000301,2026-01-11,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Short,08:00,14:00,0,Yes,
+S000302,2026-01-11,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Short,08:00,14:00,45,No,
+S000303,2026-01-11,E0023,Dana Biton,Physician,Emergency,Imaging Center,Day,07:00,15:00,45,No,
+S000304,2026-01-11,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Day,07:00,15:00,0,No,
+S000305,2026-01-11,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Evening,15:00,23:00,0,Yes,
+S000306,2026-01-11,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Night,23:00,07:00,30,No,Night shift ends next day
+S000307,2026-01-11,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Night,23:00,07:00,45,No,Night shift ends next day
+S000308,2026-01-11,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Day,07:00,15:00,0,Yes,
+S000309,2026-01-11,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Short,08:00,14:00,45,Yes,
+S000310,2026-01-11,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Short,08:00,14:00,30,No,
+S000311,2026-01-11,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Short,08:00,14:00,45,Yes,
+S000312,2026-01-11,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Night,23:00,07:00,45,No,Night shift ends next day
+S000313,2026-01-11,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000314,2026-01-11,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Short,08:00,14:00,0,Yes,
+S000315,2026-01-11,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Day,07:00,15:00,0,No,
+S000316,2026-01-11,E0036,Lior Friedman,Technician,Emergency,Main Campus,Day,07:00,15:00,30,Yes,
+S000317,2026-01-11,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Day,07:00,15:00,30,Yes,
+S000318,2026-01-11,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Short,08:00,14:00,30,No,
+S000319,2026-01-11,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Day,07:00,15:00,30,No,
+S000320,2026-01-11,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000321,2026-01-12,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Evening,15:00,23:00,45,Yes,
+S000322,2026-01-12,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Day,07:00,15:00,30,No,
+S000323,2026-01-12,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Day,07:00,15:00,30,Yes,
+S000324,2026-01-12,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Short,08:00,14:00,0,No,
+S000325,2026-01-12,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Day,07:00,15:00,15,No,
+S000326,2026-01-12,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Night,23:00,07:00,30,No,Night shift ends next day
+S000327,2026-01-12,E0007,Noam Bar,Physician,Surgery,ER Wing,Day,07:00,15:00,15,Yes,
+S000328,2026-01-12,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Short,08:00,14:00,0,Yes,
+S000329,2026-01-12,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Day,07:00,15:00,0,Yes,
+S000330,2026-01-12,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Short,08:00,14:00,45,No,
+S000331,2026-01-12,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Night,23:00,07:00,15,No,Night shift ends next day
+S000332,2026-01-12,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000333,2026-01-12,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Day,07:00,15:00,15,Yes,
+S000334,2026-01-12,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,0,No,
+S000335,2026-01-12,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Short,08:00,14:00,45,No,
+S000336,2026-01-12,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Short,08:00,14:00,45,No,
+S000337,2026-01-12,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Evening,15:00,23:00,0,No,
+S000338,2026-01-12,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Short,08:00,14:00,0,No,
+S000339,2026-01-12,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Short,08:00,14:00,30,Yes,
+S000340,2026-01-12,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Evening,15:00,23:00,45,Yes,
+S000341,2026-01-12,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Day,07:00,15:00,15,No,
+S000342,2026-01-12,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Evening,15:00,23:00,15,No,
+S000343,2026-01-12,E0023,Dana Biton,Physician,Emergency,Imaging Center,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000344,2026-01-12,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Day,07:00,15:00,45,No,
+S000345,2026-01-12,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Evening,15:00,23:00,15,No,
+S000346,2026-01-12,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Evening,15:00,23:00,30,Yes,
+S000347,2026-01-12,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Short,08:00,14:00,0,No,
+S000348,2026-01-12,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Day,07:00,15:00,45,Yes,
+S000349,2026-01-12,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Night,23:00,07:00,45,No,Night shift ends next day
+S000350,2026-01-12,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Short,08:00,14:00,30,Yes,
+S000351,2026-01-12,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Short,08:00,14:00,0,No,
+S000352,2026-01-12,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Evening,15:00,23:00,45,No,
+S000353,2026-01-12,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Day,07:00,15:00,45,Yes,
+S000354,2026-01-12,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Evening,15:00,23:00,45,No,
+S000355,2026-01-12,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Day,07:00,15:00,45,No,
+S000356,2026-01-12,E0036,Lior Friedman,Technician,Emergency,Main Campus,Night,23:00,07:00,15,No,Night shift ends next day
+S000357,2026-01-12,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Evening,15:00,23:00,0,Yes,
+S000358,2026-01-12,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Evening,15:00,23:00,30,No,
+S000359,2026-01-12,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Evening,15:00,23:00,15,Yes,
+S000360,2026-01-12,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Evening,15:00,23:00,30,Yes,
+S000361,2026-01-13,E0001,Lior Cohen,Paramedic,Radiology,Outpatient Clinic,Evening,15:00,23:00,15,Yes,
+S000362,2026-01-13,E0002,Erez Mizrahi,Paramedic,Gastroenterology,Imaging Center,Evening,15:00,23:00,45,No,
+S000363,2026-01-13,E0003,Amit Sharabi,Reception,Gastroenterology,Main Campus,Short,08:00,14:00,30,No,
+S000364,2026-01-13,E0004,Amit Peretz,Physician,Pediatrics,Imaging Center,Evening,15:00,23:00,45,Yes,
+S000365,2026-01-13,E0005,Noam Nissim,Physician,Surgery,Imaging Center,Short,08:00,14:00,45,No,
+S000366,2026-01-13,E0006,Neta Peretz,Reception,Pediatrics,Endoscopy Unit,Night,23:00,07:00,0,No,Night shift ends next day
+S000367,2026-01-13,E0007,Noam Bar,Physician,Surgery,ER Wing,Day,07:00,15:00,30,No,
+S000368,2026-01-13,E0008,Roni Biton,Physician,Emergency,Endoscopy Unit,Short,08:00,14:00,0,Yes,
+S000369,2026-01-13,E0009,Lior Levi,Reception,Gastroenterology,Endoscopy Unit,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000370,2026-01-13,E0010,Tal Sharabi,Technician,Gastroenterology,ER Wing,Day,07:00,15:00,45,No,
+S000371,2026-01-13,E0011,Lior Azulay,Nurse,Pediatrics,Endoscopy Unit,Day,07:00,15:00,45,Yes,
+S000372,2026-01-13,E0012,Tal Sharabi,Physician,Surgery,Main Campus,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000373,2026-01-13,E0013,Yael Ben-David,Physician,Radiology,Main Campus,Day,07:00,15:00,45,Yes,
+S000374,2026-01-13,E0014,Erez Halevi,Nurse,Internal Medicine,Endoscopy Unit,Night,23:00,07:00,0,Yes,Night shift ends next day
+S000375,2026-01-13,E0015,Yuval Ben-David,Technician,Emergency,Endoscopy Unit,Day,07:00,15:00,15,No,
+S000376,2026-01-13,E0016,Tal Peretz,Paramedic,Radiology,Main Campus,Short,08:00,14:00,15,No,
+S000377,2026-01-13,E0017,Itay Nissim,Paramedic,Emergency,Outpatient Clinic,Night,23:00,07:00,30,No,Night shift ends next day
+S000378,2026-01-13,E0018,Yuval Azulay,Technician,Surgery,Imaging Center,Short,08:00,14:00,30,Yes,
+S000379,2026-01-13,E0019,Erez Ben-David,Technician,Gastroenterology,Outpatient Clinic,Night,23:00,07:00,0,No,Night shift ends next day
+S000380,2026-01-13,E0020,Yael Bar,Technician,Internal Medicine,Endoscopy Unit,Day,07:00,15:00,45,No,
+S000381,2026-01-13,E0021,Amit Peretz,Phlebotomist,Surgery,Endoscopy Unit,Night,23:00,07:00,15,No,Night shift ends next day
+S000382,2026-01-13,E0022,Shira Ben-David,Reception,Internal Medicine,ER Wing,Day,07:00,15:00,15,No,
+S000383,2026-01-13,E0023,Dana Biton,Physician,Emergency,Imaging Center,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000384,2026-01-13,E0024,Maya Amir,Phlebotomist,Internal Medicine,Imaging Center,Day,07:00,15:00,30,No,
+S000385,2026-01-13,E0025,Gal Friedman,Physician,Emergency,Imaging Center,Night,23:00,07:00,15,Yes,Night shift ends next day
+S000386,2026-01-13,E0026,Adi Levi,Nurse,Gastroenterology,Outpatient Clinic,Short,08:00,14:00,30,Yes,
+S000387,2026-01-13,E0027,Itay Bar,Paramedic,Internal Medicine,Imaging Center,Night,23:00,07:00,30,Yes,Night shift ends next day
+S000388,2026-01-13,E0028,Amit Azulay,Reception,Pediatrics,ER Wing,Evening,15:00,23:00,30,No,
+S000389,2026-01-13,E0029,Maya Nissim,Nurse,Surgery,Main Campus,Evening,15:00,23:00,15,Yes,
+S000390,2026-01-13,E0030,Maya Bar,Paramedic,Radiology,Main Campus,Evening,15:00,23:00,0,No,
+S000391,2026-01-13,E0031,Omer Azulay,Physician,Internal Medicine,Main Campus,Day,07:00,15:00,0,No,
+S000392,2026-01-13,E0032,Maya Nissim,Physician,Pediatrics,Main Campus,Evening,15:00,23:00,45,Yes,
+S000393,2026-01-13,E0033,Omer Halevi,Paramedic,Pediatrics,Imaging Center,Evening,15:00,23:00,15,Yes,
+S000394,2026-01-13,E0034,Shira Mizrahi,Technician,Emergency,Imaging Center,Short,08:00,14:00,0,No,
+S000395,2026-01-13,E0035,Noam Sharabi,Technician,Internal Medicine,Main Campus,Night,23:00,07:00,15,No,Night shift ends next day
+S000396,2026-01-13,E0036,Lior Friedman,Technician,Emergency,Main Campus,Night,23:00,07:00,45,Yes,Night shift ends next day
+S000397,2026-01-13,E0037,Erez Sharabi,Nurse,Gastroenterology,ER Wing,Evening,15:00,23:00,30,No,
+S000398,2026-01-13,E0038,Amit Bar,Phlebotomist,Emergency,Outpatient Clinic,Evening,15:00,23:00,30,No,
+S000399,2026-01-13,E0039,Adi Nissim,Physician,Radiology,Imaging Center,Short,08:00,14:00,30,No,
+S000400,2026-01-13,E0040,Neta Peretz,Phlebotomist,Surgery,Outpatient Clinic,Short,08:00,14:00,15,Yes,
