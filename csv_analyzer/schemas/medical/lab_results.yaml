@@ -1,0 +1,248 @@
+name: lab_results
+vertical: medical
+version: "1.0"
+description: "Laboratory test results, lab work, diagnostic test outcomes, specimen analysis"
+
+fields:
+  - name: result_id
+    type: string
+    required: true
+    description: "Unique identifier for the lab result or specimen"
+    aliases:
+      - specimen_id
+      - lab_id
+      - test_id
+      - id
+      - record_id
+      - accession_number
+      - sample_id
+      # Hebrew
+      - מזהה_בדיקה
+      - מספר_בדיקה
+      - מזהה_תוצאה
+      # Spanish
+      - id_resultado
+      - id_muestra
+      # Arabic
+      - معرف_النتيجة
+      # Russian
+      - id_результата
+      # French
+      - id_resultat
+    embedding_text: "result specimen lab test identifier ID accession number unique sample resultado מזהה результат معرف"
+
+  - name: patient_id
+    type: string
+    required: true
+    description: "Patient identifier for whom the test was performed"
+    aliases:
+      - patient
+      - patient_mrn
+      - mrn
+      - pt_id
+      - patient_num
+      - patient_number
+      # Hebrew
+      - מספר_מטופל
+      - מזהה_מטופל
+      # Spanish
+      - id_paciente
+      # Arabic
+      - رقم_المريض
+      # Russian
+      - id_пациента
+      # French
+      - id_patient
+    embedding_text: "patient person medical record number MRN identifier paciente מטופל пациент مريض"
+
+  - name: test_code
+    type: string
+    required: true
+    description: "Laboratory test code or identifier (LOINC, local codes)"
+    aliases:
+      - test_cd
+      - lab_code
+      - code
+      - loinc_code
+      - test_type
+      - analysis_code
+      # Hebrew
+      - קוד_בדיקה
+      - קוד
+      # Spanish
+      - codigo_prueba
+      # Arabic
+      - رمز_الفحص
+      # Russian
+      - код_анализа
+      # French
+      - code_analyse
+    embedding_text: "test code LOINC laboratory identifier type analysis codigo קוד код رمز"
+
+  - name: test_name
+    type: string
+    required: false
+    description: "Human readable name of the laboratory test"
+    aliases:
+      - test_description
+      - name
+      - description
+      - test
+      - lab_test
+      - analysis_name
+      # Hebrew
+      - שם_בדיקה
+      - תיאור_בדיקה
+      # Spanish
+      - nombre_prueba
+      # Arabic
+      - اسم_الفحص
+      # Russian
+      - название_анализа
+      # French
+      - nom_analyse
+    embedding_text: "test name description laboratory what panel analysis nombre שם название اسم"
+
+  - name: result_value
+    type: string
+    required: true
+    description: "The actual result value of the test"
+    aliases:
+      - value
+      - result
+      - outcome
+      - finding
+      - measurement
+      # Hebrew
+      - תוצאה
+      - ערך
+      # Spanish
+      - valor
+      - resultado
+      # Arabic
+      - قيمة
+      - نتيجة
+      # Russian
+      - значение
+      - результат
+      # French
+      - valeur
+      - resultat
+    embedding_text: "result value outcome finding measurement valor תוצאה значение قيمة"
+
+  - name: result_unit
+    type: string
+    required: false
+    description: "Unit of measurement for the result"
+    aliases:
+      - units
+      - unit
+      - uom
+      - measurement_unit
+      # Hebrew
+      - יחידות
+      - יחידה
+      # Spanish
+      - unidad
+      - unidades
+      # Arabic
+      - وحدة
+      # Russian
+      - единица
+      # French
+      - unite
+    embedding_text: "unit measurement mg dL mL units unidad יחידה единица وحدة"
+
+  - name: reference_range
+    type: string
+    required: false
+    description: "Normal reference range for the test"
+    aliases:
+      - ref_range
+      - normal_range
+      - range
+      - reference
+      - normal_values
+      # Hebrew
+      - טווח_תקין
+      - טווח_נורמלי
+      # Spanish
+      - rango_referencia
+      - valores_normales
+      # Arabic
+      - النطاق_المرجعي
+      # Russian
+      - референсный_диапазон
+      # French
+      - valeurs_reference
+    embedding_text: "reference range normal expected values limits rango טווח диапазон نطاق"
+
+  - name: collected_at
+    type: datetime
+    required: true
+    description: "Date and time when the specimen was collected"
+    aliases:
+      - collection_time
+      - collection_date
+      - collected
+      - specimen_date
+      - draw_time
+      - sample_time
+      # Hebrew
+      - זמן_דגימה
+      - תאריך_דגימה
+      # Spanish
+      - fecha_recoleccion
+      - hora_muestra
+      # Arabic
+      - وقت_الجمع
+      # Russian
+      - время_сбора
+      # French
+      - date_prelevement
+    embedding_text: "collection collected specimen draw sample date time when recoleccion דגימה сбор جمع"
+
+  - name: resulted_at
+    type: datetime
+    required: false
+    description: "Date and time when the result was finalized"
+    aliases:
+      - result_time
+      - result_date
+      - finalized
+      - reported
+      - verified_time
+      # Hebrew
+      - זמן_תוצאה
+      - תאריך_תוצאה
+      # Spanish
+      - fecha_resultado
+      # Arabic
+      - وقت_النتيجة
+      # Russian
+      - время_результата
+      # French
+      - date_resultat
+    embedding_text: "result reported finalized available date time when resultado תוצאה результат نتيجة"
+
+  - name: status
+    type: string
+    required: false
+    description: "Status of the result (final, preliminary, corrected)"
+    aliases:
+      - result_status
+      - flag
+      - state
+      - abnormal_flag
+      # Hebrew
+      - סטטוס
+      - מצב
+      # Spanish
+      - estado
+      # Arabic
+      - الحالة
+      # Russian
+      - статус
+      # French
+      - statut
+    embedding_text: "status final preliminary corrected pending state flag estado סטטוס статус حالة"

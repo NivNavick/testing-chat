@@ -3,6 +3,10 @@ CSV Classification Engine.
 
 Classifies unknown CSVs by finding similar ground truth examples
 using embedding similarity search.
+
+Supports two modes:
+1. Basic: Document-level similarity only (PostgreSQL)
+2. Hybrid: Document + Column-level scoring (PostgreSQL + ChromaDB)
 """
 
 import logging
@@ -70,6 +74,83 @@ class ClassificationResult:
         return (
             f"ClassificationResult(document_type={self.document_type!r}, "
             f"vertical={self.vertical!r}, confidence={self.confidence:.2f})"
+        )
+
+
+class HybridClassificationResult:
+    """Result of hybrid CSV classification with detailed scoring breakdown."""
+    
+    def __init__(
+        self,
+        document_type: Optional[str],
+        vertical: Optional[str],
+        final_score: float,
+        document_score: float,
+        column_score: float,
+        coverage_score: float,
+        suggested_mappings: Dict[str, Dict[str, Any]],
+        all_scores: Dict[str, Dict[str, float]],
+        similar_examples: List[Dict],
+        column_profiles: List[Dict],
+        text_representation: str,
+    ):
+        self.document_type = document_type
+        self.vertical = vertical
+        self.final_score = final_score
+        self.document_score = document_score
+        self.column_score = column_score
+        self.coverage_score = coverage_score
+        self.suggested_mappings = suggested_mappings
+        self.all_scores = all_scores
+        self.similar_examples = similar_examples
+        self.column_profiles = column_profiles
+        self.text_representation = text_representation
+    
+    @classmethod
+    def empty(cls, column_profiles: List[Dict], text_repr: str) -> "HybridClassificationResult":
+        """Create an empty result for error cases."""
+        return cls(
+            document_type=None,
+            vertical=None,
+            final_score=0.0,
+            document_score=0.0,
+            column_score=0.0,
+            coverage_score=0.0,
+            suggested_mappings={},
+            all_scores={},
+            similar_examples=[],
+            column_profiles=column_profiles,
+            text_representation=text_repr,
+        )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "document_type": self.document_type,
+            "vertical": self.vertical,
+            "scores": {
+                "final": self.final_score,
+                "document_similarity": self.document_score,
+                "column_matching": self.column_score,
+                "field_coverage": self.coverage_score,
+            },
+            "suggested_mappings": self.suggested_mappings,
+            "all_document_type_scores": self.all_scores,
+            "similar_examples": self.similar_examples,
+            "column_profiles": [
+                {
+                    "column_name": p["column_name"],
+                    "detected_type": p["detected_type"],
+                    "sample_values": p.get("sample_values", [])[:5],
+                }
+                for p in self.column_profiles
+            ],
+        }
+    
+    def __repr__(self):
+        return (
+            f"HybridClassificationResult(document_type={self.document_type!r}, "
+            f"final_score={self.final_score:.2f}, "
+            f"doc={self.document_score:.2f}, col={self.column_score:.2f}, cov={self.coverage_score:.2f})"
         )
 
 
@@ -236,6 +317,109 @@ class ClassificationEngine:
         
         result.suggested_mappings = enhanced_mappings
         return result
+    
+    def classify_hybrid(
+        self,
+        csv_file: Union[str, Path, BinaryIO, pd.DataFrame],
+        vertical: Optional[str] = None,
+        k: int = 5,
+    ) -> "HybridClassificationResult":
+        """
+        Classify CSV using hybrid scoring (document + column level).
+        
+        This method combines:
+        1. Document-level similarity from PostgreSQL ground truth
+        2. Column-level matching from ChromaDB schema embeddings
+        3. Required field coverage scoring
+        
+        Returns a HybridClassificationResult with detailed scoring breakdown.
+        """
+        from csv_analyzer.core.schema_embeddings import get_schema_embeddings_service
+        from csv_analyzer.engines.scoring_engine import ScoringEngine
+        
+        logger.info(f"Hybrid classification: {csv_file if not isinstance(csv_file, pd.DataFrame) else 'DataFrame'}")
+        
+        # 1. Load CSV if needed
+        if isinstance(csv_file, pd.DataFrame):
+            df = csv_file
+        elif isinstance(csv_file, (str, Path)):
+            df = pd.read_csv(csv_file)
+        else:
+            df = pd.read_csv(csv_file)
+        
+        # 2. Profile columns
+        column_profiles = profile_dataframe(df)
+        logger.info(f"Profiled {len(column_profiles)} columns")
+        
+        # 3. Generate text representation and query embedding
+        text_repr = csv_to_text_representation(column_profiles)
+        query_embedding = self._create_query_embedding(text_repr)
+        
+        if query_embedding is None:
+            logger.error("Failed to generate embedding")
+            return HybridClassificationResult.empty(column_profiles, text_repr)
+        
+        # 4. Get document-level similarity results from PostgreSQL
+        vertical_id = None
+        if vertical:
+            v = VerticalRepository.get_by_name(vertical)
+            if v:
+                vertical_id = v["id"]
+        
+        similar = GroundTruthRepository.find_similar(
+            query_embedding=np.array(query_embedding),
+            vertical_id=vertical_id,
+            limit=k,
+        )
+        
+        if not similar:
+            logger.warning("No similar ground truth records found")
+            return HybridClassificationResult.empty(column_profiles, text_repr)
+        
+        logger.info(f"Found {len(similar)} similar ground truth records")
+        
+        # 5. Get schema embeddings service and ensure schemas are indexed
+        schema_service = get_schema_embeddings_service(self.embeddings_client)
+        schema_service.index_all_schemas()  # No-op if already indexed
+        
+        # 6. Run hybrid scoring
+        scoring_engine = ScoringEngine(schema_service)
+        scoring_result = scoring_engine.score(
+            column_profiles=column_profiles,
+            document_similarity_results=similar,
+            vertical=vertical,
+        )
+        
+        logger.info(
+            f"Hybrid classification: {scoring_result.document_type} "
+            f"(final={scoring_result.final_score:.2f}, "
+            f"doc={scoring_result.document_score:.2f}, "
+            f"col={scoring_result.column_score:.2f}, "
+            f"cov={scoring_result.coverage_score:.2f})"
+        )
+        
+        # 7. Build result
+        return HybridClassificationResult(
+            document_type=scoring_result.document_type,
+            vertical=scoring_result.vertical,
+            final_score=scoring_result.final_score,
+            document_score=scoring_result.document_score,
+            column_score=scoring_result.column_score,
+            coverage_score=scoring_result.coverage_score,
+            suggested_mappings=scoring_result.suggested_mappings,
+            all_scores=scoring_result.all_scores,
+            similar_examples=[
+                {
+                    "external_id": r["external_id"],
+                    "document_type": r["document_type"],
+                    "vertical": r["vertical"],
+                    "similarity": round(r.get("similarity", 0), 3),
+                }
+                for r in similar
+            ],
+            column_profiles=column_profiles,
+            text_representation=text_repr,
+        )
     
     def _create_query_embedding(self, text: str) -> Optional[List[float]]:
         """
