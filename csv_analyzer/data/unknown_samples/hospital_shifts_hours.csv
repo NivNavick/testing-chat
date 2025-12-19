@@ -1,0 +1,26 @@
+record_id,staff_name,staff_id,dept,work_date,clock_in,clock_out,dur_hrs,shift_category,is_supervisor
+SH001,Dr. Sarah Cohen,EMP001,Emergency,15/01/2026,07:00,15:00,8.0,Day,Yes
+SH002,Nurse David Levi,EMP002,Pediatrics,15/01/2026,07:30,19:30,12.0,Day,No
+SH003,Dr. Michael Rubin,EMP003,Surgery,15/01/2026,14:00,22:00,8.0,Evening,Yes
+SH004,Nurse Rachel Green,EMP004,ICU,15/01/2026,19:00,07:00,12.0,Night,No
+SH005,Dr. Daniel Shapira,EMP005,Cardiology,15/01/2026,08:00,14:00,6.0,Short,No
+SH006,Nurse Yael Mizrahi,EMP006,Emergency,15/01/2026,15:00,23:00,8.0,Evening,No
+SH007,Dr. Avi Goldstein,EMP007,Neurology,16/01/2026,07:00,15:00,8.0,Day,Yes
+SH008,Nurse Tamar Rosenberg,EMP008,Oncology,16/01/2026,06:00,18:00,12.0,Day,No
+SH009,Dr. Noam Berkowitz,EMP009,Radiology,16/01/2026,14:00,22:00,8.0,Evening,No
+SH010,Nurse Maya Stein,EMP010,Maternity,16/01/2026,22:00,06:00,8.0,Night,No
+SH011,Dr. Eitan Feldman,EMP011,Emergency,16/01/2026,08:00,12:00,4.0,Short,No
+SH012,Nurse Shira Abramov,EMP012,Pediatrics,16/01/2026,12:00,20:00,8.0,Evening,Yes
+SH013,Dr. Alon Carmel,EMP013,Surgery,17/01/2026,07:00,19:00,12.0,Day,No
+SH014,Nurse Noa Peretz,EMP014,ICU,17/01/2026,19:00,07:00,12.0,Night,Yes
+SH015,Dr. Gil Navon,EMP015,Cardiology,17/01/2026,07:30,15:30,8.0,Day,No
+SH016,Nurse Hila Katz,EMP016,Emergency,17/01/2026,15:00,23:00,8.0,Evening,No
+SH017,Dr. Oren Dayan,EMP017,Neurology,17/01/2026,23:00,07:00,8.0,Night,No
+SH018,Nurse Michal Levy,EMP018,Oncology,18/01/2026,06:00,14:00,8.0,Day,No
+SH019,Dr. Yuval Segal,EMP019,Radiology,18/01/2026,14:00,20:00,6.0,Evening,No
+SH020,Nurse Inbar Cohen,EMP020,Maternity,18/01/2026,20:00,08:00,12.0,Night,Yes
+SH021,Dr. Rotem Ashkenazi,EMP021,Emergency,18/01/2026,07:00,15:00,8.0,Day,No
+SH022,Nurse Lior Golan,EMP022,Pediatrics,18/01/2026,15:00,23:00,8.0,Evening,No
+SH023,Dr. Tomer Avraham,EMP023,Surgery,19/01/2026,07:00,15:00,8.0,Day,Yes
+SH024,Nurse Gal Friedman,EMP024,ICU,19/01/2026,15:00,23:00,8.0,Evening,No
+SH025,Dr. Yonatan Rosen,EMP025,Cardiology,19/01/2026,23:00,07:00,8.0,Night,No
