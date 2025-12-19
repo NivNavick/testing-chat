@@ -4,6 +4,12 @@ version: "1.0"
 description: "Employee work schedules, shift assignments, staff rosters, nursing schedules"
 
 fields:
+  - name: shift_id
+    type: string
+    required: false
+    description: "Unique identifier for this shift record or schedule entry"
+    embedding_text: "shift record schedule unique identifier ID number"
+
   - name: employee_id
     type: string
     required: true
