@@ -5,6 +5,7 @@ Combines document-level similarity (PostgreSQL) with column-level matching (Chro
 to produce a final classification score.
 
 Supports OpenAI fallback for columns that can't be confidently mapped by embeddings.
+Supports transformation detection for unit/format conversions.
 """
 
 import logging
@@ -18,6 +19,14 @@ if TYPE_CHECKING:
     from csv_analyzer.services.openai_fallback import OpenAIFallbackService
 
 logger = logging.getLogger(__name__)
+
+# Import transformation detection (optional - graceful degradation)
+try:
+    from csv_analyzer.transformations.detector import detect_transformation, TransformationResult
+    TRANSFORMATIONS_AVAILABLE = True
+except ImportError:
+    TRANSFORMATIONS_AVAILABLE = False
+    logger.debug("Transformations module not available")
 
 
 @dataclass
@@ -365,12 +374,24 @@ class ScoringEngine:
                 suggestions[col_name] = self._no_mapping()
             else:
                 # Good match (no verification needed in normal mode)
-                suggestions[col_name] = {
+                suggestion = {
                     "target_field": best["field_name"],
                     "confidence": best_confidence,
                     "field_type": best["field_type"],
                     "required": best["required"],
                 }
+                
+                # Check for transformation needs
+                transformation = self._detect_transformation_for_match(
+                    col_name=col_name,
+                    profile=profile,
+                    target_field=best["field_name"],
+                    vertical=self._get_vertical_from_doc_type(winning_doc_type),
+                )
+                if transformation:
+                    suggestion["transformation"] = transformation
+                
+                suggestions[col_name] = suggestion
         
         # Handle verify-all mode
         if columns_to_verify:
@@ -385,10 +406,12 @@ class ScoringEngine:
                     sample_values=col_info["sample_values"],
                     candidates=col_info["candidates"],
                     document_type=winning_doc_type or "unknown",
+                    schema_registry=self.schema_registry,
+                    vertical=self._get_vertical_from_doc_type(winning_doc_type),
                 )
                 
                 if result.get("target_field"):
-                    suggestions[col_name] = {
+                    suggestion = {
                         "target_field": result["target_field"],
                         "confidence": result.get("confidence", 0.8),
                         "field_type": result.get("field_type"),
@@ -397,6 +420,18 @@ class ScoringEngine:
                         "attempts": result.get("attempts", 1),
                         "reason": result.get("reason", ""),
                     }
+                    
+                    # Check for transformation needs
+                    transformation = self._detect_transformation_for_match(
+                        col_name=col_name,
+                        profile=profile_lookup.get(col_name, {}),
+                        target_field=result["target_field"],
+                        vertical=self._get_vertical_from_doc_type(winning_doc_type),
+                    )
+                    if transformation:
+                        suggestion["transformation"] = transformation
+                    
+                    suggestions[col_name] = suggestion
                 else:
                     suggestions[col_name] = {
                         "target_field": None,
@@ -419,7 +454,7 @@ class ScoringEngine:
             # Merge fallback results
             for col_name, result in fallback_results.items():
                 if result.get("target_field"):
-                    suggestions[col_name] = {
+                    suggestion = {
                         "target_field": result["target_field"],
                         "confidence": result.get("confidence", 0.75),
                         "field_type": result.get("field_type"),
@@ -428,6 +463,18 @@ class ScoringEngine:
                         "openai_confidence": result.get("openai_confidence", "medium"),
                         "reason": result.get("reason", ""),
                     }
+                    
+                    # Check for transformation needs
+                    transformation = self._detect_transformation_for_match(
+                        col_name=col_name,
+                        profile=profile_lookup.get(col_name, {}),
+                        target_field=result["target_field"],
+                        vertical=self._get_vertical_from_doc_type(winning_doc_type),
+                    )
+                    if transformation:
+                        suggestion["transformation"] = transformation
+                    
+                    suggestions[col_name] = suggestion
                     logger.info(f"OpenAI fallback mapped '{col_name}' → '{result['target_field']}'")
         elif unmapped_columns:
             logger.debug(f"{len(unmapped_columns)} columns remain unmapped (OpenAI fallback not available)")
@@ -495,3 +542,79 @@ class ScoringEngine:
                 return vertical
         
         return "medical"  # Default
+    
+    def _get_vertical_from_doc_type(self, doc_type: Optional[str]) -> str:
+        """Get vertical for a document type from schema registry."""
+        if not doc_type:
+            return "medical"
+        
+        for vertical, schemas in self.schema_registry.schemas.items():
+            if doc_type in schemas:
+                return vertical
+        
+        return "medical"
+    
+    def _detect_transformation_for_match(
+        self,
+        col_name: str,
+        profile: Dict[str, Any],
+        target_field: str,
+        vertical: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Detect if a transformation is needed for a column-to-field match.
+        
+        Args:
+            col_name: Source column name
+            profile: Column profile with sample values
+            target_field: Target field name
+            vertical: Vertical (e.g., "medical")
+            
+        Returns:
+            Transformation info dict or None if no transformation needed
+        """
+        if not TRANSFORMATIONS_AVAILABLE:
+            return None
+        
+        # Find all schemas in the vertical and look for the target field
+        schemas = self.schema_registry.get_schemas_by_vertical(vertical)
+        
+        for schema in schemas:
+            field = schema.get_field(target_field)
+            if field is None:
+                continue
+            
+            # Check if field has unit requirements
+            if field.target_unit and field.accepts_units:
+                # Get OpenAI client for unit detection if available
+                openai_client = None
+                if self.openai_fallback and self.openai_fallback.is_available:
+                    openai_client = getattr(self.openai_fallback, '_client', None)
+                
+                # Detect transformation
+                result = detect_transformation(
+                    column_name=col_name,
+                    sample_values=profile.get("sample_values", [])[:5],
+                    target_field=target_field,
+                    target_unit=field.target_unit,
+                    accepts_units=field.accepts_units,
+                    openai_client=openai_client,
+                )
+                
+                if result.needs_transformation and result.transformation:
+                    logger.info(
+                        f"🔄 Transformation detected: '{col_name}' needs "
+                        f"{result.source_unit} → {result.target_unit} "
+                        f"({result.transformation.formula_description})"
+                    )
+                    return result.to_dict()
+            
+            # Check if field has format requirements
+            if field.target_format and field.accepts_formats:
+                # TODO: Implement format detection
+                pass
+            
+            # Found the field, no need to check other schemas
+            break
+        
+        return None

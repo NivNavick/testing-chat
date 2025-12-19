@@ -65,6 +65,8 @@ class OpenAIClient:
         proposed_field: str,
         field_description: str,
         document_type: str,
+        accepts_units: Optional[List[str]] = None,
+        target_unit: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Verify if a proposed mapping is semantically correct.
@@ -76,14 +78,31 @@ class OpenAIClient:
             proposed_field: The field we're proposing to map to
             field_description: Description of the proposed field
             document_type: Target document type
+            accepts_units: Optional list of units the target field can accept (with conversion)
+            target_unit: Optional target unit the field expects
             
         Returns:
             {
                 "is_correct": bool,
-                "reason": "explanation"
+                "reason": "explanation",
+                "needs_transformation": bool (if unit conversion needed)
             }
         """
         samples_str = ", ".join(str(v) for v in sample_values[:5])
+        
+        # Build transformation context if available
+        transformation_context = ""
+        if accepts_units and target_unit:
+            other_units = [u for u in accepts_units if u != target_unit]
+            if other_units:
+                transformation_context = f"""
+IMPORTANT - UNIT CONVERSION SUPPORT:
+The target field "{proposed_field}" expects data in {target_unit}, but ALSO ACCEPTS:
+- {', '.join(other_units)}
+If the source column contains data in any of these units ({', '.join(other_units)}), 
+it IS a valid match because the system will automatically convert to {target_unit}.
+For example: if source is in "hours" and target expects "minutes", this is VALID (will multiply by 60).
+"""
         
         prompt = f"""Verify if this column mapping is semantically correct for a {document_type} document.
 
@@ -92,7 +111,7 @@ CONTEXT: This is a {document_type} document. Consider domain-specific terminolog
 - In shift schedules: "entry time", "arrival time", "clock in" = shift_start  
 - In medical records: "performer", "provider", "doctor" = the person who did the action
 - Column names may be in any language (Hebrew, Spanish, etc.)
-
+{transformation_context}
 SOURCE COLUMN:
 - Name: {column_name}
 - Type: {column_type}
@@ -107,12 +126,14 @@ Question: In the context of {document_type}, does "{column_name}" map to "{propo
 Be PRACTICAL, not overly strict:
 - Accept if the concepts are equivalent in this domain
 - Accept translations and synonyms (exit time = shift end)
-- Reject only if there's a CLEAR semantic mismatch (e.g., "break_minutes" vs "total_shift_duration")
+- Accept if the data represents the same concept but in different units (hours vs minutes for duration)
+- Reject only if there's a CLEAR semantic mismatch (e.g., "break_minutes" vs "shift_end_time")
 
 Respond with JSON:
 {{
     "is_correct": true or false,
-    "reason": "brief explanation"
+    "reason": "brief explanation",
+    "needs_transformation": true or false (set to true if unit conversion is needed)
 }}"""
 
         try:

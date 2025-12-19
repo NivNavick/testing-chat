@@ -22,6 +22,12 @@ class SchemaField:
         # All aliases in any language go in the same list
         self.aliases = data.get("aliases", [])
         self.embedding_text = data.get("embedding_text", "")
+        
+        # Unit/format transformation support
+        self.target_unit = data.get("target_unit")  # e.g., "minutes"
+        self.accepts_units = data.get("accepts_units", [])  # e.g., ["minutes", "hours", "seconds"]
+        self.target_format = data.get("target_format")  # e.g., "YYYY-MM-DD"
+        self.accepts_formats = data.get("accepts_formats", [])  # e.g., ["DD/MM/YYYY", "MM/DD/YYYY"]
     
     def get_embedding_text(self) -> str:
         """

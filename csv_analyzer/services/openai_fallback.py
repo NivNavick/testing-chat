@@ -68,6 +68,8 @@ class OpenAIFallbackService:
         sample_values: List[str],
         candidates: List[Dict[str, Any]],
         document_type: str,
+        schema_registry: Optional[Any] = None,
+        vertical: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Verify candidates one by one until finding a correct match.
@@ -78,6 +80,8 @@ class OpenAIFallbackService:
             sample_values: Sample values from column
             candidates: List of candidate fields from embeddings (ordered by similarity)
             document_type: Target document type
+            schema_registry: Optional schema registry for transformation info
+            vertical: Optional vertical for schema lookup
             
         Returns:
             {
@@ -110,7 +114,18 @@ class OpenAIFallbackService:
             field_name = candidate.get("field_name")
             field_description = candidate.get("description", "")
             
-            # Verify with OpenAI
+            # Get transformation info from schema if available
+            accepts_units = None
+            target_unit = None
+            if schema_registry and vertical:
+                schema = schema_registry.get_schema(vertical, document_type)
+                if schema:
+                    field = schema.get_field(field_name)
+                    if field:
+                        accepts_units = getattr(field, 'accepts_units', None)
+                        target_unit = getattr(field, 'target_unit', None)
+            
+            # Verify with OpenAI (including transformation context)
             result = self._client.verify_mapping(
                 column_name=column_name,
                 column_type=column_type,
@@ -118,6 +133,8 @@ class OpenAIFallbackService:
                 proposed_field=field_name,
                 field_description=field_description,
                 document_type=document_type,
+                accepts_units=accepts_units,
+                target_unit=target_unit,
             )
             
             if result.get("is_correct"):
@@ -132,7 +149,8 @@ class OpenAIFallbackService:
                     "required": candidate.get("required", False),
                     "source": "openai_verified",
                     "attempts": attempt,
-                    "reason": result.get("reason", "Verified by OpenAI")
+                    "reason": result.get("reason", "Verified by OpenAI"),
+                    "needs_transformation": result.get("needs_transformation", False),
                 }
             else:
                 logger.info(

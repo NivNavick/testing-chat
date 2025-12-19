@@ -49,6 +49,13 @@ fields:
     type: date
     required: true
     description: "The calendar date when the shift occurs"
+    # Format transformation support
+    target_format: "YYYY-MM-DD"
+    accepts_formats:
+      - "YYYY-MM-DD"
+      - "DD/MM/YYYY"
+      - "MM/DD/YYYY"
+      - "DD-MM-YYYY"
     aliases:
       - work_date
       - schedule_date
@@ -134,6 +141,12 @@ fields:
     type: integer
     required: false
     description: "Total duration of the shift in minutes or hours worked"
+    # Unit transformation support
+    target_unit: minutes
+    accepts_units:
+      - minutes
+      - hours
+      - seconds
     aliases:
       - duration
       - hours_worked

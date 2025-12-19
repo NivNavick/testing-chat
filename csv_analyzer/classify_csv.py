@@ -319,6 +319,22 @@ def print_hybrid_result(result):
                 conf_icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(openai_confidence, "⚪")
                 print(f"      {conf_icon} OpenAI confidence: {openai_confidence}")
             
+            # Show transformation info if needed
+            transformation = mapping.get("transformation")
+            if transformation and transformation.get("needs_transformation"):
+                source_unit = transformation.get("source_unit", "?")
+                target_unit = transformation.get("target_unit", "?")
+                formula = transformation.get("formula", "?")
+                func_name = transformation.get("transform_function", "?")
+                trans_conf = transformation.get("confidence", "medium")
+                trans_reason = transformation.get("reason", "")
+                
+                conf_icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(trans_conf, "⚪")
+                print(f"      🔄 Transform: {source_unit} → {target_unit} ({formula})")
+                print(f"         Function: {func_name}")
+                if trans_reason:
+                    print(f"         {conf_icon} {trans_reason}")
+            
             # Show candidates for this column
             candidates = column_candidates.get(source, [])
             if candidates:
