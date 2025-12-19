@@ -161,6 +161,9 @@ class ClassificationEngine:
     Uses embedding similarity to find the most similar ground truth examples
     and aggregates their document types via weighted voting.
     
+    Supports OpenAI fallback for columns that can't be confidently mapped
+    by embeddings alone.
+    
     Usage:
         engine = ClassificationEngine(embeddings_client)
         
@@ -168,16 +171,30 @@ class ClassificationEngine:
         print(result.document_type)  # "employee_shifts"
         print(result.confidence)     # 0.89
         print(result.suggested_mappings)  # {"emp_id": {"target": "employee_id", ...}}
+        
+        # With OpenAI fallback for unmapped columns
+        from csv_analyzer.services.openai_fallback import create_fallback_service
+        fallback = create_fallback_service()
+        engine = ClassificationEngine(embeddings_client, openai_fallback=fallback)
     """
     
-    def __init__(self, embeddings_client: MultilingualEmbeddingsClient):
+    def __init__(
+        self,
+        embeddings_client: MultilingualEmbeddingsClient,
+        openai_fallback=None,
+        openai_verify_all: bool = False,
+    ):
         """
         Initialize the classification engine.
         
         Args:
             embeddings_client: Multilingual embeddings client
+            openai_fallback: Optional OpenAI fallback service for unmapped columns
+            openai_verify_all: If True, verify ALL matches with OpenAI (not just low-confidence)
         """
         self.embeddings_client = embeddings_client
+        self.openai_fallback = openai_fallback
+        self.openai_verify_all = openai_verify_all
     
     def classify(
         self,
@@ -382,8 +399,12 @@ class ClassificationEngine:
         schema_service = get_schema_embeddings_service(self.embeddings_client)
         schema_service.index_all_schemas()  # No-op if already indexed
         
-        # 6. Run hybrid scoring
-        scoring_engine = ScoringEngine(schema_service)
+        # 6. Run hybrid scoring (with optional OpenAI fallback/verification)
+        scoring_engine = ScoringEngine(
+            schema_service,
+            openai_fallback=self.openai_fallback,
+            openai_verify_all=self.openai_verify_all,
+        )
         scoring_result = scoring_engine.score(
             column_profiles=column_profiles,
             document_similarity_results=similar,

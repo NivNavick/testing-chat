@@ -3,14 +3,19 @@ Hybrid Scoring Engine.
 
 Combines document-level similarity (PostgreSQL) with column-level matching (ChromaDB)
 to produce a final classification score.
+
+Supports OpenAI fallback for columns that can't be confidently mapped by embeddings.
 """
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from csv_analyzer.core.schema_embeddings import SchemaEmbeddingsService
 from csv_analyzer.core.schema_registry import SchemaRegistry, get_schema_registry
+
+if TYPE_CHECKING:
+    from csv_analyzer.services.openai_fallback import OpenAIFallbackService
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +94,8 @@ class ScoringEngine:
         weight_document: float = None,
         weight_column: float = None,
         weight_coverage: float = None,
+        openai_fallback: Optional["OpenAIFallbackService"] = None,
+        openai_verify_all: bool = False,
     ):
         """
         Initialize the scoring engine.
@@ -99,6 +106,8 @@ class ScoringEngine:
             weight_document: Weight for document similarity (default 0.3)
             weight_column: Weight for column matching (default 0.5)
             weight_coverage: Weight for field coverage (default 0.2)
+            openai_fallback: Optional OpenAI fallback service for unmapped columns
+            openai_verify_all: If True, verify ALL matches with OpenAI (not just low-confidence)
         """
         self.schema_service = schema_embeddings_service
         self.schema_registry = schema_registry or get_schema_registry()
@@ -106,6 +115,9 @@ class ScoringEngine:
         self.weight_document = weight_document or self.WEIGHT_DOCUMENT
         self.weight_column = weight_column or self.WEIGHT_COLUMN
         self.weight_coverage = weight_coverage or self.WEIGHT_COVERAGE
+        
+        self.openai_fallback = openai_fallback
+        self.openai_verify_all = openai_verify_all
     
     def score(
         self,
@@ -179,10 +191,11 @@ class ScoringEngine:
                 "coverage_score": 0,
             }
         
-        # 6. Build suggested mappings
+        # 6. Build suggested mappings (with optional OpenAI fallback)
         suggested_mappings = self._build_suggested_mappings(
             column_matches=column_matches,
             winning_doc_type=winner,
+            column_profiles=column_profiles,
         )
         
         # 7. Get vertical
@@ -260,19 +273,36 @@ class ScoringEngine:
     # If best=83% and 2nd=82%, the match is ambiguous
     MIN_CONFIDENCE_GAP = 0.02
     
+    # Number of candidates to send to OpenAI fallback
+    OPENAI_TOP_K_CANDIDATES = 5
+    
     def _build_suggested_mappings(
         self,
         column_matches: Dict[str, List[Dict]],
         winning_doc_type: Optional[str],
+        column_profiles: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Dict[str, Any]]:
         """
         Build suggested column mappings for the winning document type.
         
-        Uses confidence thresholds to avoid bad mappings:
-        1. If best match < MIN_CONFIDENCE_THRESHOLD → no mapping
-        2. If gap between best and 2nd best < MIN_CONFIDENCE_GAP → ambiguous, no mapping
+        Two modes:
+        1. Normal mode (openai_verify_all=False):
+           - Only send low-confidence/ambiguous matches to OpenAI
+        
+        2. Verify-all mode (openai_verify_all=True):
+           - Verify EVERY match with OpenAI
+           - If rejected, try next candidate
+           - Ensures semantic correctness, not just similarity
         """
         suggestions = {}
+        unmapped_columns = []  # Columns to send to OpenAI fallback
+        columns_to_verify = []  # Columns to verify with OpenAI (verify-all mode)
+        
+        # Build a lookup for column profiles
+        profile_lookup = {}
+        if column_profiles:
+            for p in column_profiles:
+                profile_lookup[p.get("column_name", "")] = p
         
         for col_name, matches in column_matches.items():
             # Filter matches for winning doc type
@@ -290,16 +320,16 @@ class ScoringEngine:
             
             best = relevant_matches[0]
             best_confidence = best["similarity"]
+            needs_fallback = False
             
             # Check 1: Is confidence high enough?
             if best_confidence < self.MIN_CONFIDENCE_THRESHOLD:
                 logger.debug(f"Column '{col_name}': best match '{best['field_name']}' "
                            f"below threshold ({best_confidence:.1%} < {self.MIN_CONFIDENCE_THRESHOLD:.0%})")
-                suggestions[col_name] = self._no_mapping()
-                continue
+                needs_fallback = True
             
             # Check 2: Is there a clear winner? (sufficient gap to 2nd best)
-            if len(relevant_matches) > 1:
+            if not needs_fallback and len(relevant_matches) > 1:
                 second_best = relevant_matches[1]
                 gap = best_confidence - second_best["similarity"]
                 
@@ -309,16 +339,98 @@ class ScoringEngine:
                     logger.debug(f"Column '{col_name}': ambiguous match between "
                                f"'{best['field_name']}' ({best_confidence:.1%}) and "
                                f"'{second_best['field_name']}' ({second_best['similarity']:.1%})")
-                    suggestions[col_name] = self._no_mapping()
-                    continue
+                    needs_fallback = True
             
-            # Good match!
-            suggestions[col_name] = {
-                "target_field": best["field_name"],
-                "confidence": best_confidence,
-                "field_type": best["field_type"],
-                "required": best["required"],
-            }
+            profile = profile_lookup.get(col_name, {})
+            
+            if self.openai_verify_all and self.openai_fallback and self.openai_fallback.is_available:
+                # Verify-all mode: verify EVERY match, even high-confidence ones
+                columns_to_verify.append({
+                    "column_name": col_name,
+                    "column_type": profile.get("detected_type", "unknown"),
+                    "sample_values": profile.get("sample_values", [])[:5],
+                    "candidates": relevant_matches[:self.OPENAI_TOP_K_CANDIDATES],
+                })
+                # Placeholder - will be filled after verification
+                suggestions[col_name] = self._no_mapping()
+            elif needs_fallback:
+                # Normal mode: only fallback for low-confidence/ambiguous
+                unmapped_columns.append({
+                    "column_name": col_name,
+                    "column_type": profile.get("detected_type", "unknown"),
+                    "sample_values": profile.get("sample_values", [])[:5],
+                    "candidates": relevant_matches[:self.OPENAI_TOP_K_CANDIDATES],
+                })
+                # Placeholder - will be filled by OpenAI or left as no_mapping
+                suggestions[col_name] = self._no_mapping()
+            else:
+                # Good match (no verification needed in normal mode)
+                suggestions[col_name] = {
+                    "target_field": best["field_name"],
+                    "confidence": best_confidence,
+                    "field_type": best["field_type"],
+                    "required": best["required"],
+                }
+        
+        # Handle verify-all mode
+        if columns_to_verify:
+            logger.info(f"🔍 Verifying {len(columns_to_verify)} column mappings with OpenAI...")
+            
+            for col_info in columns_to_verify:
+                col_name = col_info["column_name"]
+                
+                result = self.openai_fallback.verify_and_find_match(
+                    column_name=col_name,
+                    column_type=col_info["column_type"],
+                    sample_values=col_info["sample_values"],
+                    candidates=col_info["candidates"],
+                    document_type=winning_doc_type or "unknown",
+                )
+                
+                if result.get("target_field"):
+                    suggestions[col_name] = {
+                        "target_field": result["target_field"],
+                        "confidence": result.get("confidence", 0.8),
+                        "field_type": result.get("field_type"),
+                        "required": result.get("required", False),
+                        "source": result.get("source", "openai_verified"),
+                        "attempts": result.get("attempts", 1),
+                        "reason": result.get("reason", ""),
+                    }
+                else:
+                    suggestions[col_name] = {
+                        "target_field": None,
+                        "confidence": 0.0,
+                        "field_type": None,
+                        "required": False,
+                        "source": "openai_verified",
+                        "reason": result.get("reason", "No valid match found"),
+                    }
+        
+        # Handle normal fallback mode for unmapped columns
+        elif unmapped_columns and self.openai_fallback and self.openai_fallback.is_available:
+            logger.info(f"Sending {len(unmapped_columns)} unmapped columns to OpenAI fallback")
+            
+            fallback_results = self.openai_fallback.process_unmapped_columns(
+                unmapped_columns=unmapped_columns,
+                document_type=winning_doc_type or "unknown",
+            )
+            
+            # Merge fallback results
+            for col_name, result in fallback_results.items():
+                if result.get("target_field"):
+                    suggestions[col_name] = {
+                        "target_field": result["target_field"],
+                        "confidence": result.get("confidence", 0.75),
+                        "field_type": result.get("field_type"),
+                        "required": result.get("required", False),
+                        "source": "openai_fallback",
+                        "openai_confidence": result.get("openai_confidence", "medium"),
+                        "reason": result.get("reason", ""),
+                    }
+                    logger.info(f"OpenAI fallback mapped '{col_name}' → '{result['target_field']}'")
+        elif unmapped_columns:
+            logger.debug(f"{len(unmapped_columns)} columns remain unmapped (OpenAI fallback not available)")
         
         return suggestions
     

@@ -12,6 +12,9 @@ Usage:
     # Classify with vertical filter
     python classify_csv.py --csv data/unknown_file.csv --vertical medical
     
+    # Classify with OpenAI fallback for unmapped columns
+    python classify_csv.py --csv data/unknown_file.csv --hybrid --openai-fallback
+    
     # Output as JSON
     python classify_csv.py --csv data/unknown_file.csv --json
 """
@@ -19,6 +22,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -78,7 +82,36 @@ def classify_csv(args):
         return 1
     
     # Create classification engine
-    engine = ClassificationEngine(embeddings_client)
+    openai_fallback = None
+    openai_verify_all = getattr(args, 'openai_verify', False)
+    
+    # Enable OpenAI if either fallback or verify mode is requested
+    if getattr(args, 'openai_fallback', False) or openai_verify_all:
+        try:
+            from csv_analyzer.services.openai_fallback import create_fallback_service
+            openai_fallback = create_fallback_service(
+                api_key=getattr(args, 'openai_key', None),  # Use key from args if provided
+                model=getattr(args, 'openai_model', 'gpt-4o-mini'),
+                enabled=True,
+            )
+            if openai_fallback.is_available:
+                if openai_verify_all:
+                    logger.info("🔍 OpenAI verify-all mode enabled (will verify every mapping)")
+                else:
+                    logger.info("OpenAI fallback enabled")
+            else:
+                logger.warning("OpenAI requested but not available (provide --openai-key or set OPENAI_API_KEY)")
+                openai_fallback = None
+                openai_verify_all = False
+        except Exception as e:
+            logger.warning(f"Failed to initialize OpenAI: {e}")
+            openai_verify_all = False
+    
+    engine = ClassificationEngine(
+        embeddings_client,
+        openai_fallback=openai_fallback,
+        openai_verify_all=openai_verify_all,
+    )
     
     # Classify
     logger.info(f"Classifying: {args.csv}")
@@ -379,6 +412,31 @@ def main():
         "--hybrid",
         action="store_true",
         help="Use hybrid scoring: document similarity (PostgreSQL) + column matching (ChromaDB)"
+    )
+    parser.add_argument(
+        "--openai-fallback",
+        action="store_true",
+        dest="openai_fallback",
+        help="Use OpenAI as fallback for columns that can't be mapped by embeddings"
+    )
+    parser.add_argument(
+        "--openai-verify",
+        action="store_true",
+        dest="openai_verify",
+        help="Verify ALL column mappings with OpenAI (rejects wrong matches, tries next candidate)"
+    )
+    parser.add_argument(
+        "--openai-key",
+        type=str,
+        dest="openai_key",
+        help="OpenAI API key (or set OPENAI_API_KEY env var)"
+    )
+    parser.add_argument(
+        "--openai-model",
+        type=str,
+        default="gpt-4o-mini",
+        dest="openai_model",
+        help="OpenAI model to use for fallback/verify (default: gpt-4o-mini)"
     )
     parser.add_argument(
         "--json",
