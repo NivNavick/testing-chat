@@ -286,6 +286,12 @@ def print_hybrid_result(result):
             conf_str = f"{conf:.0%}" if conf > 0 else "-"
             required = "⚡" if mapping.get("required") else ""
             
+            # Get OpenAI-related info
+            mapping_source = mapping.get("source", "embeddings")
+            openai_reason = mapping.get("reason", "")
+            openai_attempts = mapping.get("attempts")
+            openai_confidence = mapping.get("openai_confidence", "")
+            
             # Color code by confidence
             if conf >= 0.8:
                 status = "✅"
@@ -294,7 +300,24 @@ def print_hybrid_result(result):
             else:
                 status = "❓"
             
-            print(f"\n  {source:<23} {'→':<3} {target:<21}{required} {conf_str:<8} {status}")
+            # Add source indicator
+            if mapping_source == "openai_verified":
+                source_tag = " [OpenAI verified]"
+            elif mapping_source == "openai_fallback":
+                source_tag = " [OpenAI fallback]"
+            else:
+                source_tag = ""
+            
+            print(f"\n  {source:<23} {'→':<3} {target:<21}{required} {conf_str:<8} {status}{source_tag}")
+            
+            # Show OpenAI reasoning if available
+            if openai_reason:
+                print(f"      💬 OpenAI: {openai_reason}")
+            if openai_attempts:
+                print(f"      🔄 Attempts: {openai_attempts} candidate(s) tried")
+            if openai_confidence:
+                conf_icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(openai_confidence, "⚪")
+                print(f"      {conf_icon} OpenAI confidence: {openai_confidence}")
             
             # Show candidates for this column
             candidates = column_candidates.get(source, [])
@@ -333,23 +356,34 @@ def print_hybrid_result(result):
                         marker = "→" if is_selected else " "
                         req_icon = "⚡" if req else ""
                         
-                        # Add reasoning
+                        # Add reasoning based on embedding threshold
                         if i == 0:  # Best candidate
                             if similarity >= 0.82:
-                                reason = "✓ above threshold"
+                                emb_reason = "✓ above threshold"
                             else:
-                                reason = "✗ below 82% threshold"
+                                emb_reason = "✗ below 82% threshold"
                         elif i == 1 and len(relevant_candidates) > 1:
                             gap = relevant_candidates[0]["similarity"] - similarity
                             if gap < 0.02:
-                                reason = f"⚠ ambiguous (gap {gap:.1%})"
+                                emb_reason = f"⚠ ambiguous (gap {gap:.1%})"
                             else:
-                                reason = ""
+                                emb_reason = ""
                         else:
-                            reason = ""
+                            emb_reason = ""
                         
-                        reason_str = f"  {reason}" if reason else ""
-                        print(f"      {marker} {i+1}. {field_name:<18} {similarity:>5.1%} {req_icon:<2}{reason_str}")
+                        # Show if this was rejected/accepted by OpenAI
+                        if mapping_source in ("openai_verified", "openai_fallback"):
+                            if is_selected:
+                                openai_status = " ← accepted"
+                            elif i < (openai_attempts or 1):
+                                openai_status = " ← rejected"
+                            else:
+                                openai_status = ""
+                        else:
+                            openai_status = ""
+                        
+                        reason_str = f"  {emb_reason}" if emb_reason else ""
+                        print(f"      {marker} {i+1}. {field_name:<18} {similarity:>5.1%} {req_icon:<2}{reason_str}{openai_status}")
                 else:
                     # Show all candidates if none match winning doc type
                     print("      Candidates (other doc types):")
