@@ -93,6 +93,7 @@ class HybridClassificationResult:
         similar_examples: List[Dict],
         column_profiles: List[Dict],
         text_representation: str,
+        column_candidates: Optional[Dict[str, List[Dict]]] = None,
     ):
         self.document_type = document_type
         self.vertical = vertical
@@ -105,6 +106,7 @@ class HybridClassificationResult:
         self.similar_examples = similar_examples
         self.column_profiles = column_profiles
         self.text_representation = text_representation
+        self.column_candidates = column_candidates or {}
     
     @classmethod
     def empty(cls, column_profiles: List[Dict], text_repr: str) -> "HybridClassificationResult":
@@ -121,9 +123,23 @@ class HybridClassificationResult:
             similar_examples=[],
             column_profiles=column_profiles,
             text_representation=text_repr,
+            column_candidates={},
         )
     
     def to_dict(self) -> Dict[str, Any]:
+        # Convert column_candidates to serializable format
+        candidates_dict = {}
+        for col_name, candidates in self.column_candidates.items():
+            candidates_dict[col_name] = [
+                {
+                    "target_field": c.target_field if hasattr(c, 'target_field') else c.get("field_name"),
+                    "similarity": c.similarity if hasattr(c, 'similarity') else c.get("similarity", 0),
+                    "document_type": c.document_type if hasattr(c, 'document_type') else c.get("document_type"),
+                    "required": c.required if hasattr(c, 'required') else c.get("required", False),
+                }
+                for c in candidates[:5]  # Limit to top 5 candidates
+            ]
+        
         return {
             "document_type": self.document_type,
             "vertical": self.vertical,
@@ -134,6 +150,7 @@ class HybridClassificationResult:
                 "field_coverage": self.coverage_score,
             },
             "suggested_mappings": self.suggested_mappings,
+            "column_candidates": candidates_dict,
             "all_document_type_scores": self.all_scores,
             "similar_examples": self.similar_examples,
             "column_profiles": [
@@ -440,6 +457,7 @@ class ClassificationEngine:
             ],
             column_profiles=column_profiles,
             text_representation=text_repr,
+            column_candidates=scoring_result.column_matches,
         )
     
     def _create_query_embedding(self, text: str) -> Optional[List[float]]:

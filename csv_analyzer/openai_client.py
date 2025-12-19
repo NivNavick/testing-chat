@@ -85,7 +85,13 @@ class OpenAIClient:
         """
         samples_str = ", ".join(str(v) for v in sample_values[:5])
         
-        prompt = f"""Verify if this column mapping is semantically correct:
+        prompt = f"""Verify if this column mapping is semantically correct for a {document_type} document.
+
+CONTEXT: This is a {document_type} document. Consider domain-specific terminology:
+- In shift schedules: "exit time", "departure time", "clock out" = shift_end
+- In shift schedules: "entry time", "arrival time", "clock in" = shift_start  
+- In medical records: "performer", "provider", "doctor" = the person who did the action
+- Column names may be in any language (Hebrew, Spanish, etc.)
 
 SOURCE COLUMN:
 - Name: {column_name}
@@ -95,14 +101,13 @@ SOURCE COLUMN:
 PROPOSED MAPPING:
 - Target field: {proposed_field}
 - Field description: {field_description}
-- Document type: {document_type}
 
-Is "{column_name}" a correct match for "{proposed_field}"?
+Question: In the context of {document_type}, does "{column_name}" map to "{proposed_field}"?
 
-Consider:
-1. Do the sample values match what the field expects?
-2. Does the column NAME semantically match the field meaning?
-3. Is there a conceptual mismatch? (e.g., "break_minutes" vs "duration_minutes")
+Be PRACTICAL, not overly strict:
+- Accept if the concepts are equivalent in this domain
+- Accept translations and synonyms (exit time = shift end)
+- Reject only if there's a CLEAR semantic mismatch (e.g., "break_minutes" vs "total_shift_duration")
 
 Respond with JSON:
 {{
@@ -286,16 +291,21 @@ Respond with JSON:
 You will be given:
 1. A source column with its name, type, and sample values
 2. A list of candidate target fields (pre-filtered by semantic similarity)
+3. The document type context (e.g., employee_shifts, medical_actions)
 
 Your job is to:
-1. Analyze the column name and sample values
-2. Determine if any candidate field is a good match
-3. If yes, return the field name with confidence level
-4. If no good match exists, return null
+1. Analyze the column name and sample values IN CONTEXT
+2. Consider domain-specific terminology and translations
+3. Accept matches where concepts are equivalent (e.g., "exit time" = "shift end" in schedules)
+4. Reject only clear mismatches (e.g., "break time" ≠ "total duration")
 
-Always respond in JSON format.
+IMPORTANT:
+- Column names may be in ANY language (Hebrew, Spanish, Arabic, etc.)
+- Be PRACTICAL: in real-world data, "departure time" in a shift schedule IS the shift end
+- Accept synonyms and translations
+- Don't be overly pedantic about wording
 
-Be strict: only map if there's a clear semantic match. It's better to say "no match" than to force a bad mapping."""
+Always respond in JSON format."""
 
     def _build_mapping_prompt(
         self,

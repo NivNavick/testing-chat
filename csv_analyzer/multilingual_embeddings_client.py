@@ -3,11 +3,15 @@ Multilingual embeddings client using sentence-transformers.
 Supports Hebrew, English, and 100+ other languages with good cross-language performance.
 """
 
+import os
 import logging
 import time
 import warnings
 from typing import List, Optional, Tuple
 import numpy as np
+
+# Disable tokenizers parallelism warning (must be set before importing transformers)
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 logger = logging.getLogger(__name__)
 

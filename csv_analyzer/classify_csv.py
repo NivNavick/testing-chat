@@ -270,13 +270,15 @@ def print_hybrid_result(result):
             print(f"  {i}. {ex['external_id']}")
             print(f"     Type: {ex['document_type']} | Similarity: {ex['similarity']:.1%}")
     
-    # Column mappings with improved display
+    # Column mappings with candidates displayed under each mapping
     if result.suggested_mappings:
         print("\n" + "-"*70)
         print("Suggested Column Mappings (from Schema Matching):")
         print("-"*70)
-        print(f"{'Source Column':<25} {'→':<3} {'Target Field':<25} {'Confidence':<12}")
-        print("-"*70)
+        
+        # Get candidates lookup and winning document type
+        column_candidates = getattr(result, 'column_candidates', {}) or {}
+        winning_doc_type = result.document_type
         
         for source, mapping in result.suggested_mappings.items():
             target = mapping.get("target_field") or mapping.get("target") or "(no mapping)"
@@ -292,7 +294,77 @@ def print_hybrid_result(result):
             else:
                 status = "❓"
             
-            print(f"{source:<25} {'→':<3} {target:<23}{required} {conf_str:<10} {status}")
+            print(f"\n  {source:<23} {'→':<3} {target:<21}{required} {conf_str:<8} {status}")
+            
+            # Show candidates for this column
+            candidates = column_candidates.get(source, [])
+            if candidates:
+                # Filter candidates for winning document type
+                relevant_candidates = []
+                for c in candidates:
+                    # Handle both ColumnMatch objects and dicts
+                    if hasattr(c, 'document_type'):
+                        doc_type = c.document_type
+                        field_name = c.target_field
+                        similarity = c.similarity
+                        req = c.required
+                    else:
+                        doc_type = c.get("document_type", "")
+                        field_name = c.get("field_name", c.get("target_field", ""))
+                        similarity = c.get("similarity", 0)
+                        req = c.get("required", False)
+                    
+                    if winning_doc_type and doc_type == winning_doc_type:
+                        relevant_candidates.append({
+                            "field_name": field_name,
+                            "similarity": similarity,
+                            "required": req,
+                        })
+                
+                if relevant_candidates:
+                    print("      Candidates:")
+                    for i, cand in enumerate(relevant_candidates[:5]):
+                        field_name = cand["field_name"]
+                        similarity = cand["similarity"]
+                        req = cand["required"]
+                        
+                        # Determine if this is the selected one
+                        is_selected = (field_name == target)
+                        marker = "→" if is_selected else " "
+                        req_icon = "⚡" if req else ""
+                        
+                        # Add reasoning
+                        if i == 0:  # Best candidate
+                            if similarity >= 0.82:
+                                reason = "✓ above threshold"
+                            else:
+                                reason = "✗ below 82% threshold"
+                        elif i == 1 and len(relevant_candidates) > 1:
+                            gap = relevant_candidates[0]["similarity"] - similarity
+                            if gap < 0.02:
+                                reason = f"⚠ ambiguous (gap {gap:.1%})"
+                            else:
+                                reason = ""
+                        else:
+                            reason = ""
+                        
+                        reason_str = f"  {reason}" if reason else ""
+                        print(f"      {marker} {i+1}. {field_name:<18} {similarity:>5.1%} {req_icon:<2}{reason_str}")
+                else:
+                    # Show all candidates if none match winning doc type
+                    print("      Candidates (other doc types):")
+                    for i, c in enumerate(candidates[:3]):
+                        if hasattr(c, 'target_field'):
+                            field_name = c.target_field
+                            similarity = c.similarity
+                            doc_type = c.document_type
+                        else:
+                            field_name = c.get("field_name", c.get("target_field", ""))
+                            similarity = c.get("similarity", 0)
+                            doc_type = c.get("document_type", "")
+                        print(f"        {i+1}. {field_name:<18} {similarity:>5.1%}  ({doc_type})")
+            else:
+                print("      Candidates: (none found)")
     
     # Input column profiles
     if result.column_profiles:
