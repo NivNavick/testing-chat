@@ -2,17 +2,21 @@
 ChromaDB-based schema field embeddings service.
 
 Stores embeddings of target schema fields for column-level matching.
+Supports vertical context expansion for better semantic matching.
 """
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 import chromadb
 from chromadb.config import Settings
 
 from csv_analyzer.core.schema_registry import SchemaRegistry, get_schema_registry
 from csv_analyzer.multilingual_embeddings_client import MultilingualEmbeddingsClient
+
+if TYPE_CHECKING:
+    from csv_analyzer.contexts.registry import VerticalContext
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +70,18 @@ class SchemaEmbeddingsService:
         logger.info(f"ChromaDB initialized at {persist_directory}")
         logger.info(f"Collection '{self.COLLECTION_NAME}' has {self.collection.count()} documents")
     
-    def index_all_schemas(self, force_reindex: bool = False):
+    def index_all_schemas(
+        self,
+        force_reindex: bool = False,
+        vertical_context: Optional["VerticalContext"] = None,
+    ):
         """
         Index all schema fields into ChromaDB.
         
         Args:
             force_reindex: If True, delete existing and reindex all
+            vertical_context: Optional vertical context to expand embeddings with
+                             semantic descriptions for better matching
         """
         if force_reindex:
             # Delete and recreate collection
@@ -108,6 +118,16 @@ class SchemaEmbeddingsService:
             
             # Get embedding text
             embedding_text = field.get_embedding_text()
+            
+            # Expand with vertical context if available
+            if vertical_context and vertical_context.name == vertical:
+                embedding_text = vertical_context.expand_embedding_text(
+                    field.name, embedding_text
+                )
+                logger.debug(
+                    f"Expanded '{field.name}' embedding with context: "
+                    f"{len(embedding_text)} chars"
+                )
             
             ids.append(field_id)
             documents.append(embedding_text)

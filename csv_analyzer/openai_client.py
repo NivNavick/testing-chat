@@ -67,6 +67,7 @@ class OpenAIClient:
         document_type: str,
         accepts_units: Optional[List[str]] = None,
         target_unit: Optional[str] = None,
+        vertical_context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Verify if a proposed mapping is semantically correct.
@@ -80,6 +81,7 @@ class OpenAIClient:
             document_type: Target document type
             accepts_units: Optional list of units the target field can accept (with conversion)
             target_unit: Optional target unit the field expects
+            vertical_context: Optional domain context string with terminology
             
         Returns:
             {
@@ -104,14 +106,26 @@ it IS a valid match because the system will automatically convert to {target_uni
 For example: if source is in "hours" and target expects "minutes", this is VALID (will multiply by 60).
 """
         
-        prompt = f"""Verify if this column mapping is semantically correct for a {document_type} document.
+        # Build domain context section
+        domain_context = ""
+        if vertical_context:
+            domain_context = f"""
+{vertical_context}
 
-CONTEXT: This is a {document_type} document. Consider domain-specific terminology:
+"""
+        else:
+            # Fallback to hardcoded context if no vertical context provided
+            domain_context = """CONTEXT: Consider domain-specific terminology:
 - In shift schedules: "exit time", "departure time", "clock out" = shift_end
 - In shift schedules: "entry time", "arrival time", "clock in" = shift_start  
 - In medical records: "performer", "provider", "doctor" = the person who did the action
 - Column names may be in any language (Hebrew, Spanish, etc.)
-{transformation_context}
+
+"""
+        
+        prompt = f"""Verify if this column mapping is semantically correct for a {document_type} document.
+
+{domain_context}{transformation_context}
 SOURCE COLUMN:
 - Name: {column_name}
 - Type: {column_type}

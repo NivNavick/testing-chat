@@ -17,6 +17,7 @@ from csv_analyzer.core.schema_registry import SchemaRegistry, get_schema_registr
 
 if TYPE_CHECKING:
     from csv_analyzer.services.openai_fallback import OpenAIFallbackService
+    from csv_analyzer.contexts.registry import VerticalContext
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ class ScoringEngine:
         weight_coverage: float = None,
         openai_fallback: Optional["OpenAIFallbackService"] = None,
         openai_verify_all: bool = False,
+        vertical_context: Optional["VerticalContext"] = None,
     ):
         """
         Initialize the scoring engine.
@@ -117,6 +119,7 @@ class ScoringEngine:
             weight_coverage: Weight for field coverage (default 0.2)
             openai_fallback: Optional OpenAI fallback service for unmapped columns
             openai_verify_all: If True, verify ALL matches with OpenAI (not just low-confidence)
+            vertical_context: Optional vertical context for domain terminology
         """
         self.schema_service = schema_embeddings_service
         self.schema_registry = schema_registry or get_schema_registry()
@@ -127,6 +130,7 @@ class ScoringEngine:
         
         self.openai_fallback = openai_fallback
         self.openai_verify_all = openai_verify_all
+        self.vertical_context = vertical_context
     
     def score(
         self,
@@ -408,6 +412,7 @@ class ScoringEngine:
                     document_type=winning_doc_type or "unknown",
                     schema_registry=self.schema_registry,
                     vertical=self._get_vertical_from_doc_type(winning_doc_type),
+                    vertical_context=self.vertical_context,
                 )
                 
                 if result.get("target_field"):

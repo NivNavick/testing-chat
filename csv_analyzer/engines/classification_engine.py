@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from csv_analyzer.columns_analyzer import profile_dataframe
+from csv_analyzer.contexts import get_vertical_context
 from csv_analyzer.core.text_representation import (
     csv_to_text_representation,
     column_to_embedding_text,
@@ -355,7 +356,7 @@ class ClassificationEngine:
     def classify_hybrid(
         self,
         csv_file: Union[str, Path, BinaryIO, pd.DataFrame],
-        vertical: Optional[str] = None,
+        vertical: str,
         k: int = 5,
         force_reindex: bool = False,
     ) -> "HybridClassificationResult":
@@ -366,10 +367,11 @@ class ClassificationEngine:
         1. Document-level similarity from PostgreSQL ground truth
         2. Column-level matching from ChromaDB schema embeddings
         3. Required field coverage scoring
+        4. Vertical context for enhanced semantic matching
         
         Args:
             csv_file: CSV file path, file object, or DataFrame
-            vertical: Optional vertical filter
+            vertical: Required vertical name (e.g., "medical")
             k: Number of similar examples to retrieve
             force_reindex: If True, rebuild ChromaDB schema embeddings (use after schema changes)
         
@@ -379,8 +381,20 @@ class ClassificationEngine:
         from csv_analyzer.engines.scoring_engine import ScoringEngine
         
         logger.info(f"Hybrid classification: {csv_file if not isinstance(csv_file, pd.DataFrame) else 'DataFrame'}")
+        logger.info(f"Using vertical: {vertical}")
         
-        # 1. Load CSV if needed
+        # 1. Load vertical context
+        vertical_context = get_vertical_context(vertical)
+        if vertical_context:
+            logger.info(
+                f"Loaded vertical context '{vertical}': "
+                f"{len(vertical_context.field_contexts)} field contexts, "
+                f"{len(vertical_context.terminology)} terminology entries"
+            )
+        else:
+            logger.warning(f"No vertical context found for '{vertical}' - proceeding without context expansion")
+        
+        # 2. Load CSV if needed
         if isinstance(csv_file, pd.DataFrame):
             df = csv_file
         elif isinstance(csv_file, (str, Path)):
@@ -388,11 +402,11 @@ class ClassificationEngine:
         else:
             df = pd.read_csv(csv_file)
         
-        # 2. Profile columns
+        # 3. Profile columns
         column_profiles = profile_dataframe(df)
         logger.info(f"Profiled {len(column_profiles)} columns")
         
-        # 3. Generate text representation and query embedding
+        # 4. Generate text representation and query embedding
         text_repr = csv_to_text_representation(column_profiles)
         query_embedding = self._create_query_embedding(text_repr)
         
@@ -400,12 +414,11 @@ class ClassificationEngine:
             logger.error("Failed to generate embedding")
             return HybridClassificationResult.empty(column_profiles, text_repr)
         
-        # 4. Get document-level similarity results from PostgreSQL
+        # 5. Get document-level similarity results from PostgreSQL
         vertical_id = None
-        if vertical:
-            v = VerticalRepository.get_by_name(vertical)
-            if v:
-                vertical_id = v["id"]
+        v = VerticalRepository.get_by_name(vertical)
+        if v:
+            vertical_id = v["id"]
         
         similar = GroundTruthRepository.find_similar(
             query_embedding=np.array(query_embedding),
@@ -419,15 +432,19 @@ class ClassificationEngine:
         
         logger.info(f"Found {len(similar)} similar ground truth records")
         
-        # 5. Get schema embeddings service and ensure schemas are indexed
+        # 6. Get schema embeddings service and ensure schemas are indexed with context
         schema_service = get_schema_embeddings_service(self.embeddings_client)
-        schema_service.index_all_schemas(force_reindex=force_reindex)  # Reindex if requested or no-op if already indexed
+        schema_service.index_all_schemas(
+            force_reindex=force_reindex,
+            vertical_context=vertical_context,
+        )
         
-        # 6. Run hybrid scoring (with optional OpenAI fallback/verification)
+        # 7. Run hybrid scoring (with optional OpenAI fallback/verification and context)
         scoring_engine = ScoringEngine(
             schema_service,
             openai_fallback=self.openai_fallback,
             openai_verify_all=self.openai_verify_all,
+            vertical_context=vertical_context,
         )
         scoring_result = scoring_engine.score(
             column_profiles=column_profiles,

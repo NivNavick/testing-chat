@@ -70,6 +70,7 @@ class OpenAIFallbackService:
         document_type: str,
         schema_registry: Optional[Any] = None,
         vertical: Optional[str] = None,
+        vertical_context: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Verify candidates one by one until finding a correct match.
@@ -82,6 +83,7 @@ class OpenAIFallbackService:
             document_type: Target document type
             schema_registry: Optional schema registry for transformation info
             vertical: Optional vertical for schema lookup
+            vertical_context: Optional VerticalContext for domain terminology
             
         Returns:
             {
@@ -109,6 +111,11 @@ class OpenAIFallbackService:
                 }
             return self._no_match("No candidates available")
         
+        # Get domain context for OpenAI if available
+        openai_context = None
+        if vertical_context:
+            openai_context = vertical_context.get_openai_context()
+        
         # Try each candidate in order
         for attempt, candidate in enumerate(candidates, 1):
             field_name = candidate.get("field_name")
@@ -125,7 +132,7 @@ class OpenAIFallbackService:
                         accepts_units = getattr(field, 'accepts_units', None)
                         target_unit = getattr(field, 'target_unit', None)
             
-            # Verify with OpenAI (including transformation context)
+            # Verify with OpenAI (including transformation and domain context)
             result = self._client.verify_mapping(
                 column_name=column_name,
                 column_type=column_type,
@@ -135,6 +142,7 @@ class OpenAIFallbackService:
                 document_type=document_type,
                 accepts_units=accepts_units,
                 target_unit=target_unit,
+                vertical_context=openai_context,
             )
             
             if result.get("is_correct"):

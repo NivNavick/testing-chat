@@ -1,0 +1,195 @@
+name: medical
+description: |
+  Healthcare domain including hospitals, clinics, medical practices.
+  Deals with patients, staff scheduling, lab results, procedures.
+
+# Rich semantic descriptions per target field
+# These get embedded alongside the field's embedding_text to help
+# match unknown/creative column names that aren't in explicit aliases.
+field_contexts:
+  # === Employee Shifts Schema ===
+  shift_id:
+    semantic_description: |
+      Unique identifier for a work shift record or schedule entry.
+      A reference number or code that identifies this specific shift assignment.
+    examples: [shift_id, schedule_id, roster_id, record_id, assignment_id]
+
+  employee_id:
+    semantic_description: |
+      Identifier for a person who works at the healthcare facility.
+      Could be a badge number, personnel code, staff identifier, or employee number.
+      Refers to doctors, nurses, technicians, administrative staff, or any worker.
+    examples: [employee, staff, nurse, doctor, worker, personnel, badge, emp_id]
+
+  shift_date:
+    semantic_description: |
+      The calendar date when a work shift occurs.
+      The day an employee is scheduled to work or did work.
+    examples: [date, work_date, schedule_date, duty_date, working_day]
+
+  shift_start:
+    semantic_description: |
+      The time when a work shift begins.
+      When an employee clocks in, arrives, or starts their duty.
+      The beginning of a work period.
+    examples: [start_time, clock_in, entry_time, arrival, begin, in_time]
+
+  shift_end:
+    semantic_description: |
+      The time when a work shift ends.
+      When an employee clocks out, leaves, or finishes their duty.
+      The end of a work period, departure time.
+    examples: [end_time, clock_out, exit_time, departure, finish, out_time]
+
+  duration_minutes:
+    semantic_description: |
+      Length of time for a work shift or procedure.
+      Total hours or minutes worked during a shift.
+      The duration or span of a work period.
+    examples: [duration, hours, hours_worked, length, time_worked, total_hours]
+
+  department_code:
+    semantic_description: |
+      Physical or organizational division of a healthcare facility.
+      Where staff work and patients receive care.
+      A section, area, wing, unit, ward, floor, or subdivision of a hospital or clinic.
+      Named by location (East Wing), function (ICU), floor (3rd Floor), or specialty (Cardiology).
+    examples: [department, wing, unit, ward, floor, section, area, pavilion, building]
+
+  shift_type:
+    semantic_description: |
+      Classification of a work shift by time of day or pattern.
+      Morning, day, evening, night, overnight, or rotating shift.
+      The category or kind of shift assignment.
+    examples: [type, shift_kind, shift_category, day_night, morning_evening]
+
+  employee_name:
+    semantic_description: |
+      Full name of a healthcare worker or staff member.
+      The person's name who is assigned to a shift.
+    examples: [name, full_name, staff_name, worker_name, person]
+
+  is_supervisor:
+    semantic_description: |
+      Whether an employee is a supervisor, manager, or team lead.
+      Indicates leadership or oversight responsibility during a shift.
+    examples: [supervisor, lead, manager, team_lead, in_charge, responsible]
+
+  break_minutes:
+    semantic_description: |
+      Break or rest time during a work shift.
+      Pause period, lunch break, or rest interval in minutes or hours.
+    examples: [break, break_time, rest, pause, lunch, rest_time]
+
+  # === Lab Results Schema ===
+  test_id:
+    semantic_description: |
+      Unique identifier for a laboratory test or examination.
+      A code or number that identifies a specific lab test order.
+    examples: [test_id, lab_id, exam_id, order_id, specimen_id]
+
+  patient_id:
+    semantic_description: |
+      Unique identifier for a patient receiving medical care.
+      A medical record number, patient number, or case identifier.
+    examples: [patient, patient_id, mrn, medical_record, case_id, subject]
+
+  test_code:
+    semantic_description: |
+      Standard code for a type of laboratory test.
+      LOINC code, CPT code, or internal lab test code.
+    examples: [test_code, loinc, cpt, exam_code, procedure_code]
+
+  test_name:
+    semantic_description: |
+      Name or description of a laboratory test.
+      What the test measures or examines.
+    examples: [test_name, exam_name, test_description, procedure_name]
+
+  result_value:
+    semantic_description: |
+      The measured result or outcome of a laboratory test.
+      The numeric value, reading, or measurement obtained.
+    examples: [result, value, reading, measurement, outcome, finding]
+
+  result_unit:
+    semantic_description: |
+      Unit of measurement for a lab test result.
+      Examples: mg/dL, mmol/L, cells/uL, etc.
+    examples: [unit, units, measure, uom, unit_of_measure]
+
+  reference_range:
+    semantic_description: |
+      Normal or expected range for a lab test result.
+      The values considered healthy or within normal limits.
+    examples: [range, normal_range, ref_range, expected, normal_values]
+
+  # === Medical Actions Schema ===
+  action_id:
+    semantic_description: |
+      Unique identifier for a medical action, procedure, or intervention.
+      A code or number identifying a specific medical event.
+    examples: [action_id, procedure_id, intervention_id, event_id]
+
+  action_code:
+    semantic_description: |
+      Standard code for a medical procedure or action.
+      CPT code, ICD procedure code, or internal action code.
+    examples: [action_code, procedure_code, cpt, icd, billing_code]
+
+  action_description:
+    semantic_description: |
+      Description of a medical procedure, treatment, or action.
+      What was done to or for the patient.
+    examples: [description, action_desc, procedure_desc, treatment, intervention]
+
+  performer_id:
+    semantic_description: |
+      Identifier for the healthcare provider who performed an action.
+      The doctor, nurse, or technician who carried out the procedure.
+    examples: [performer, provider, doctor, physician, clinician, practitioner]
+
+  action_datetime:
+    semantic_description: |
+      Date and time when a medical action was performed.
+      When the procedure or intervention occurred.
+    examples: [datetime, action_time, procedure_time, performed_at, event_time]
+
+  location:
+    semantic_description: |
+      Where a medical action was performed.
+      The room, clinic, department, or facility location.
+    examples: [location, room, clinic, facility, site, place, venue]
+
+# Domain-specific terminology for OpenAI prompts
+# Helps OpenAI understand medical jargon and abbreviations
+terminology:
+  # Scheduling terms
+  PRN: "As needed (pro re nata) - Latin medical term for 'when necessary'"
+  stat: "Immediately, urgently (statim) - Latin for 'at once'"
+  on-call: "Available to work if needed, standby duty"
+  rounds: "Regular visits by medical staff to check on patients"
+  handoff: "Transfer of patient care responsibility between shifts"
+  
+  # Facility terms
+  wing: "A section or wing of a hospital building (e.g., East Wing, Maternity Wing)"
+  ward: "A hospital department for specific patient care (e.g., ICU ward, pediatric ward)"
+  unit: "A specialized department or care area (e.g., cardiac unit, burn unit)"
+  floor: "A level of a hospital building, often specialized (e.g., 3rd floor surgery)"
+  pavilion: "A separate building or section of a hospital complex"
+  
+  # Staff terms
+  attending: "The physician with primary responsibility for a patient"
+  resident: "A physician in training after medical school"
+  charge_nurse: "The nurse in charge of a unit during a shift"
+  
+  # Lab terms
+  specimen: "A sample collected for laboratory testing"
+  panel: "A group of related lab tests ordered together"
+  titer: "A measurement of antibody concentration"
+  culture: "Growing microorganisms from a sample to identify infections"
+  
+  # Documentation
+  chart: "A patient's medical record"
+  orders: "Instructions from a physician for patient care"
+  consult: "A request for specialist opinion"

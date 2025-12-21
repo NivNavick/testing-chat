@@ -53,6 +53,13 @@ def classify_csv(args):
         logger.error(f"File not found: {args.csv}")
         return 1
     
+    # Vertical is required for hybrid mode
+    if args.hybrid and not args.vertical:
+        logger.error("--vertical is required for hybrid classification")
+        logger.error("Available verticals: medical")
+        logger.error("Usage: python classify_csv.py --csv <file> --hybrid --vertical medical")
+        return 1
+    
     # Initialize database
     logger.info("Connecting to database...")
     init_database(
@@ -518,7 +525,7 @@ def main():
     parser.add_argument(
         "--vertical",
         type=str,
-        help="Filter by vertical (e.g., 'medical')"
+        help="Vertical domain (e.g., 'medical'). REQUIRED for --hybrid mode."
     )
     parser.add_argument(
         "--k",
