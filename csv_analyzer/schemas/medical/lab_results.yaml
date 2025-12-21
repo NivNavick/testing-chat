@@ -16,20 +16,25 @@ fields:
       - record_id
       - accession_number
       - sample_id
+      - reading_id
       # Hebrew
       - מזהה_בדיקה
       - מספר_בדיקה
       - מזהה_תוצאה
+      - מזהה
       # Spanish
       - id_resultado
       - id_muestra
+      - resultado
       # Arabic
       - معرف_النتيجة
+      - معرف
       # Russian
       - id_результата
+      - результат
       # French
       - id_resultat
-    embedding_text: "result specimen lab test identifier ID accession number unique sample resultado מזהה результат معرف"
+    embedding_text: "result specimen lab test identifier ID accession number unique sample"
 
   - name: patient_id
     type: string
@@ -42,18 +47,23 @@ fields:
       - pt_id
       - patient_num
       - patient_number
+      - patient_name
       # Hebrew
       - מספר_מטופל
       - מזהה_מטופל
+      - מטופל
       # Spanish
       - id_paciente
+      - paciente
       # Arabic
       - رقم_المريض
+      - مريض
       # Russian
       - id_пациента
+      - пациент
       # French
       - id_patient
-    embedding_text: "patient person medical record number MRN identifier paciente מטופל пациент مريض"
+    embedding_text: "patient person medical record number MRN identifier"
 
   - name: test_code
     type: string
@@ -71,13 +81,16 @@ fields:
       - קוד
       # Spanish
       - codigo_prueba
+      - codigo
       # Arabic
       - رمز_الفحص
+      - رمز
       # Russian
       - код_анализа
+      - код
       # French
       - code_analyse
-    embedding_text: "test code LOINC laboratory identifier type analysis codigo קוד код رمز"
+    embedding_text: "test code LOINC laboratory identifier type analysis"
 
   - name: test_name
     type: string
@@ -93,15 +106,19 @@ fields:
       # Hebrew
       - שם_בדיקה
       - תיאור_בדיקה
+      - שם
       # Spanish
       - nombre_prueba
+      - nombre
       # Arabic
       - اسم_الفحص
+      - اسم
       # Russian
       - название_анализа
+      - название
       # French
       - nom_analyse
-    embedding_text: "test name description laboratory what panel analysis nombre שם название اسم"
+    embedding_text: "test name description laboratory what panel analysis"
 
   - name: result_value
     type: string
@@ -128,7 +145,7 @@ fields:
       # French
       - valeur
       - resultat
-    embedding_text: "result value outcome finding measurement valor תוצאה значение قيمة"
+    embedding_text: "result value outcome finding measurement"
 
   - name: result_unit
     type: string
@@ -151,7 +168,7 @@ fields:
       - единица
       # French
       - unite
-    embedding_text: "unit measurement mg dL mL units unidad יחידה единица وحدة"
+    embedding_text: "unit measurement mg dL mL"
 
   - name: reference_range
     type: string
@@ -166,16 +183,20 @@ fields:
       # Hebrew
       - טווח_תקין
       - טווח_נורמלי
+      - טווח
       # Spanish
       - rango_referencia
       - valores_normales
+      - rango
       # Arabic
       - النطاق_المرجعي
+      - نطاق
       # Russian
       - референсный_диапазон
+      - диапазон
       # French
       - valeurs_reference
-    embedding_text: "reference range normal expected values limits rango טווח диапазон نطاق"
+    embedding_text: "reference range normal expected values limits"
 
   - name: collected_at
     type: datetime
@@ -188,19 +209,25 @@ fields:
       - specimen_date
       - draw_time
       - sample_time
+      - reading_date
+      - reading_time
       # Hebrew
       - זמן_דגימה
       - תאריך_דגימה
+      - דגימה
       # Spanish
       - fecha_recoleccion
       - hora_muestra
+      - recoleccion
       # Arabic
       - وقت_الجمع
+      - جمع
       # Russian
       - время_сбора
+      - сбор
       # French
       - date_prelevement
-    embedding_text: "collection collected specimen draw sample date time when recoleccion דגימה сбор جمع"
+    embedding_text: "collection collected specimen draw sample date time when"
 
   - name: resulted_at
     type: datetime
@@ -223,7 +250,7 @@ fields:
       - время_результата
       # French
       - date_resultat
-    embedding_text: "result reported finalized available date time when resultado תוצאה результат نتيجة"
+    embedding_text: "result reported finalized available date time when"
 
   - name: status
     type: string
@@ -241,8 +268,52 @@ fields:
       - estado
       # Arabic
       - الحالة
+      - حالة
       # Russian
       - статус
       # French
       - statut
-    embedding_text: "status final preliminary corrected pending state flag estado סטטוס статус حالة"
+    embedding_text: "status final preliminary corrected pending state flag"
+
+  - name: ward
+    type: string
+    required: false
+    description: "Hospital ward or department where patient is located"
+    aliases:
+      - department
+      - unit
+      - location
+      - ward_name
+      # Hebrew
+      - מחלקה
+      - יחידה
+      # Spanish
+      - departamento
+      - unidad
+      # Arabic
+      - القسم
+      # Russian
+      - отделение
+      # French
+      - service
+    embedding_text: "ward department unit location hospital clinic area"
+
+  - name: nurse_id
+    type: string
+    required: false
+    description: "ID of the nurse who collected the sample or recorded the result"
+    aliases:
+      - collector_id
+      - staff_id
+      - technician_id
+      # Hebrew
+      - מזהה_אחות
+      # Spanish
+      - id_enfermera
+      # Arabic
+      - معرف_الممرض
+      # Russian
+      - id_медсестры
+      # French
+      - id_infirmier
+    embedding_text: "nurse collector staff technician phlebotomist ID"

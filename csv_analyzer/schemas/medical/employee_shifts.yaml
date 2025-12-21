@@ -8,6 +8,21 @@ fields:
     type: string
     required: false
     description: "Unique identifier for this shift record or schedule entry"
+    aliases:
+      - schedule_id
+      - roster_id
+      - record_id
+      - shift_num
+      # Hebrew
+      - מזהה_משמרת
+      # Spanish
+      - turno_id
+      # Arabic
+      - معرف_الوردية
+      # Russian
+      - id_смены
+      # French
+      - id_poste
     embedding_text: "shift record schedule unique identifier ID number"
 
   - name: employee_id
@@ -26,24 +41,32 @@ fields:
       - nrs_id
       - nurse_id
       - personnel_id
+      - personnel_no
+      - badge
+      - emp_code
       # Hebrew (עברית)
       - מספר_עובד
       - קוד_עובד
       - מזהה_עובד
+      - עובד
       # Spanish (Español)
       - numero_empleado
       - id_empleado
       - codigo_trabajador
+      - trabajador
       # Arabic (العربية)
       - رقم_الموظف
       - معرف_العامل
+      - موظف
       # Russian (Русский)
       - номер_сотрудника
       - id_работника
+      - сотрудник
       # French (Français)
       - numero_employe
       - id_employe
-    embedding_text: "employee worker staff nurse identifier ID number code unique personnel trabajador employé сотрудник עובד موظف"
+      - employé
+    embedding_text: "employee worker staff nurse identifier ID number code unique personnel"
 
   - name: shift_date
     type: date
@@ -64,6 +87,8 @@ fields:
       - dt
       - work_dt
       - working_date
+      - duty_date
+      - work_day
       # Hebrew
       - תאריך_משמרת
       - תאריך_עבודה
@@ -71,13 +96,18 @@ fields:
       # Spanish
       - fecha_turno
       - fecha_trabajo
+      - fecha
       # Arabic
       - تاريخ_الوردية
+      - تاريخ
       # Russian
       - дата_смены
+      - дата
       # French
       - date_travail
-    embedding_text: "shift work schedule date day calendar when working fecha תאריך дата تاريخ"
+      # Portuguese
+      - data
+    embedding_text: "shift work schedule date day calendar when working"
 
   - name: shift_start
     type: datetime
@@ -92,6 +122,7 @@ fields:
       - in_time
       - t_in
       - entry_time
+      - arrival
       # Hebrew
       - שעת_התחלה
       - שעת_כניסה
@@ -100,13 +131,18 @@ fields:
       # Spanish
       - hora_entrada
       - inicio_turno
+      - entrada
       # Arabic
       - وقت_البداية
+      - بداية
       # Russian
       - время_начала
+      - начало
       # French
       - heure_debut
-    embedding_text: "shift start begin clock in time entry arrival punch entrada início начало بداية התחלה"
+      # Portuguese
+      - início
+    embedding_text: "shift start begin clock in time entry arrival punch"
 
   - name: shift_end
     type: datetime
@@ -121,6 +157,7 @@ fields:
       - out_time
       - t_out
       - exit_time
+      - departure
       # Hebrew
       - שעת_סיום
       - שעת_יציאה
@@ -129,13 +166,18 @@ fields:
       # Spanish
       - hora_salida
       - fin_turno
+      - salida
       # Arabic
       - وقت_النهاية
+      - نهاية
       # Russian
       - время_окончания
+      - окончание
       # French
       - heure_fin
-    embedding_text: "shift end finish clock out time departure punch leave salida fim окончание نهاية סיום"
+      # Portuguese
+      - fim
+    embedding_text: "shift end finish clock out time departure punch leave"
 
   - name: duration_minutes
     type: integer
@@ -156,20 +198,28 @@ fields:
       - dur_hrs
       - hours
       - total_hours
+      - worked_hrs
+      - total_hrs
+      - duration_min
       # Hebrew
       - משך_משמרת
       - שעות_עבודה
       - משך
+      - שעות
       # Spanish
       - horas_trabajadas
       - duracion
+      - horas
       # Arabic
       - ساعات_العمل
+      - ساعات
       # Russian
       - часы_работы
+      - часы
       # French
       - heures_travaillees
-    embedding_text: "duration hours worked length time total shift period horas שעות часы ساعات heures"
+      - heures
+    embedding_text: "duration worked length time total shift period"
 
   - name: department_code
     type: string
@@ -182,9 +232,11 @@ fields:
       - unit
       - unit_code
       - ward
+      - wing
       - location
       - dept_cd
       - section
+      - area
       # Hebrew
       - מחלקה
       - יחידה
@@ -196,13 +248,15 @@ fields:
       # Arabic
       - القسم
       - الوحدة
+      - قسم
       # Russian
       - отделение
       - подразделение
+      - отдел
       # French
       - departement
       - service
-    embedding_text: "department unit ward section location area hospital clinic departamento מחלקה отдел قسم"
+    embedding_text: "department unit ward section location area hospital clinic"
 
   - name: shift_type
     type: string
@@ -213,15 +267,104 @@ fields:
       - shift_kind
       - shift_category
       - shift_name
+      - category
+      - shift_class
+      - assignment
       # Hebrew
       - סוג_משמרת
       - סוג
       # Spanish
       - tipo_turno
+      - turno
       # Arabic
       - نوع_الوردية
+      - نوع
       # Russian
       - тип_смены
+      - тип
       # French
       - type_poste
-    embedding_text: "shift type morning evening night day overnight category kind turno סוג тип نوع"
+    embedding_text: "shift type morning evening night day overnight category kind"
+
+  - name: employee_name
+    type: string
+    required: false
+    description: "Full name of the employee or staff member"
+    aliases:
+      - name
+      - full_name
+      - staff_name
+      - worker_name
+      - staff_member
+      # Hebrew
+      - שם_עובד
+      - שם
+      - שם_מלא
+      # Spanish
+      - nombre_empleado
+      - nombre
+      # Arabic
+      - اسم_الموظف
+      - اسم
+      # Russian
+      - имя_сотрудника
+      - имя
+      # French
+      - nom_employe
+      - nom
+    embedding_text: "employee name full name staff worker"
+
+  - name: is_supervisor
+    type: boolean
+    required: false
+    description: "Whether the employee is a supervisor or team lead for this shift"
+    aliases:
+      - supervisor
+      - is_lead
+      - team_lead
+      - lead
+      - manager
+      - is_manager
+      # Hebrew
+      - אחראי
+      - מנהל
+      # Spanish
+      - es_supervisor
+      - supervisor
+      # Arabic
+      - مشرف
+      # Russian
+      - руководитель
+      # French
+      - superviseur
+    embedding_text: "supervisor lead manager team responsible"
+
+  - name: break_minutes
+    type: integer
+    required: false
+    description: "Break time during the shift in minutes"
+    # Unit transformation support
+    target_unit: minutes
+    accepts_units:
+      - minutes
+      - hours
+    aliases:
+      - break
+      - break_time
+      - break_duration
+      - break_min
+      - break_hrs
+      - rest_time
+      # Hebrew
+      - הפסקה
+      - זמן_הפסקה
+      # Spanish
+      - descanso
+      - tiempo_descanso
+      # Arabic
+      - استراحة
+      # Russian
+      - перерыв
+      # French
+      - pause
+    embedding_text: "break rest pause time off"

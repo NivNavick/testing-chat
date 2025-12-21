@@ -20,16 +20,20 @@ fields:
       - מזהה_פעולה
       - מזהה_טיפול
       - מספר_פעולה
+      - פעולה
       # Spanish
       - id_procedimiento
       - id_accion
+      - procedimiento
       # Arabic
       - معرف_الاجراء
+      - إجراء
       # Russian
       - id_процедуры
+      - процедура
       # French
       - id_acte
-    embedding_text: "action procedure service treatment identifier ID number unique record procedimiento פעולה процедура إجراء"
+    embedding_text: "action procedure service treatment identifier ID number unique record"
 
   - name: patient_id
     type: string
@@ -50,13 +54,16 @@ fields:
       # Spanish
       - id_paciente
       - numero_paciente
+      - paciente
       # Arabic
       - رقم_المريض
+      - مريض
       # Russian
       - id_пациента
+      - пациент
       # French
       - id_patient
-    embedding_text: "patient person medical record number MRN identifier recipient paciente מטופל пациент مريض"
+    embedding_text: "patient person medical record number MRN identifier recipient"
 
   - name: performer_id
     type: string
@@ -70,20 +77,25 @@ fields:
       - staff_id
       - practitioner_id
       - clinician_id
+      - provider
       # Hebrew
       - מזהה_רופא
       - מזהה_מטפל
       - קוד_רופא
+      - רופא
       # Spanish
       - id_medico
       - id_proveedor
+      - medico
       # Arabic
       - معرف_الطبيب
+      - طبيب
       # Russian
       - id_врача
+      - врач
       # French
       - id_medecin
-    embedding_text: "performer provider physician doctor nurse practitioner healthcare worker staff medico רופא врач طبيب"
+    embedding_text: "performer provider physician doctor nurse practitioner healthcare worker staff"
 
   - name: action_code
     type: string
@@ -105,11 +117,13 @@ fields:
       - codigo
       # Arabic
       - رمز_الاجراء
+      - رمز
       # Russian
       - код_процедуры
+      - код
       # French
       - code_acte
-    embedding_text: "procedure code CPT ICD SNOMED service treatment billing codigo קוד код رمز"
+    embedding_text: "procedure code CPT ICD SNOMED service treatment billing"
 
   - name: action_name
     type: string
@@ -127,16 +141,20 @@ fields:
       - שם_פעולה
       - תיאור_פעולה
       - תיאור
+      - שם
       # Spanish
       - nombre_procedimiento
       - descripcion
+      - nombre
       # Arabic
       - اسم_الاجراء
+      - اسم
       # Russian
       - название_процедуры
+      - название
       # French
       - nom_acte
-    embedding_text: "procedure name description title action service treatment what nombre שם название اسم"
+    embedding_text: "procedure name description title action service treatment what"
 
   - name: performed_at
     type: datetime
@@ -155,16 +173,20 @@ fields:
       - תאריך_ביצוע
       - זמן_ביצוע
       - תאריך_פעולה
+      - תאריך
       # Spanish
       - fecha_procedimiento
       - fecha_hora
+      - fecha
       # Arabic
       - تاريخ_التنفيذ
+      - تاريخ
       # Russian
       - дата_выполнения
+      - дата
       # French
       - date_execution
-    embedding_text: "performed date time when action service timestamp fecha תאריך дата تاريخ"
+    embedding_text: "performed date time when action service timestamp"
 
   - name: department_code
     type: string
@@ -187,11 +209,13 @@ fields:
       - ubicacion
       # Arabic
       - القسم
+      - قسم
       # Russian
       - отделение
+      - отдел
       # French
       - departement
-    embedding_text: "department location clinic unit service area ward departamento מחלקה отдел قسم"
+    embedding_text: "department location clinic unit service area ward"
 
   - name: diagnosis_code
     type: string
@@ -212,11 +236,13 @@ fields:
       - diagnostico
       # Arabic
       - رمز_التشخيص
+      - تشخيص
       # Russian
       - код_диагноза
+      - диагноз
       # French
       - code_diagnostic
-    embedding_text: "diagnosis ICD code condition reason indication diagnostico אבחנה диагноз تشخيص"
+    embedding_text: "diagnosis ICD code condition reason indication"
 
   - name: notes
     type: string
@@ -239,4 +265,4 @@ fields:
       - примечания
       # French
       - remarques
-    embedding_text: "notes comments remarks additional information notas הערות примечания ملاحظات"
+    embedding_text: "notes comments remarks additional information"

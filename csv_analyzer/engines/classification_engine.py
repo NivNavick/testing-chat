@@ -357,6 +357,7 @@ class ClassificationEngine:
         csv_file: Union[str, Path, BinaryIO, pd.DataFrame],
         vertical: Optional[str] = None,
         k: int = 5,
+        force_reindex: bool = False,
     ) -> "HybridClassificationResult":
         """
         Classify CSV using hybrid scoring (document + column level).
@@ -365,6 +366,12 @@ class ClassificationEngine:
         1. Document-level similarity from PostgreSQL ground truth
         2. Column-level matching from ChromaDB schema embeddings
         3. Required field coverage scoring
+        
+        Args:
+            csv_file: CSV file path, file object, or DataFrame
+            vertical: Optional vertical filter
+            k: Number of similar examples to retrieve
+            force_reindex: If True, rebuild ChromaDB schema embeddings (use after schema changes)
         
         Returns a HybridClassificationResult with detailed scoring breakdown.
         """
@@ -414,7 +421,7 @@ class ClassificationEngine:
         
         # 5. Get schema embeddings service and ensure schemas are indexed
         schema_service = get_schema_embeddings_service(self.embeddings_client)
-        schema_service.index_all_schemas()  # No-op if already indexed
+        schema_service.index_all_schemas(force_reindex=force_reindex)  # Reindex if requested or no-op if already indexed
         
         # 6. Run hybrid scoring (with optional OpenAI fallback/verification)
         scoring_engine = ScoringEngine(

@@ -33,15 +33,36 @@ class SchemaField:
         """
         Get the full text to embed for this field.
         Combines name, description, aliases (all languages), and embedding hints.
+        Deduplicates tokens on-the-fly to avoid redundancy.
         The multilingual embedding model handles all languages automatically.
         """
-        parts = [
-            self.name,
-            self.description,
-            self.embedding_text,
-            " ".join(self.aliases),  # All languages included
-        ]
-        return " ".join(parts)
+        # Collect all tokens from various sources
+        all_tokens = []
+        
+        # 1. Field name (highest priority)
+        all_tokens.append(self.name)
+        
+        # 2. Add all aliases
+        all_tokens.extend(self.aliases)
+        
+        # 3. Add tokens from description
+        if self.description:
+            all_tokens.extend(self.description.split())
+        
+        # 4. Add tokens from embedding_text hints
+        if self.embedding_text:
+            all_tokens.extend(self.embedding_text.split())
+        
+        # Deduplicate while preserving order (case-insensitive comparison)
+        seen = set()
+        unique_tokens = []
+        for token in all_tokens:
+            token_lower = token.lower()
+            if token_lower not in seen:
+                seen.add(token_lower)
+                unique_tokens.append(token)
+        
+        return " ".join(unique_tokens)
     
     def __repr__(self):
         return f"SchemaField({self.name}, {self.type}, required={self.required})"

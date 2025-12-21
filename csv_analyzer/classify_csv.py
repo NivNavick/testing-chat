@@ -122,6 +122,7 @@ def classify_csv(args):
             csv_file=csv_path,
             vertical=args.vertical,
             k=args.k,
+            force_reindex=getattr(args, 'reindex', False),
         )
         # Output results
         if args.json:
@@ -564,6 +565,11 @@ def main():
         "--json",
         action="store_true",
         help="Output as JSON"
+    )
+    parser.add_argument(
+        "--reindex",
+        action="store_true",
+        help="Force reindex of schema embeddings in ChromaDB (use after schema changes)"
     )
     parser.add_argument(
         "--demo",
