@@ -221,6 +221,89 @@ fields:
       - heures
     embedding_text: "duration worked length time total shift period"
 
+  # ============================================
+  # ACTUAL (RECORDED) TIMES
+  # For systems that track actual clock in/out times
+  # ============================================
+
+  - name: actual_start
+    type: datetime
+    required: false
+    description: "Actual time when the employee clocked in / arrived"
+    aliases:
+      - actual_start
+      - real_start
+      - clock_in_time
+      - actual_in
+      - real_in
+      - recorded_start
+      # Hebrew
+      - שעת_התחלה_בפועל
+      - כניסה_בפועל
+      # Spanish
+      - inicio_real
+      - hora_entrada_real
+      # Arabic
+      - وقت_البداية_الفعلي
+      # Russian
+      - фактическое_начало
+      # French
+      - debut_reel
+    embedding_text: "actual real recorded clock in start time arrived punched"
+
+  - name: actual_end
+    type: datetime
+    required: false
+    description: "Actual time when the employee clocked out / departed"
+    aliases:
+      - actual_end
+      - real_end
+      - clock_out_time
+      - actual_out
+      - real_out
+      - recorded_end
+      # Hebrew
+      - שעת_סיום_בפועל
+      - יציאה_בפועל
+      # Spanish
+      - fin_real
+      - hora_salida_real
+      # Arabic
+      - وقت_النهاية_الفعلي
+      # Russian
+      - фактическое_окончание
+      # French
+      - fin_reel
+    embedding_text: "actual real recorded clock out end time departed punched"
+
+  - name: actual_hours
+    type: float
+    required: false
+    description: "Actual hours worked as recorded"
+    target_unit: hours
+    accepts_units:
+      - hours
+      - minutes
+    aliases:
+      - actual_hrs
+      - real_hours
+      - worked_hours
+      - recorded_hours
+      - real_duration
+      # Hebrew
+      - שעות_בפועל
+      - משך_בפועל
+      # Spanish
+      - horas_reales
+      - horas_trabajadas_reales
+      # Arabic
+      - ساعات_فعلية
+      # Russian
+      - фактические_часы
+      # French
+      - heures_reelles
+    embedding_text: "actual real recorded hours worked duration shift length"
+
   - name: department_code
     type: string
     required: false
