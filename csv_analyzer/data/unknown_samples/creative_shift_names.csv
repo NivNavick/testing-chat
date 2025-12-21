@@ -1,0 +1,12 @@
+roster_entry,personnel_badge,duty_date,duty_begins,duty_ends,time_on_floor_hrs,care_zone,work_block,team_leader
+RST-001,BADGE-4421,2024-03-15,07:00,15:30,8.5,East Pavilion,Morning,Yes
+RST-002,BADGE-4422,2024-03-15,07:30,16:00,8.5,Cardiac Wing,Morning,No
+RST-003,BADGE-4423,2024-03-15,15:00,23:30,8.5,Surgical Floor,Evening,Yes
+RST-004,BADGE-4424,2024-03-15,23:00,07:30,8.5,Emergency Bay,Night,No
+RST-005,BADGE-4425,2024-03-16,06:45,15:15,8.5,Pediatric Zone,Morning,No
+RST-006,BADGE-4426,2024-03-16,07:00,15:30,8.5,Radiology Suite,Morning,Yes
+RST-007,BADGE-4427,2024-03-16,14:45,23:15,8.5,ICU Station,Evening,No
+RST-008,BADGE-4428,2024-03-16,22:30,07:00,8.5,Labor Ward,Night,Yes
+RST-009,BADGE-4429,2024-03-17,07:15,15:45,8.5,Oncology Unit,Morning,No
+RST-010,BADGE-4430,2024-03-17,15:30,00:00,8.5,Neurology Section,Evening,No
+
