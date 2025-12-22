@@ -235,7 +235,14 @@ class ScoringEngine:
         # Convert to suggested mappings format
         suggested_mappings = resolution_result.to_suggested_mappings()
         
-        # 7. Get vertical
+        # 7. Apply transformation detection to final mappings
+        suggested_mappings = self._apply_transformations(
+            suggested_mappings=suggested_mappings,
+            column_profiles=column_profiles,
+            winning_doc_type=winner,
+        )
+        
+        # 8. Get vertical
         winning_vertical = self._get_vertical_for_doc_type(winner, vertical, document_similarity_results)
         
         return ScoringResult(
@@ -424,16 +431,26 @@ class ScoringEngine:
                 
                 if result.get("target_field"):
                     # Update the match with OpenAI's verified result
-                    # Insert at front with boosted confidence
+                    # BOOST confidence since OpenAI confirmed it's correct
+                    # Original embedding confidence might be below threshold (e.g., 81.4%)
+                    # but OpenAI verification means we should trust it
+                    original_confidence = result.get("confidence", 0.8)
+                    boosted_confidence = max(original_confidence, 0.90)  # At least 90% if OpenAI verified
+                    
                     verified_match = {
                         "field_name": result["target_field"],
-                        "similarity": result.get("confidence", 0.9),
+                        "similarity": boosted_confidence,
                         "document_type": winning_doc_type,
                         "field_type": result.get("field_type"),
                         "required": result.get("required", False),
                         "source": "openai_verified",
                         "reason": result.get("reason", ""),
+                        "original_confidence": original_confidence,  # Keep for transparency
                     }
+                    logger.info(
+                        f"OpenAI verified '{col_name}' → '{result['target_field']}' "
+                        f"(boosted {original_confidence:.0%} → {boosted_confidence:.0%})"
+                    )
                     # Put verified match first
                     enhanced_matches[col_name] = [verified_match] + [
                         m for m in enhanced_matches.get(col_name, [])
@@ -452,20 +469,28 @@ class ScoringEngine:
             for col_name, result in fallback_results.items():
                 if result.get("target_field"):
                     # Insert OpenAI's suggestion at front
+                    # Boost confidence since OpenAI suggested it
+                    original_confidence = result.get("confidence", 0.75)
+                    boosted_confidence = max(original_confidence, 0.85)  # At least 85% for fallback
+                    
                     fallback_match = {
                         "field_name": result["target_field"],
-                        "similarity": result.get("confidence", 0.75),
+                        "similarity": boosted_confidence,
                         "document_type": winning_doc_type,
                         "field_type": result.get("field_type"),
                         "required": result.get("required", False),
                         "source": "openai_fallback",
                         "reason": result.get("reason", ""),
+                        "original_confidence": original_confidence,
                     }
                     enhanced_matches[col_name] = [fallback_match] + [
                         m for m in enhanced_matches.get(col_name, [])
                         if m.get("field_name") != result["target_field"]
                     ]
-                    logger.info(f"OpenAI fallback mapped '{col_name}' → '{result['target_field']}'")
+                    logger.info(
+                        f"OpenAI fallback mapped '{col_name}' → '{result['target_field']}' "
+                        f"(boosted {original_confidence:.0%} → {boosted_confidence:.0%})"
+                    )
         
         return enhanced_matches
     
@@ -522,6 +547,61 @@ class ScoringEngine:
                 return vertical
         
         return "medical"  # Default
+    
+    def _apply_transformations(
+        self,
+        suggested_mappings: Dict[str, Dict[str, Any]],
+        column_profiles: List[Dict[str, Any]],
+        winning_doc_type: Optional[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Apply transformation detection to all suggested mappings.
+        
+        This runs AFTER conflict resolution to detect unit/format transformations
+        needed for each mapping (e.g., hours → minutes).
+        
+        Args:
+            suggested_mappings: Mappings from conflict resolver
+            column_profiles: Column profiles with sample values
+            winning_doc_type: The document type that won classification
+            
+        Returns:
+            Updated mappings with transformation info added
+        """
+        if not TRANSFORMATIONS_AVAILABLE:
+            return suggested_mappings
+        
+        # Build profile lookup
+        profile_lookup = {}
+        for p in column_profiles:
+            profile_lookup[p.get("column_name", "")] = p
+        
+        # Get vertical for transformation detection
+        vertical = self._get_vertical_from_doc_type(winning_doc_type)
+        
+        # Check each mapping for transformation needs
+        for col_name, mapping in suggested_mappings.items():
+            target_field = mapping.get("target_field")
+            
+            if not target_field:
+                continue  # No mapping, skip
+            
+            if mapping.get("transformation"):
+                continue  # Already has transformation, skip
+            
+            profile = profile_lookup.get(col_name, {})
+            
+            transformation = self._detect_transformation_for_match(
+                col_name=col_name,
+                profile=profile,
+                target_field=target_field,
+                vertical=vertical,
+            )
+            
+            if transformation:
+                mapping["transformation"] = transformation
+        
+        return suggested_mappings
     
     def _get_vertical_from_doc_type(self, doc_type: Optional[str]) -> str:
         """Get vertical for a document type from schema registry."""
