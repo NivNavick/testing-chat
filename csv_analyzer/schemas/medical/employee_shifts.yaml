@@ -112,17 +112,17 @@ fields:
   - name: shift_start
     type: datetime
     required: true
-    description: "The time when the shift begins, clock in time"
+    description: "The SCHEDULED time when the shift is planned to begin"
     aliases:
       - start_time
-      - clock_in
+      - scheduled_start
+      - planned_start
       - time_in
       - begin
       - start
       - in_time
       - t_in
       - entry_time
-      - arrival
       # Hebrew
       - שעת_התחלה
       - שעת_כניסה
@@ -142,22 +142,22 @@ fields:
       - heure_debut
       # Portuguese
       - início
-    embedding_text: "shift start begin clock in time entry arrival punch"
+    embedding_text: "scheduled planned expected shift start begin time entry rostered assigned NOT actual NOT real NOT recorded"
 
   - name: shift_end
     type: datetime
     required: true
-    description: "The time when the shift ends, clock out time"
+    description: "The SCHEDULED time when the shift is planned to end"
     aliases:
       - end_time
-      - clock_out
+      - scheduled_end
+      - planned_end
       - time_out
       - finish
       - end
       - out_time
       - t_out
       - exit_time
-      - departure
       # Hebrew
       - שעת_סיום
       - שעת_יציאה
@@ -177,12 +177,12 @@ fields:
       - heure_fin
       # Portuguese
       - fim
-    embedding_text: "shift end finish clock out time departure punch leave"
+    embedding_text: "scheduled planned expected shift end finish time departure rostered assigned NOT actual NOT real NOT recorded"
 
   - name: duration_minutes
     type: integer
     required: false
-    description: "Total duration of the shift in minutes or hours worked"
+    description: "SCHEDULED/PLANNED duration of the shift in minutes"
     # Unit transformation support
     target_unit: minutes
     accepts_units:
@@ -191,35 +191,43 @@ fields:
       - seconds
     aliases:
       - duration
-      - hours_worked
+      - scheduled_hrs
+      - scheduled_hours
+      - planned_hours
+      - planned_hrs
+      - shift_hours
+      - shift_hrs
       - hrs
       - work_hours
       - shift_length
       - dur_hrs
       - hours
       - total_hours
-      - worked_hrs
-      - total_hrs
       - duration_min
+      - expected_hours
+      - rostered_hours
       # Hebrew
       - משך_משמרת
       - שעות_עבודה
       - משך
       - שעות
+      - שעות_מתוכננות
       # Spanish
-      - horas_trabajadas
+      - horas_planificadas
       - duracion
       - horas
       # Arabic
       - ساعات_العمل
       - ساعات
+      - ساعات_مخططة
       # Russian
       - часы_работы
       - часы
+      - запланированные_часы
       # French
-      - heures_travaillees
+      - heures_prevues
       - heures
-    embedding_text: "duration worked length time total shift period"
+    embedding_text: "scheduled planned expected rostered shift duration hours length time total period NOT actual NOT real NOT recorded"
 
   # ============================================
   # ACTUAL (RECORDED) TIMES
@@ -229,14 +237,18 @@ fields:
   - name: actual_start
     type: datetime
     required: false
-    description: "Actual time when the employee clocked in / arrived"
+    description: "ACTUAL time when the employee really clocked in / arrived"
     aliases:
       - actual_start
       - real_start
+      - clock_in
       - clock_in_time
       - actual_in
       - real_in
       - recorded_start
+      - true_start
+      - punched_in
+      - arrival
       # Hebrew
       - שעת_התחלה_בפועל
       - כניסה_בפועל
@@ -249,19 +261,23 @@ fields:
       - фактическое_начало
       # French
       - debut_reel
-    embedding_text: "actual real recorded clock in start time arrived punched"
+    embedding_text: "actual real recorded true clock in start time arrived punched measured NOT scheduled NOT planned NOT expected"
 
   - name: actual_end
     type: datetime
     required: false
-    description: "Actual time when the employee clocked out / departed"
+    description: "ACTUAL time when the employee really clocked out / departed"
     aliases:
       - actual_end
       - real_end
+      - clock_out
       - clock_out_time
       - actual_out
       - real_out
       - recorded_end
+      - true_end
+      - punched_out
+      - departure
       # Hebrew
       - שעת_סיום_בפועל
       - יציאה_בפועל
@@ -274,35 +290,48 @@ fields:
       - фактическое_окончание
       # French
       - fin_reel
-    embedding_text: "actual real recorded clock out end time departed punched"
+    embedding_text: "actual real recorded true clock out end time departed punched measured NOT scheduled NOT planned NOT expected"
 
-  - name: actual_hours
-    type: float
+  - name: actual_minutes
+    type: integer
     required: false
-    description: "Actual hours worked as recorded"
-    target_unit: hours
+    description: "ACTUAL time really worked as recorded, stored in minutes"
+    target_unit: minutes
     accepts_units:
-      - hours
       - minutes
+      - hours
+      - seconds
     aliases:
       - actual_hrs
+      - actual_hours
       - real_hours
+      - real_hrs
       - worked_hours
       - recorded_hours
       - real_duration
+      - actual_duration
+      - real_mins
+      - worked_mins
+      - true_hours
+      - measured_hours
       # Hebrew
       - שעות_בפועל
       - משך_בפועל
+      - דקות_בפועל
       # Spanish
       - horas_reales
       - horas_trabajadas_reales
+      - minutos_reales
       # Arabic
       - ساعات_فعلية
+      - دقائق_فعلية
       # Russian
       - фактические_часы
+      - фактические_минуты
       # French
       - heures_reelles
-    embedding_text: "actual real recorded hours worked duration shift length"
+      - minutes_reelles
+    embedding_text: "actual real recorded true measured hours minutes worked duration time NOT scheduled NOT planned NOT expected"
 
   - name: department_code
     type: string

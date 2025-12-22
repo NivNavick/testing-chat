@@ -220,8 +220,8 @@ class ConflictResolver:
         Strategy:
         1. Resolve each conflict (pick winner)
         2. Claim target for winner
-        3. Reassign losers to alternatives
-        4. Build non-conflicting mappings
+        3. Build non-conflicting mappings FIRST (so they claim their targets)
+        4. THEN reassign losers to alternatives (won't steal from non-conflicting)
         """
         claimed_targets: Dict[str, str] = {}  # target -> source that owns it
         mappings: Dict[str, ResolvedMapping] = {}
@@ -258,23 +258,15 @@ class ConflictResolver:
                     conflict_details=conflict.resolution_reason,
                 )
         
-        # Step 3: Build mappings for conflict losers (try alternatives)
-        for loser_source, conflict in losers.items():
-            loser_matches = filtered_matches.get(loser_source, [])
-            mappings[loser_source] = self._reassign_loser(
-                source=loser_source,
-                matches=loser_matches,
-                conflict=conflict,
-                claimed=claimed_targets,
-            )
-        
-        # Step 4: Build mappings for non-conflicting columns
+        # Step 3: Build mappings for NON-CONFLICTING columns FIRST
+        # This ensures they claim their rightful targets before losers try alternatives
         for col_name, matches in filtered_matches.items():
             if col_name in mappings:
-                continue  # Already handled (winner or loser)
+                continue  # Already handled (winner)
+            if col_name in losers:
+                continue  # Handle later
             
             if not matches:
-                # No candidates at all
                 mappings[col_name] = self._no_mapping(
                     source=col_name,
                     reason="No candidates for winning document type",
@@ -286,19 +278,18 @@ class ConflictResolver:
             target = best.get("field_name")
             
             if best_confidence < self.min_confidence:
-                # Below threshold
                 mappings[col_name] = self._no_mapping(
                     source=col_name,
                     reason=f"Best match ({best_confidence:.0%}) below threshold ({self.min_confidence:.0%})",
                 )
             elif target in claimed_targets:
-                # Target already claimed by a conflict winner
-                # This shouldn't happen normally, but handle it gracefully
+                # Shouldn't happen, but handle gracefully
                 mappings[col_name] = self._reassign_loser(
                     source=col_name,
                     matches=matches,
                     conflict=None,
                     claimed=claimed_targets,
+                    all_column_matches=filtered_matches,
                 )
             else:
                 # Normal case: claim target
@@ -311,6 +302,17 @@ class ConflictResolver:
                     required=best.get("required", False),
                     resolution_strategy=ResolutionStrategy.NO_CONFLICT,
                 )
+        
+        # Step 4: NOW reassign losers (after non-conflicting columns claimed their targets)
+        for loser_source, conflict in losers.items():
+            loser_matches = filtered_matches.get(loser_source, [])
+            mappings[loser_source] = self._reassign_loser(
+                source=loser_source,
+                matches=loser_matches,
+                conflict=conflict,
+                claimed=claimed_targets,
+                all_column_matches=filtered_matches,
+            )
         
         return mappings
     
@@ -424,12 +426,20 @@ class ConflictResolver:
         matches: List[Dict],
         conflict: Optional[MappingConflict],
         claimed: Dict[str, str],
+        all_column_matches: Optional[Dict[str, List[Dict]]] = None,
     ) -> ResolvedMapping:
         """
         Try to assign a losing column to an alternative target.
         
-        Iterates through the column's candidate list (skipping the first,
-        which was the conflict) and finds the first unclaimed target.
+        IMPORTANT: Only reassign to a target if no other column has a BETTER claim.
+        This prevents cascade stealing (e.g., hours column stealing a time column's target).
+        
+        Args:
+            source: Source column name
+            matches: This column's match candidates
+            conflict: The conflict this column lost (if any)
+            claimed: Currently claimed targets
+            all_column_matches: ALL columns' matches (to check for better claims)
         """
         original_target = matches[0]["field_name"] if matches else None
         
@@ -438,28 +448,52 @@ class ConflictResolver:
             alt_target = alt.get("field_name")
             alt_confidence = alt.get("similarity", 0)
             
-            # Must be above threshold and unclaimed
-            if alt_confidence >= self.min_confidence and alt_target not in claimed:
-                claimed[alt_target] = source
-                
-                winner_source = conflict.winner if conflict else claimed.get(original_target)
-                logger.info(
-                    f"   └─ 🔄 '{source}' reassigned: "
-                    f"'{original_target}' → '{alt_target}' "
-                    f"(lost to '{winner_source}')"
+            # Must be above threshold
+            if alt_confidence < self.min_confidence:
+                continue
+            
+            # Must be unclaimed
+            if alt_target in claimed:
+                continue
+            
+            # NEW: Check if another column has this as their BEST match
+            # If so, don't steal it - let them have it
+            if all_column_matches:
+                better_claimant = self._find_better_claimant(
+                    target=alt_target,
+                    my_source=source,
+                    my_confidence=alt_confidence,
+                    all_matches=all_column_matches,
+                    claimed=claimed,
                 )
-                
-                return ResolvedMapping(
-                    source_column=source,
-                    target_field=alt_target,
-                    confidence=alt_confidence,
-                    field_type=alt.get("field_type"),
-                    required=alt.get("required", False),
-                    had_conflict=True,
-                    resolution_strategy=ResolutionStrategy.REASSIGNED,
-                    original_target=original_target,
-                    conflict_details=f"Lost '{original_target}' to '{winner_source}'",
-                )
+                if better_claimant:
+                    logger.debug(
+                        f"   └─ Skipping '{alt_target}' for '{source}': "
+                        f"'{better_claimant}' has better claim"
+                    )
+                    continue
+            
+            # Safe to claim this alternative
+            claimed[alt_target] = source
+            
+            winner_source = conflict.winner if conflict else claimed.get(original_target)
+            logger.info(
+                f"   └─ 🔄 '{source}' reassigned: "
+                f"'{original_target}' → '{alt_target}' "
+                f"(lost to '{winner_source}')"
+            )
+            
+            return ResolvedMapping(
+                source_column=source,
+                target_field=alt_target,
+                confidence=alt_confidence,
+                field_type=alt.get("field_type"),
+                required=alt.get("required", False),
+                had_conflict=True,
+                resolution_strategy=ResolutionStrategy.REASSIGNED,
+                original_target=original_target,
+                conflict_details=f"Lost '{original_target}' to '{winner_source}'",
+            )
         
         # No valid alternative found
         winner_source = conflict.winner if conflict else claimed.get(original_target)
@@ -477,6 +511,51 @@ class ConflictResolver:
             original_target=original_target,
             conflict_details=f"Lost '{original_target}' to '{winner_source}', no valid alternatives",
         )
+    
+    def _find_better_claimant(
+        self,
+        target: str,
+        my_source: str,
+        my_confidence: float,
+        all_matches: Dict[str, List[Dict]],
+        claimed: Dict[str, str],
+    ) -> Optional[str]:
+        """
+        Check if another column has a better claim on a target.
+        
+        A column has a "better claim" if:
+        1. The target is their BEST (first) match
+        2. Their confidence is >= my confidence
+        3. They haven't already been assigned elsewhere
+        
+        Returns the source column name that has better claim, or None.
+        """
+        for other_source, other_matches in all_matches.items():
+            # Skip myself
+            if other_source == my_source:
+                continue
+            
+            # Skip if this column already claimed something
+            if other_source in [v for v in claimed.values()]:
+                continue
+            
+            # Skip if no matches
+            if not other_matches:
+                continue
+            
+            # Check if target is their BEST match
+            other_best = other_matches[0]
+            if other_best.get("field_name") != target:
+                continue
+            
+            other_confidence = other_best.get("similarity", 0)
+            
+            # They have better or equal claim if confidence is higher
+            # (equal goes to them since it's their primary target)
+            if other_confidence >= my_confidence:
+                return other_source
+        
+        return None
     
     def _no_mapping(self, source: str, reason: str) -> ResolvedMapping:
         """Create a 'no mapping' result for a column."""
