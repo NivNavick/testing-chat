@@ -244,6 +244,9 @@ class SchemaEmbeddingsService:
         
         return matches
     
+    # Confidence score for exact alias matches (very high since it's explicit)
+    ALIAS_MATCH_CONFIDENCE = 0.98
+    
     def score_columns_against_schemas(
         self,
         columns: List[Dict[str, Any]],
@@ -251,6 +254,10 @@ class SchemaEmbeddingsService:
     ) -> Dict[str, Any]:
         """
         Score a list of columns against all schemas.
+        
+        PRIORITY ORDER:
+        1. Exact alias match (column name matches a known alias) → 0.98 confidence
+        2. Embedding similarity from ChromaDB → variable confidence
         
         Args:
             columns: List of column profiles (from column_profiler)
@@ -269,19 +276,69 @@ class SchemaEmbeddingsService:
         """
         from csv_analyzer.core.text_representation import column_to_embedding_text
         
+        # Build alias lookup table for fast exact-match checking
+        alias_lookup = self.schema_registry.build_alias_lookup(vertical=vertical)
+        
         column_matches = {}
         doc_type_votes = {}  # doc_type -> list of similarities
         
         for col in columns:
             col_name = col["column_name"]
-            col_text = column_to_embedding_text(col)
             
-            # Find matching fields
-            matches = self.find_matching_fields(
-                column_text=col_text,
-                vertical=vertical,
-                n_results=5,
-            )
+            # === STEP 1: Check for exact alias match (highest priority) ===
+            # Try both simple lowercase and separator-stripped normalization
+            normalized_simple = col_name.lower().strip()
+            normalized_stripped = self.schema_registry._normalize_for_alias_match(col_name)
+            
+            # Check both normalizations (simple first, then stripped)
+            alias_match = alias_lookup.get(normalized_simple) or alias_lookup.get(normalized_stripped)
+            
+            if alias_match:
+                # Found an exact alias match - use it with high confidence
+                logger.info(
+                    f"✅ Alias match: '{col_name}' → '{alias_match['field_name']}' "
+                    f"(exact alias in {alias_match['document_type']})"
+                )
+                
+                # Create a match entry for the alias hit
+                alias_hit = {
+                    "field_id": f"{alias_match['vertical']}_{alias_match['document_type']}_{alias_match['field_name']}",
+                    "field_name": alias_match["field_name"],
+                    "document_type": alias_match["document_type"],
+                    "vertical": alias_match["vertical"],
+                    "field_type": alias_match["field_type"],
+                    "required": alias_match["required"],
+                    "description": alias_match["description"],
+                    "similarity": self.ALIAS_MATCH_CONFIDENCE,
+                    "match_source": "alias",  # Track that this was an alias match
+                }
+                
+                # Still get embedding matches as fallback candidates (but alias match comes first)
+                col_text = column_to_embedding_text(col)
+                embedding_matches = self.find_matching_fields(
+                    column_text=col_text,
+                    vertical=vertical,
+                    n_results=5,
+                )
+                
+                # Filter out the alias-matched field from embedding results to avoid duplicates
+                embedding_matches = [
+                    m for m in embedding_matches
+                    if not (m["field_name"] == alias_match["field_name"] and 
+                           m["document_type"] == alias_match["document_type"])
+                ]
+                
+                # Alias match first, then embedding matches as alternatives
+                matches = [alias_hit] + embedding_matches
+                
+            else:
+                # === STEP 2: No alias match - fall back to embedding similarity ===
+                col_text = column_to_embedding_text(col)
+                matches = self.find_matching_fields(
+                    column_text=col_text,
+                    vertical=vertical,
+                    n_results=5,
+                )
             
             column_matches[col_name] = matches
             

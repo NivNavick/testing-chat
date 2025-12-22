@@ -1,0 +1,12 @@
+EmpID,Badge_Number,Worker_Code,Date,Scheduled_Start,Scheduled_End,Actual_Start,Actual_End,Scheduled_Hrs,Actual_Hrs,Planned_Dept,Work_Unit,Shift_Category,Shift_Type,Staff_Name,Employee_Name,Is_Lead,Supervisor
+E001,B-1001,WRK001,2024-01-15,08:00,16:00,08:05,16:10,8.0,8.08,Cardiology,CARD,Morning,Day,John Smith,J. Smith,true,false
+E002,B-1002,WRK002,2024-01-15,09:00,17:00,08:55,17:05,8.0,8.17,Radiology,RAD,Morning,Day,Jane Doe,J. Doe,false,true
+E003,B-1003,WRK003,2024-01-15,16:00,00:00,16:02,00:15,8.0,8.22,Emergency,ER,Evening,Night,Bob Wilson,R. Wilson,false,false
+E004,B-1004,WRK004,2024-01-15,00:00,08:00,23:58,08:03,8.0,8.08,ICU,ICU,Night,Overnight,Alice Brown,A. Brown,true,false
+E005,B-1005,WRK005,2024-01-16,07:00,15:00,07:10,15:00,8.0,7.83,Surgery,SURG,Morning,Day,Charlie Davis,C. Davis,false,false
+E006,B-1006,WRK006,2024-01-16,15:00,23:00,14:55,23:10,8.0,8.25,Oncology,ONC,Afternoon,Evening,Diana Evans,D. Evans,false,true
+E007,B-1007,WRK007,2024-01-16,08:00,16:00,08:00,16:00,8.0,8.0,Pediatrics,PEDS,Morning,Day,Frank Garcia,F. Garcia,false,false
+E008,B-1008,WRK008,2024-01-16,10:00,18:00,10:15,18:30,8.0,8.25,Neurology,NEURO,Day,Day,Grace Hill,G. Hill,true,false
+E009,B-1009,WRK009,2024-01-17,06:00,14:00,06:00,14:05,8.0,8.08,Lab,LAB,Early,Day,Henry Irwin,H. Irwin,false,false
+E010,B-1010,WRK010,2024-01-17,14:00,22:00,13:50,22:00,8.0,8.17,Pharmacy,PHRM,Afternoon,Evening,Ivy Jones,I. Jones,false,true
+

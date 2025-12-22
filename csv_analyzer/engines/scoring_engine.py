@@ -136,6 +136,7 @@ class ScoringEngine:
         # Initialize conflict resolver for end-of-mapping conflict detection
         self.conflict_resolver = ConflictResolver(
             openai_fallback=openai_fallback,
+            schema_registry=self.schema_registry,
         )
     
     def score(

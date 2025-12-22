@@ -169,6 +169,88 @@ class SchemaRegistry:
                 for field in schema.fields:
                     fields.append((vertical, doc_type, field))
         return fields
+    
+    @staticmethod
+    def _normalize_for_alias_match(name: str) -> str:
+        """
+        Normalize a name for alias matching.
+        
+        Removes common separators (underscores, dashes, spaces) and lowercases.
+        This allows 'EmpID' to match 'emp_id', 'Worker_Code' to match 'worker_code', etc.
+        """
+        import re
+        # Remove underscores, dashes, spaces; lowercase
+        return re.sub(r'[_\-\s]+', '', name.lower().strip())
+    
+    def build_alias_lookup(
+        self,
+        vertical: Optional[str] = None,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Build a lookup table mapping aliases to their target fields.
+        
+        This enables O(1) exact-match lookups for column names that match
+        known aliases, which should take priority over embedding similarity.
+        
+        Args:
+            vertical: Optional vertical filter (e.g., "medical")
+            
+        Returns:
+            Dict mapping normalized alias -> {
+                "vertical": str,
+                "document_type": str,
+                "field_name": str,
+                "field_type": str,
+                "required": bool,
+                "description": str,
+            }
+            
+        Note:
+            - Keys are normalized (lowercase, no separators)
+            - Field names themselves are also added as aliases
+            - If an alias appears in multiple schemas, first occurrence wins
+            - Both original form and separator-stripped form are indexed
+        """
+        lookup = {}
+        
+        verticals_to_check = (
+            [vertical] if vertical and vertical in self.schemas
+            else self.schemas.keys()
+        )
+        
+        for vert in verticals_to_check:
+            for doc_type, schema in self.schemas.get(vert, {}).items():
+                for field in schema.fields:
+                    # Add field name itself as a key
+                    all_aliases = [field.name] + field.aliases
+                    
+                    field_info = {
+                        "vertical": vert,
+                        "document_type": doc_type,
+                        "field_name": field.name,
+                        "field_type": field.type,
+                        "required": field.required,
+                        "description": field.description,
+                    }
+                    
+                    for alias in all_aliases:
+                        # Skip empty aliases
+                        if not alias or not alias.strip():
+                            continue
+                        
+                        # Add both normalized forms:
+                        # 1. Simple lowercase (for exact matches like "worker_code")
+                        simple_normalized = alias.lower().strip()
+                        if simple_normalized and simple_normalized not in lookup:
+                            lookup[simple_normalized] = field_info
+                        
+                        # 2. Separator-stripped (for matches like "EmpID" -> "emp_id")
+                        stripped_normalized = self._normalize_for_alias_match(alias)
+                        if stripped_normalized and stripped_normalized not in lookup:
+                            lookup[stripped_normalized] = field_info
+        
+        logger.debug(f"Built alias lookup with {len(lookup)} entries")
+        return lookup
 
 
 # Global registry instance

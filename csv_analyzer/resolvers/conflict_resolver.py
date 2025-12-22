@@ -12,6 +12,7 @@ Integrates with OpenAI fallback for ambiguous conflicts.
 """
 
 import logging
+import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -24,6 +25,7 @@ from .base import (
 
 if TYPE_CHECKING:
     from csv_analyzer.services.openai_fallback import OpenAIFallbackService
+    from csv_analyzer.core.schema_registry import SchemaRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +61,44 @@ class ConflictResolver:
     # Gap below this = ambiguous (may need OpenAI)
     AMBIGUITY_THRESHOLD = 0.02
     
+    # Bonus added when column name exactly matches field name or alias
+    NAME_MATCH_BONUS = 0.15
+    
+    # Penalty for type mismatches
+    TYPE_MISMATCH_PENALTY = 0.15
+    
+    # Type compatibility matrix: source_type -> set of compatible target_types
+    # Types not in compatible set get penalized
+    TYPE_COMPATIBILITY = {
+        # Datetime types
+        "datetime": {"datetime", "string"},
+        "date": {"date", "datetime", "string"},
+        "time_of_day": {"datetime", "time", "string"},
+        
+        # Numeric types
+        "integer": {"integer", "float", "number", "string"},
+        "float": {"float", "integer", "number", "string"},
+        "numeric": {"integer", "float", "number", "string"},
+        
+        # Text types
+        "text": {"string", "text"},
+        "id_like": {"string", "text", "integer"},
+        "categorical": {"string", "text"},
+        
+        # Boolean
+        "boolean": {"boolean", "string", "integer"},
+        
+        # Special
+        "empty": set(),  # Empty columns match nothing well
+        "unknown": {"string", "text"},  # Unknown defaults to string
+    }
+    
     def __init__(
         self,
         min_confidence: float = None,
         ambiguity_threshold: float = None,
         openai_fallback: Optional["OpenAIFallbackService"] = None,
+        schema_registry: Optional["SchemaRegistry"] = None,
     ):
         """
         Initialize the conflict resolver.
@@ -72,10 +107,13 @@ class ConflictResolver:
             min_confidence: Minimum confidence to accept a mapping (default 0.82)
             ambiguity_threshold: Gap below which conflicts are ambiguous (default 0.02)
             openai_fallback: Optional OpenAI service for arbitrating ambiguous conflicts
+            schema_registry: Optional schema registry for name matching
         """
         self.min_confidence = min_confidence or self.MIN_CONFIDENCE_THRESHOLD
         self.ambiguity_threshold = ambiguity_threshold or self.AMBIGUITY_THRESHOLD
         self.openai_fallback = openai_fallback
+        self.schema_registry = schema_registry
+        self._field_names_cache: Dict[str, set] = {}  # target_field -> set of normalized names/aliases
     
     def resolve(
         self,
@@ -100,6 +138,9 @@ class ConflictResolver:
         
         # Filter matches to winning document type only
         filtered_matches = self._filter_by_doc_type(column_matches, winning_doc_type)
+        
+        # Apply type compatibility adjustments to confidences
+        filtered_matches = self._apply_type_adjustments(filtered_matches, profile_lookup)
         
         # ═══════════════════════════════════════════════════════════════
         # PHASE 1: Detect all conflicts
@@ -156,6 +197,54 @@ class ConflictResolver:
             col: [m for m in matches if m.get("document_type") == doc_type]
             for col, matches in column_matches.items()
         }
+    
+    def _apply_type_adjustments(
+        self,
+        filtered_matches: Dict[str, List[Dict]],
+        profile_lookup: Dict[str, Dict],
+    ) -> Dict[str, List[Dict]]:
+        """
+        Apply type compatibility adjustments to match confidences.
+        
+        Penalizes matches where column type doesn't match field type.
+        Re-sorts matches by adjusted confidence.
+        """
+        adjusted_matches = {}
+        
+        for col_name, matches in filtered_matches.items():
+            # Get source column type
+            profile = profile_lookup.get(col_name, {})
+            source_type = profile.get("detected_type", "unknown")
+            
+            adjusted_list = []
+            for match in matches:
+                # Copy match to avoid modifying original
+                adjusted_match = dict(match)
+                
+                target_type = match.get("field_type", "string")
+                original_conf = match.get("similarity", 0)
+                
+                # Apply type adjustment
+                adjusted_conf = self._get_type_adjusted_confidence(
+                    original_conf, source_type, target_type
+                )
+                
+                if adjusted_conf != original_conf:
+                    adjusted_match["similarity"] = adjusted_conf
+                    adjusted_match["original_similarity"] = original_conf
+                    adjusted_match["type_penalty_applied"] = True
+                    logger.debug(
+                        f"'{col_name}' ({source_type}) → '{match.get('field_name')}' ({target_type}): "
+                        f"{original_conf:.0%} → {adjusted_conf:.0%} (type mismatch)"
+                    )
+                
+                adjusted_list.append(adjusted_match)
+            
+            # Re-sort by adjusted confidence
+            adjusted_list.sort(key=lambda x: x.get("similarity", 0), reverse=True)
+            adjusted_matches[col_name] = adjusted_list
+        
+        return adjusted_matches
     
     def _detect_conflicts(
         self,
@@ -290,6 +379,7 @@ class ConflictResolver:
                     conflict=None,
                     claimed=claimed_targets,
                     all_column_matches=filtered_matches,
+                    profile=profile_lookup.get(col_name),
                 )
             else:
                 # Normal case: claim target
@@ -312,21 +402,214 @@ class ConflictResolver:
                 conflict=conflict,
                 claimed=claimed_targets,
                 all_column_matches=filtered_matches,
+                profile=profile_lookup.get(loser_source),
             )
         
         return mappings
+    
+    def _normalize_name(self, name: str) -> str:
+        """Normalize a column/field name for comparison."""
+        # Remove common separators, lowercase
+        normalized = re.sub(r'[_\-\s]+', '', name.lower())
+        return normalized
+    
+    def _get_field_name_and_aliases(self, target_field: str, vertical: str = "medical") -> tuple:
+        """
+        Get field name and aliases separately for priority matching.
+        
+        Returns:
+            (normalized_field_name, set_of_normalized_aliases)
+        """
+        cache_key = f"{vertical}:{target_field}"
+        
+        if cache_key in self._field_names_cache:
+            return self._field_names_cache[cache_key]
+        
+        field_name = self._normalize_name(target_field)
+        aliases = set()
+        
+        if self.schema_registry:
+            for schema in self.schema_registry.get_schemas_by_vertical(vertical):
+                field = schema.get_field(target_field)
+                if field:
+                    for alias in field.aliases:
+                        aliases.add(self._normalize_name(alias))
+                    break
+        
+        self._field_names_cache[cache_key] = (field_name, aliases)
+        return field_name, aliases
+    
+    def _get_name_match_priority(self, source_column: str, target_field: str) -> int:
+        """
+        Get name match priority for a source column.
+        
+        Returns:
+            2 = Exact field name match (highest priority)
+            1 = Alias match (medium priority)
+            0 = No name match (use embedding confidence)
+        """
+        normalized_source = self._normalize_name(source_column)
+        field_name, aliases = self._get_field_name_and_aliases(target_field)
+        
+        if normalized_source == field_name:
+            return 2  # Exact field name match
+        elif normalized_source in aliases:
+            return 1  # Alias match
+        else:
+            return 0  # No name match
+    
+    def _is_exact_name_match(self, source_column: str, target_field: str) -> bool:
+        """Check if source column name matches target field name or alias."""
+        return self._get_name_match_priority(source_column, target_field) > 0
+    
+    def _is_type_compatible(self, source_type: str, target_type: str) -> bool:
+        """
+        Check if source column type is compatible with target field type.
+        
+        Args:
+            source_type: Detected type from column profiler (e.g., "datetime", "integer")
+            target_type: Field type from schema (e.g., "datetime", "string")
+            
+        Returns:
+            True if types are compatible, False otherwise
+        """
+        if not source_type or not target_type:
+            return True  # Can't check, assume compatible
+        
+        source_type = source_type.lower()
+        target_type = target_type.lower()
+        
+        # Exact match is always compatible
+        if source_type == target_type:
+            return True
+        
+        # Check compatibility matrix
+        compatible_types = self.TYPE_COMPATIBILITY.get(source_type, {"string"})
+        return target_type in compatible_types
+    
+    def _get_type_adjusted_confidence(
+        self,
+        base_confidence: float,
+        source_type: str,
+        target_type: str,
+    ) -> float:
+        """
+        Adjust confidence based on type compatibility.
+        
+        - Compatible types: no change
+        - Incompatible types: apply penalty
+        
+        Args:
+            base_confidence: Original embedding confidence
+            source_type: Detected column type
+            target_type: Schema field type
+            
+        Returns:
+            Adjusted confidence score
+        """
+        if self._is_type_compatible(source_type, target_type):
+            return base_confidence
+        
+        # Apply penalty for type mismatch
+        adjusted = base_confidence - self.TYPE_MISMATCH_PENALTY
+        logger.debug(
+            f"Type mismatch penalty: {source_type} → {target_type}, "
+            f"{base_confidence:.0%} → {adjusted:.0%}"
+        )
+        return max(0.0, adjusted)  # Don't go below 0
     
     def _pick_winner(self, conflict: MappingConflict) -> str:
         """
         Decide the winner of a conflict.
         
-        Strategy:
-        1. If clear gap (>2%), highest confidence wins
-        2. If ambiguous, try OpenAI arbitration
-        3. Fall back to highest confidence
+        Strategy (in priority order):
+        1. Exact FIELD NAME match beats everything
+        2. ALIAS match beats non-matching columns
+        3. If multiple at same priority level, highest confidence wins
+        4. If ambiguous, try OpenAI arbitration
+        5. Fall back to highest confidence
         """
         contenders = conflict.contenders
-        top = contenders[0]
+        target_field = conflict.target_field
+        
+        # Calculate name match priority for each contender
+        # Priority: 2 = field name match, 1 = alias match, 0 = no match
+        prioritized = []
+        for contender in contenders:
+            source = contender["source"]
+            priority = self._get_name_match_priority(source, target_field)
+            prioritized.append({
+                **contender,
+                "name_priority": priority,
+            })
+        
+        # Sort by: name_priority DESC, then confidence DESC
+        prioritized.sort(key=lambda x: (x["name_priority"], x["confidence"]), reverse=True)
+        
+        top = prioritized[0]
+        top_priority = top["name_priority"]
+        
+        # Check if top has clear name priority advantage
+        if top_priority > 0:
+            # Count how many have same priority
+            same_priority = [p for p in prioritized if p["name_priority"] == top_priority]
+            
+            if top_priority == 2:
+                # Exact field name match
+                if len(same_priority) == 1:
+                    winner = top["source"]
+                    conflict.resolution_strategy = ResolutionStrategy.WINNER
+                    conflict.resolution_reason = f"Exact field name match: '{winner}' = '{target_field}'"
+                    logger.info(
+                        f"   └─ 🎯 '{winner}' wins '{target_field}' (exact field name match)"
+                    )
+                    return winner
+                else:
+                    # Multiple field name matches (shouldn't happen, but handle it)
+                    winner = same_priority[0]["source"]
+                    conflict.resolution_strategy = ResolutionStrategy.WINNER
+                    conflict.resolution_reason = f"Best among field name matches"
+                    logger.info(
+                        f"   └─ 🎯 '{winner}' wins '{target_field}' (best field name match)"
+                    )
+                    return winner
+            
+            elif top_priority == 1:
+                # Alias match - check if any have higher priority (field name)
+                field_name_matches = [p for p in prioritized if p["name_priority"] == 2]
+                if field_name_matches:
+                    # Field name match beats alias
+                    winner = field_name_matches[0]["source"]
+                    conflict.resolution_strategy = ResolutionStrategy.WINNER
+                    conflict.resolution_reason = f"Field name match beats alias match"
+                    logger.info(
+                        f"   └─ 🎯 '{winner}' wins '{target_field}' (field name > alias)"
+                    )
+                    return winner
+                
+                if len(same_priority) == 1:
+                    # Only one alias match
+                    winner = top["source"]
+                    conflict.resolution_strategy = ResolutionStrategy.WINNER
+                    conflict.resolution_reason = f"Alias match: '{winner}' matches alias of '{target_field}'"
+                    logger.info(
+                        f"   └─ 🏷️ '{winner}' wins '{target_field}' (alias match)"
+                    )
+                    return winner
+                else:
+                    # Multiple alias matches - pick highest confidence
+                    winner = same_priority[0]["source"]
+                    conflict.resolution_strategy = ResolutionStrategy.WINNER
+                    conflict.resolution_reason = (
+                        f"Multiple alias matches, '{winner}' has highest confidence"
+                    )
+                    logger.info(
+                        f"   └─ 🏷️ '{winner}' wins '{target_field}' "
+                        f"(best among {len(same_priority)} alias matches)"
+                    )
+                    return winner
+        
+        # No name matches - use confidence-based resolution
         gap = conflict.confidence_gap
         
         if conflict.is_ambiguous:
@@ -339,7 +622,7 @@ class ConflictResolver:
                         f"Ambiguous (gap={gap:.1%}), OpenAI chose '{winner}'"
                     )
                     logger.info(
-                        f"   └─ 🤖 OpenAI arbitrated: '{winner}' wins '{conflict.target_field}'"
+                        f"   └─ 🤖 OpenAI arbitrated: '{winner}' wins '{target_field}'"
                     )
                     return winner
             
@@ -349,15 +632,15 @@ class ConflictResolver:
                 f"Ambiguous (gap={gap:.1%}), defaulted to highest confidence"
             )
             logger.info(
-                f"   └─ ⚠️ Ambiguous conflict on '{conflict.target_field}', "
+                f"   └─ ⚠️ Ambiguous conflict on '{target_field}', "
                 f"chose '{top['source']}' (highest confidence)"
             )
         else:
-            # Clear winner
+            # Clear winner by confidence
             conflict.resolution_strategy = ResolutionStrategy.WINNER
             conflict.resolution_reason = f"Clear winner (gap={gap:.1%})"
             logger.info(
-                f"   └─ ✅ '{top['source']}' wins '{conflict.target_field}' "
+                f"   └─ ✅ '{top['source']}' wins '{target_field}' "
                 f"({top['confidence']:.0%})"
             )
         
@@ -399,7 +682,7 @@ class ConflictResolver:
             )
             
             # This is a simplified call - in production you'd use a structured approach
-            response = client._client.chat.completions.create(
+            response = client.client.chat.completions.create(
                 model=client.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
@@ -427,12 +710,14 @@ class ConflictResolver:
         conflict: Optional[MappingConflict],
         claimed: Dict[str, str],
         all_column_matches: Optional[Dict[str, List[Dict]]] = None,
+        profile: Optional[Dict] = None,
     ) -> ResolvedMapping:
         """
         Try to assign a losing column to an alternative target.
         
-        IMPORTANT: Only reassign to a target if no other column has a BETTER claim.
-        This prevents cascade stealing (e.g., hours column stealing a time column's target).
+        IMPORTANT: Only reassign to a target if:
+        1. No other column has a BETTER claim
+        2. OpenAI validates the alternative (if available)
         
         Args:
             source: Source column name
@@ -440,8 +725,10 @@ class ConflictResolver:
             conflict: The conflict this column lost (if any)
             claimed: Currently claimed targets
             all_column_matches: ALL columns' matches (to check for better claims)
+            profile: Column profile with sample values (for OpenAI validation)
         """
         original_target = matches[0]["field_name"] if matches else None
+        original_confidence = matches[0].get("similarity", 0) if matches else 0
         
         # Try alternatives (skip first which was the conflict)
         for alt in matches[1:]:
@@ -456,8 +743,7 @@ class ConflictResolver:
             if alt_target in claimed:
                 continue
             
-            # NEW: Check if another column has this as their BEST match
-            # If so, don't steal it - let them have it
+            # Check if another column has this as their BEST match
             if all_column_matches:
                 better_claimant = self._find_better_claimant(
                     target=alt_target,
@@ -470,6 +756,21 @@ class ConflictResolver:
                     logger.debug(
                         f"   └─ Skipping '{alt_target}' for '{source}': "
                         f"'{better_claimant}' has better claim"
+                    )
+                    continue
+            
+            # NEW: Validate alternative with OpenAI if available
+            if self.openai_fallback and self.openai_fallback.is_available:
+                is_valid = self._validate_alternative_with_openai(
+                    source_column=source,
+                    original_target=original_target,
+                    alternative_target=alt_target,
+                    profile=profile,
+                )
+                if not is_valid:
+                    logger.info(
+                        f"   └─ 🤖 OpenAI rejected '{source}' → '{alt_target}' "
+                        f"(not semantically appropriate)"
                     )
                     continue
             
@@ -511,6 +812,91 @@ class ConflictResolver:
             original_target=original_target,
             conflict_details=f"Lost '{original_target}' to '{winner_source}', no valid alternatives",
         )
+    
+    def _validate_alternative_with_openai(
+        self,
+        source_column: str,
+        original_target: str,
+        alternative_target: str,
+        profile: Optional[Dict] = None,
+    ) -> bool:
+        """
+        Ask OpenAI if an alternative target is semantically appropriate.
+        
+        This is called when a column loses a conflict and tries to reassign
+        to an alternative target. OpenAI validates if this makes sense.
+        
+        Args:
+            source_column: Source column name (e.g., "Worker_Code")
+            original_target: The target it originally wanted (e.g., "employee_id")
+            alternative_target: The alternative being considered (e.g., "shift_id")
+            profile: Column profile with sample values
+            
+        Returns:
+            True if alternative is semantically appropriate, False otherwise
+        """
+        try:
+            client = getattr(self.openai_fallback, '_client', None)
+            if not client:
+                return True  # Can't validate, assume OK
+            
+            # Get sample values for context
+            samples = []
+            if profile:
+                samples = profile.get("sample_values", [])[:5]
+            samples_str = ", ".join(str(s) for s in samples) if samples else "N/A"
+            
+            # Get field descriptions if available
+            original_desc = ""
+            alt_desc = ""
+            if self.schema_registry:
+                for schema in self.schema_registry.get_all_schemas():
+                    orig_field = schema.get_field(original_target)
+                    alt_field = schema.get_field(alternative_target)
+                    if orig_field:
+                        original_desc = orig_field.description
+                    if alt_field:
+                        alt_desc = alt_field.description
+                    if original_desc and alt_desc:
+                        break
+            
+            prompt = f"""I'm mapping CSV columns to a target schema. A column lost a conflict and is trying to reassign to an alternative target.
+
+Column: "{source_column}"
+Sample values: {samples_str}
+
+Original target (lost): "{original_target}"
+  Description: {original_desc or 'N/A'}
+
+Proposed alternative: "{alternative_target}"
+  Description: {alt_desc or 'N/A'}
+
+Question: Is "{alternative_target}" a semantically appropriate mapping for a column named "{source_column}" with the sample values shown?
+
+Answer ONLY "yes" or "no" followed by a brief reason.
+Example: "no - Worker_Code is an employee identifier, not a shift identifier"
+"""
+            
+            response = client.client.chat.completions.create(
+                model=client.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=100,
+            )
+            
+            answer = response.choices[0].message.content.strip().lower()
+            
+            # Parse yes/no from response
+            if answer.startswith("yes"):
+                logger.debug(f"OpenAI approved '{source_column}' → '{alternative_target}'")
+                return True
+            else:
+                logger.debug(f"OpenAI rejected '{source_column}' → '{alternative_target}': {answer}")
+                return False
+                
+        except Exception as e:
+            logger.warning(f"OpenAI validation failed: {e}")
+            return True  # On error, assume OK
     
     def _find_better_claimant(
         self,
