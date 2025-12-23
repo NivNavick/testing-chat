@@ -38,8 +38,10 @@ class ColumnMatch:
     target_field: Optional[str]
     target_type: Optional[str]
     document_type: str
-    similarity: float
+    similarity: float  # Type-adjusted similarity
     required: bool = False
+    type_compatibility: float = 1.0  # Type compatibility score (0.4 to 1.0)
+    raw_similarity: float = 0.0  # Original embedding similarity before type adjustment
 
 
 @dataclass
@@ -383,6 +385,9 @@ class ScoringEngine:
                     "confidence": best_confidence,
                     "field_type": best["field_type"],
                     "required": best["required"],
+                    "source_type": best.get("source_type", "unknown"),
+                    "type_compatibility": best.get("type_compatibility", 1.0),
+                    "raw_similarity": best.get("raw_similarity", best_confidence),
                 }
                 
                 # Check for transformation needs
@@ -505,12 +510,14 @@ class ScoringEngine:
             result[col_name] = [
                 ColumnMatch(
                     source_column=col_name,
-                    source_type="",  # Not available here
+                    source_type=m.get("source_type", "unknown"),
                     target_field=m["field_name"],
                     target_type=m["field_type"],
                     document_type=m["document_type"],
                     similarity=m["similarity"],
                     required=m["required"],
+                    type_compatibility=m.get("type_compatibility", 1.0),
+                    raw_similarity=m.get("raw_similarity", m["similarity"]),
                 )
                 for m in matches
             ]

@@ -259,7 +259,7 @@ class SchemaEmbeddingsService:
         Returns:
             {
                 "column_matches": {
-                    "col_name": [{"field": "...", "doc_type": "...", "similarity": 0.9}, ...]
+                    "col_name": [{"field": "...", "doc_type": "...", "similarity": 0.9, "source_type": "...", ...}, ...]
                 },
                 "document_type_scores": {
                     "employee_shifts": {"score": 0.85, "matched_fields": 4, "total_required": 4},
@@ -268,12 +268,14 @@ class SchemaEmbeddingsService:
             }
         """
         from csv_analyzer.core.text_representation import column_to_embedding_text
+        from csv_analyzer.core.type_compatibility import get_type_compatibility
         
         column_matches = {}
-        doc_type_votes = {}  # doc_type -> list of similarities
+        doc_type_votes = {}  # doc_type -> list of adjusted similarities
         
         for col in columns:
             col_name = col["column_name"]
+            col_type = col.get("detected_type", "unknown")
             col_text = column_to_embedding_text(col)
             
             # Find matching fields
@@ -283,10 +285,33 @@ class SchemaEmbeddingsService:
                 n_results=5,
             )
             
-            column_matches[col_name] = matches
-            
-            # Vote for document types based on matches
+            # Enrich matches with source type and type-adjusted similarity
+            enriched_matches = []
             for match in matches:
+                target_type = match.get("field_type", "string")
+                
+                # Calculate type compatibility
+                type_compat = get_type_compatibility(col_type, target_type)
+                raw_similarity = match["similarity"]
+                
+                # Adjust similarity by type compatibility
+                adjusted_similarity = raw_similarity * type_compat
+                
+                enriched_match = {
+                    **match,
+                    "source_type": col_type,
+                    "raw_similarity": raw_similarity,
+                    "type_compatibility": round(type_compat, 3),
+                    "similarity": round(adjusted_similarity, 4),  # Replace with adjusted
+                }
+                enriched_matches.append(enriched_match)
+            
+            # Re-sort by adjusted similarity
+            enriched_matches.sort(key=lambda x: x["similarity"], reverse=True)
+            column_matches[col_name] = enriched_matches
+            
+            # Vote for document types based on adjusted similarities
+            for match in enriched_matches:
                 doc_type = match["document_type"]
                 similarity = match["similarity"]
                 

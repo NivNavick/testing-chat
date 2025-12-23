@@ -294,6 +294,12 @@ def print_hybrid_result(result):
             conf_str = f"{conf:.0%}" if conf > 0 else "-"
             required = "⚡" if mapping.get("required") else ""
             
+            # Get type compatibility info
+            source_type = mapping.get("source_type", "")
+            target_type = mapping.get("field_type", "")
+            type_compat = mapping.get("type_compatibility", 1.0)
+            raw_sim = mapping.get("raw_similarity", conf)
+            
             # Get OpenAI-related info
             mapping_source = mapping.get("source", "embeddings")
             openai_reason = mapping.get("reason", "")
@@ -316,7 +322,16 @@ def print_hybrid_result(result):
             else:
                 source_tag = ""
             
-            print(f"\n  {source:<23} {'→':<3} {target:<21}{required} {conf_str:<8} {status}{source_tag}")
+            # Type compatibility indicator
+            if type_compat < 0.95 and type_compat > 0:
+                if type_compat >= 0.80:
+                    type_tag = f" 🟡 type:{source_type}→{target_type}"
+                else:
+                    type_tag = f" 🔴 type:{source_type}→{target_type}"
+            else:
+                type_tag = ""
+            
+            print(f"\n  {source:<23} {'→':<3} {target:<21}{required} {conf_str:<8} {status}{source_tag}{type_tag}")
             
             # Show OpenAI reasoning if available
             if openai_reason:
@@ -355,17 +370,29 @@ def print_hybrid_result(result):
                         field_name = c.target_field
                         similarity = c.similarity
                         req = c.required
+                        type_compat = getattr(c, 'type_compatibility', 1.0)
+                        raw_sim = getattr(c, 'raw_similarity', similarity)
+                        source_type = getattr(c, 'source_type', '')
+                        target_type = getattr(c, 'target_type', '')
                     else:
                         doc_type = c.get("document_type", "")
                         field_name = c.get("field_name", c.get("target_field", ""))
                         similarity = c.get("similarity", 0)
                         req = c.get("required", False)
+                        type_compat = c.get("type_compatibility", 1.0)
+                        raw_sim = c.get("raw_similarity", similarity)
+                        source_type = c.get("source_type", "")
+                        target_type = c.get("field_type", "")
                     
                     if winning_doc_type and doc_type == winning_doc_type:
                         relevant_candidates.append({
                             "field_name": field_name,
                             "similarity": similarity,
                             "required": req,
+                            "type_compatibility": type_compat,
+                            "raw_similarity": raw_sim,
+                            "source_type": source_type,
+                            "field_type": target_type,
                         })
                 
                 if relevant_candidates:
@@ -374,11 +401,23 @@ def print_hybrid_result(result):
                         field_name = cand["field_name"]
                         similarity = cand["similarity"]
                         req = cand["required"]
+                        type_compat = cand.get("type_compatibility", 1.0)
+                        raw_sim = cand.get("raw_similarity", similarity)
+                        source_type = cand.get("source_type", "?")
+                        target_type = cand.get("field_type", "?")
                         
                         # Determine if this is the selected one
                         is_selected = (field_name == target)
                         marker = "→" if is_selected else " "
                         req_icon = "⚡" if req else ""
+                        
+                        # Type compatibility indicator
+                        if type_compat >= 0.95:
+                            type_icon = "🟢"
+                        elif type_compat >= 0.80:
+                            type_icon = "🟡"
+                        else:
+                            type_icon = "🔴"
                         
                         # Add reasoning based on embedding threshold
                         if i == 0:  # Best candidate
@@ -406,8 +445,10 @@ def print_hybrid_result(result):
                         else:
                             openai_status = ""
                         
+                        # Type info string
+                        type_str = f"{type_icon} {source_type}→{target_type}" if type_compat < 1.0 else ""
                         reason_str = f"  {emb_reason}" if emb_reason else ""
-                        print(f"      {marker} {i+1}. {field_name:<18} {similarity:>5.1%} {req_icon:<2}{reason_str}{openai_status}")
+                        print(f"      {marker} {i+1}. {field_name:<18} {similarity:>5.1%} {req_icon:<2}{type_str}{reason_str}{openai_status}")
                 else:
                     # Show all candidates if none match winning doc type
                     print("      Candidates (other doc types):")
