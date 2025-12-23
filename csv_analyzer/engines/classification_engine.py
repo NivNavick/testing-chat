@@ -95,6 +95,7 @@ class HybridClassificationResult:
         column_profiles: List[Dict],
         text_representation: str,
         column_candidates: Optional[Dict[str, List[Dict]]] = None,
+        mapping_conflicts: Optional[Dict[str, List[Dict]]] = None,
     ):
         self.document_type = document_type
         self.vertical = vertical
@@ -108,6 +109,7 @@ class HybridClassificationResult:
         self.column_profiles = column_profiles
         self.text_representation = text_representation
         self.column_candidates = column_candidates or {}
+        self.mapping_conflicts = mapping_conflicts or {}
     
     @classmethod
     def empty(cls, column_profiles: List[Dict], text_repr: str) -> "HybridClassificationResult":
@@ -125,6 +127,7 @@ class HybridClassificationResult:
             column_profiles=column_profiles,
             text_representation=text_repr,
             column_candidates={},
+            mapping_conflicts={},
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -151,6 +154,7 @@ class HybridClassificationResult:
                 "field_coverage": self.coverage_score,
             },
             "suggested_mappings": self.suggested_mappings,
+            "mapping_conflicts": self.mapping_conflicts,
             "column_candidates": candidates_dict,
             "all_document_type_scores": self.all_scores,
             "similar_examples": self.similar_examples,
@@ -482,6 +486,7 @@ class ClassificationEngine:
             column_profiles=column_profiles,
             text_representation=text_repr,
             column_candidates=scoring_result.column_matches,
+            mapping_conflicts=scoring_result.mapping_conflicts,
         )
     
     def _create_query_embedding(self, text: str) -> Optional[List[float]]:

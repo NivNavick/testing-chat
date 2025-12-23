@@ -66,6 +66,9 @@ class ScoringResult:
     # Score breakdown by document type
     all_scores: Dict[str, Dict[str, float]] = field(default_factory=dict)
     
+    # Mapping conflicts: target_field -> list of source columns that map to it
+    mapping_conflicts: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    
     def to_dict(self) -> Dict[str, Any]:
         return {
             "document_type": self.document_type,
@@ -77,6 +80,7 @@ class ScoringResult:
                 "field_coverage": self.coverage_score,
             },
             "suggested_mappings": self.suggested_mappings,
+            "mapping_conflicts": self.mapping_conflicts,
             "all_document_type_scores": self.all_scores,
         }
 
@@ -213,7 +217,10 @@ class ScoringEngine:
             column_profiles=column_profiles,
         )
         
-        # 7. Get vertical
+        # 7. Detect mapping conflicts (multiple source columns → same target field)
+        mapping_conflicts = self._detect_mapping_conflicts(suggested_mappings)
+        
+        # 8. Get vertical
         winning_vertical = self._get_vertical_for_doc_type(winner, vertical, document_similarity_results)
         
         return ScoringResult(
@@ -226,6 +233,7 @@ class ScoringEngine:
             column_matches=self._convert_column_matches(column_matches),
             suggested_mappings=suggested_mappings,
             all_scores=combined_scores,
+            mapping_conflicts=mapping_conflicts,
         )
     
     def _calculate_document_scores(
@@ -499,6 +507,54 @@ class ScoringEngine:
             "field_type": None,
             "required": False,
         }
+    
+    def _detect_mapping_conflicts(
+        self,
+        suggested_mappings: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Detect cases where multiple source columns map to the same target field.
+        
+        Returns a dict where:
+        - Key: target field name (the schema field)
+        - Value: list of source columns that map to it, sorted by confidence desc
+        
+        Only includes targets with 2+ source columns (actual conflicts).
+        """
+        from collections import defaultdict
+        
+        # Invert the mapping: target_field -> list of source columns
+        target_to_sources = defaultdict(list)
+        
+        for source_col, mapping in suggested_mappings.items():
+            target = mapping.get("target_field")
+            if target:
+                target_to_sources[target].append({
+                    "source_column": source_col,
+                    "confidence": mapping.get("confidence", 0),
+                    "field_type": mapping.get("field_type"),
+                    "required": mapping.get("required", False),
+                    "source": mapping.get("source", "embeddings"),
+                    "reason": mapping.get("reason", ""),
+                    "attempts": mapping.get("attempts"),
+                    "transformation": mapping.get("transformation"),
+                })
+        
+        # Filter to only conflicts (2+ sources for same target)
+        conflicts = {}
+        for target, sources in target_to_sources.items():
+            if len(sources) > 1:
+                # Sort by confidence descending
+                sources.sort(key=lambda x: x.get("confidence", 0), reverse=True)
+                conflicts[target] = sources
+        
+        if conflicts:
+            logger.info(f"⚠️  Detected {len(conflicts)} mapping conflicts (multiple columns → same target)")
+            for target, sources in conflicts.items():
+                source_names = [s["source_column"] for s in sources]
+                logger.debug(f"   {target} ← {source_names}")
+        
+        return conflicts
     
     def _convert_column_matches(
         self,
