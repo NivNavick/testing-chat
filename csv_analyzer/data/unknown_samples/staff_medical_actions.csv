@@ -1,0 +1,22 @@
+action_id,patient_id,staff_id,procedure_code,procedure_name,performed_at,department,diagnosis_code,notes
+ACT-001,P-1001,DR-101,99213,Office Visit - Established Patient,2024-12-10 08:30:00,Internal Medicine,J06.9,Routine follow-up for upper respiratory infection
+ACT-002,P-1002,DR-102,99214,Office Visit - Detailed,2024-12-10 09:15:00,Cardiology,I10,Blood pressure management review
+ACT-003,P-1003,NP-201,96372,Therapeutic Injection,2024-12-10 10:00:00,Rheumatology,M06.9,Cortisone injection for joint inflammation
+ACT-004,P-1004,RN-301,90471,Immunization Administration,2024-12-10 10:30:00,Primary Care,Z23,Flu vaccine administered
+ACT-005,P-1005,DR-103,99203,New Patient Visit,2024-12-10 11:00:00,Family Medicine,E11.9,Initial diabetes consultation
+ACT-006,P-1006,DR-104,99215,Office Visit - High Complexity,2024-12-10 13:00:00,Oncology,C50.9,Breast cancer treatment planning
+ACT-007,P-1007,PA-401,97110,Physical Therapy Evaluation,2024-12-10 14:00:00,Rehabilitation,M54.5,Lower back pain assessment
+ACT-008,P-1008,DR-105,90837,Psychotherapy 60 minutes,2024-12-10 14:30:00,Psychiatry,F32.1,Major depressive disorder therapy session
+ACT-009,P-1009,RN-302,99211,Nurse Visit,2024-12-10 15:00:00,Wound Care,L89.0,Pressure ulcer dressing change
+ACT-010,P-1010,DR-106,43239,Upper GI Endoscopy with Biopsy,2024-12-10 16:00:00,Gastroenterology,K21.0,GERD evaluation with tissue sampling
+ACT-011,P-1001,NP-202,99213,Follow-up Visit,2024-12-11 08:00:00,Internal Medicine,J06.9,Recovery assessment - symptoms improving
+ACT-012,P-1011,DR-107,27447,Total Knee Replacement,2024-12-11 07:30:00,Orthopedic Surgery,M17.11,Primary osteoarthritis right knee
+ACT-013,P-1012,RN-303,96365,IV Infusion - Initial,2024-12-11 09:00:00,Infusion Center,D64.9,Iron infusion for anemia
+ACT-014,P-1013,DR-108,92014,Comprehensive Eye Exam,2024-12-11 10:00:00,Ophthalmology,H40.10,Glaucoma screening and monitoring
+ACT-015,P-1014,NP-203,99395,Preventive Visit - Adult,2024-12-11 11:00:00,Primary Care,Z00.00,Annual wellness examination
+ACT-016,P-1015,DR-109,93000,Electrocardiogram,2024-12-11 11:30:00,Cardiology,R00.0,Palpitations workup
+ACT-017,P-1016,PA-402,20610,Joint Aspiration,2024-12-11 13:00:00,Orthopedics,M25.56,Knee effusion drainage
+ACT-018,P-1017,DR-110,31231,Nasal Endoscopy,2024-12-11 14:00:00,ENT,J34.2,Deviated septum evaluation
+ACT-019,P-1018,RN-304,99497,Advance Care Planning,2024-12-11 15:00:00,Palliative Care,Z51.5,End-of-life care discussion
+ACT-020,P-1019,DR-111,11102,Tangential Skin Biopsy,2024-12-11 16:00:00,Dermatology,L82.1,Suspicious lesion removed for pathology
+
