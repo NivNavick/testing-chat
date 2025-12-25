@@ -49,6 +49,10 @@ fields:
       - קוד_עובד
       - מזהה_עובד
       - עובד
+      - זיהוי_עובד
+      - ת_עובד
+      - מס_עובד
+      - קוד
       # Spanish (Español)
       - numero_empleado
       - id_empleado
@@ -93,6 +97,7 @@ fields:
       - תאריך_משמרת
       - תאריך_עבודה
       - תאריך
+      - יום_עבודה
       # Spanish
       - fecha_turno
       - fecha_trabajo
@@ -128,6 +133,8 @@ fields:
       - שעת_כניסה
       - התחלה
       - כניסה
+      - זמן_התחלה
+      - שעת_הגעה
       # Spanish
       - hora_entrada
       - inicio_turno
@@ -163,6 +170,8 @@ fields:
       - שעת_יציאה
       - סיום
       - יציאה
+      - זמן_סיום
+      - שעת_עזיבה
       # Spanish
       - hora_salida
       - fin_turno
@@ -325,6 +334,8 @@ fields:
       - יחידה
       - שם_מחלקה
       - קוד_מחלקה
+      - אגף
+      - מחלקת_עבודה
       # Spanish
       - departamento
       - unidad
@@ -356,6 +367,9 @@ fields:
       # Hebrew
       - סוג_משמרת
       - סוג
+      - סוג_תורנות
+      - תורנות
+      - סיווג_משמרת
       # Spanish
       - tipo_turno
       - turno
@@ -411,6 +425,8 @@ fields:
       # Hebrew
       - אחראי
       - מנהל
+      - האם_אחמש
+      - אחמש
       # Spanish
       - es_supervisor
       - supervisor
