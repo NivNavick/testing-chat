@@ -176,6 +176,7 @@ class SchemaEmbeddingsService:
         vertical: Optional[str] = None,
         document_type: Optional[str] = None,
         n_results: int = 5,
+        query_embedding: Optional[Any] = None,
     ) -> List[Dict[str, Any]]:
         """
         Find schema fields that match a column description.
@@ -185,6 +186,7 @@ class SchemaEmbeddingsService:
             vertical: Optional filter by vertical
             document_type: Optional filter by document type
             n_results: Number of results to return
+            query_embedding: Optional pre-computed embedding (avoids regeneration)
             
         Returns:
             List of matching fields with similarity scores
@@ -193,13 +195,14 @@ class SchemaEmbeddingsService:
             logger.warning("No schema fields indexed. Run index_all_schemas() first.")
             return []
         
-        # Generate query embedding
-        prefixed = f"query: {column_text}"
-        query_embedding = self.embeddings_client._model.encode(
-            prefixed,
-            convert_to_numpy=True,
-            normalize_embeddings=True
-        )
+        # Use pre-computed embedding or generate new one
+        if query_embedding is None:
+            prefixed = f"query: {column_text}"
+            query_embedding = self.embeddings_client._model.encode(
+                prefixed,
+                convert_to_numpy=True,
+                normalize_embeddings=True
+            )
         
         # Build where filter
         where_filter = None
@@ -264,6 +267,9 @@ class SchemaEmbeddingsService:
                 "document_type_scores": {
                     "employee_shifts": {"score": 0.85, "matched_fields": 4, "total_required": 4},
                     "medical_actions": {"score": 0.65, "matched_fields": 3, "total_required": 6},
+                },
+                "column_embeddings": {
+                    "col_name": <embedding array>  # Cached for reuse
                 }
             }
         """
@@ -271,6 +277,7 @@ class SchemaEmbeddingsService:
         from csv_analyzer.core.type_compatibility import get_type_compatibility
         
         column_matches = {}
+        column_embeddings = {}  # Cache embeddings for potential reuse
         doc_type_votes = {}  # doc_type -> list of adjusted similarities
         
         for col in columns:
@@ -278,11 +285,21 @@ class SchemaEmbeddingsService:
             col_type = col.get("detected_type", "unknown")
             col_text = column_to_embedding_text(col)
             
-            # Find matching fields
+            # Generate and cache embedding
+            prefixed = f"query: {col_text}"
+            query_embedding = self.embeddings_client._model.encode(
+                prefixed,
+                convert_to_numpy=True,
+                normalize_embeddings=True
+            )
+            column_embeddings[col_name] = query_embedding
+            
+            # Find matching fields using cached embedding
             matches = self.find_matching_fields(
                 column_text=col_text,
                 vertical=vertical,
                 n_results=5,
+                query_embedding=query_embedding,
             )
             
             # Enrich matches with source type and type-adjusted similarity
@@ -341,7 +358,84 @@ class SchemaEmbeddingsService:
         return {
             "column_matches": column_matches,
             "document_type_scores": document_type_scores,
+            "column_embeddings": column_embeddings,
         }
+    
+    def get_column_matches_for_document_type(
+        self,
+        columns: List[Dict[str, Any]],
+        column_embeddings: Dict[str, Any],
+        document_type: str,
+        vertical: Optional[str] = None,
+        n_results: int = 5,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Get column matches filtered to a specific document type.
+        
+        Uses cached embeddings to avoid regenerating them.
+        
+        Args:
+            columns: List of column profiles
+            column_embeddings: Cached embeddings from score_columns_against_schemas
+            document_type: Document type to filter by
+            vertical: Optional vertical filter
+            n_results: Number of results per column
+            
+        Returns:
+            Dict of column_name -> list of matches (all from the specified document_type)
+        """
+        from csv_analyzer.core.text_representation import column_to_embedding_text
+        from csv_analyzer.core.type_compatibility import get_type_compatibility
+        
+        column_matches = {}
+        
+        for col in columns:
+            col_name = col["column_name"]
+            col_type = col.get("detected_type", "unknown")
+            col_text = column_to_embedding_text(col)
+            
+            # Use cached embedding
+            query_embedding = column_embeddings.get(col_name)
+            if query_embedding is None:
+                logger.warning(f"No cached embedding for column '{col_name}', generating new one")
+                prefixed = f"query: {col_text}"
+                query_embedding = self.embeddings_client._model.encode(
+                    prefixed,
+                    convert_to_numpy=True,
+                    normalize_embeddings=True
+                )
+            
+            # Find matching fields filtered by document type
+            matches = self.find_matching_fields(
+                column_text=col_text,
+                vertical=vertical,
+                document_type=document_type,
+                n_results=n_results,
+                query_embedding=query_embedding,
+            )
+            
+            # Enrich matches with source type and type-adjusted similarity
+            enriched_matches = []
+            for match in matches:
+                target_type = match.get("field_type", "string")
+                type_compat = get_type_compatibility(col_type, target_type)
+                raw_similarity = match["similarity"]
+                adjusted_similarity = raw_similarity * type_compat
+                
+                enriched_match = {
+                    **match,
+                    "source_type": col_type,
+                    "raw_similarity": raw_similarity,
+                    "type_compatibility": round(type_compat, 3),
+                    "similarity": round(adjusted_similarity, 4),
+                }
+                enriched_matches.append(enriched_match)
+            
+            # Sort by adjusted similarity
+            enriched_matches.sort(key=lambda x: x["similarity"], reverse=True)
+            column_matches[col_name] = enriched_matches
+        
+        return column_matches
 
 
 # Global service instance

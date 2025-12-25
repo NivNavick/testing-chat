@@ -160,7 +160,7 @@ class ScoringEngine:
             document_similarity_results
         )
         
-        # 2. Calculate column-level scores
+        # 2. Calculate column-level scores (also caches embeddings)
         column_results = self.schema_service.score_columns_against_schemas(
             columns=column_profiles,
             vertical=vertical,
@@ -168,6 +168,7 @@ class ScoringEngine:
         
         doc_type_col_scores = column_results["document_type_scores"]
         column_matches = column_results["column_matches"]
+        column_embeddings = column_results.get("column_embeddings", {})
         
         # 3. Calculate coverage scores
         doc_type_coverage = self._calculate_coverage_scores(
@@ -210,18 +211,31 @@ class ScoringEngine:
                 "coverage_score": 0,
             }
         
+        # 5b. Second query: Get column matches filtered to winning document type
+        # Uses cached embeddings to avoid regenerating them
+        winning_vertical = self._get_vertical_for_doc_type(winner, vertical, document_similarity_results)
+        if winner and column_embeddings:
+            final_column_matches = self.schema_service.get_column_matches_for_document_type(
+                columns=column_profiles,
+                column_embeddings=column_embeddings,
+                document_type=winner,
+                vertical=winning_vertical,
+                n_results=5,
+            )
+            logger.info(f"Second query: Retrieved column matches filtered to '{winner}'")
+        else:
+            final_column_matches = column_matches
+        
         # 6. Build suggested mappings (with optional OpenAI fallback)
+        # Use final_column_matches which is filtered to winning doc type
         suggested_mappings = self._build_suggested_mappings(
-            column_matches=column_matches,
+            column_matches=final_column_matches,
             winning_doc_type=winner,
             column_profiles=column_profiles,
         )
         
         # 7. Detect mapping conflicts (multiple source columns → same target field)
         mapping_conflicts = self._detect_mapping_conflicts(suggested_mappings)
-        
-        # 8. Get vertical
-        winning_vertical = self._get_vertical_for_doc_type(winner, vertical, document_similarity_results)
         
         return ScoringResult(
             document_type=winner,
@@ -230,7 +244,7 @@ class ScoringEngine:
             document_score=winner_scores["document_score"],
             column_score=winner_scores["column_score"],
             coverage_score=winner_scores["coverage_score"],
-            column_matches=self._convert_column_matches(column_matches),
+            column_matches=self._convert_column_matches(final_column_matches),
             suggested_mappings=suggested_mappings,
             all_scores=combined_scores,
             mapping_conflicts=mapping_conflicts,
