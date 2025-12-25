@@ -1,0 +1,12 @@
+procedure_id,patient_id,staff_id,billing_code,procedure_description,performed_datetime,department,diagnosis_code,notes
+PROC-001,PT-10001,DR-SMITH-101,99213,Office Visit - Established Patient,2024-01-15 09:00:00,Internal Medicine,J06.9,Follow-up for URI - improving
+PROC-002,PT-10002,DR-JONES-102,99214,Office Visit - Extended,2024-01-15 10:30:00,Family Medicine,E11.9,Diabetes management review
+PROC-003,PT-10003,NP-WILSON-201,96372,Therapeutic Injection,2024-01-15 11:00:00,Rheumatology,M06.9,Cortisone injection - left knee
+PROC-004,PT-10004,RN-GARCIA-301,90471,Immunization Administration,2024-01-15 11:30:00,Primary Care,Z23,Flu vaccine given
+PROC-005,PT-10005,DR-LEE-103,93000,Electrocardiogram Complete,2024-01-15 14:00:00,Cardiology,I25.10,Routine cardiac screening
+PROC-006,PT-10006,PA-CHEN-401,97110,Physical Therapy Evaluation,2024-01-15 14:30:00,Rehabilitation,M54.5,Lower back pain assessment
+PROC-007,PT-10007,DR-PATEL-104,71046,Chest X-Ray 2 Views,2024-01-16 08:00:00,Radiology,J18.9,Pneumonia workup
+PROC-008,PT-10008,DR-BROWN-105,29881,Knee Arthroscopy,2024-01-16 09:00:00,Orthopedics,M23.41,Meniscus repair successful
+PROC-009,PT-10009,NP-DAVIS-202,99395,Preventive Visit Adult,2024-01-16 10:00:00,Primary Care,Z00.00,Annual wellness exam
+PROC-010,PT-10010,DR-MILLER-106,43239,Upper GI Endoscopy with Biopsy,2024-01-16 11:00:00,Gastroenterology,K21.0,GERD evaluation
+

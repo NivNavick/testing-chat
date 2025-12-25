@@ -1,0 +1,442 @@
+name: staff_clinical_procedures
+vertical: medical
+version: "1.0"
+description: "Clinical procedures and medical actions performed BY healthcare staff (doctors, nurses, PAs, etc.) on patients. This is a log of what each staff member did - encounters, treatments, services, interventions."
+
+# Distinguishing features from lab_results:
+# - NO result_value, result_unit, reference_range (lab-specific)
+# - HAS performer/staff info as core field (who did the action)
+# - HAS billing/CPT codes (services performed)
+# - HAS procedure descriptions (what was done)
+
+fields:
+  - name: procedure_id
+    type: string
+    required: true
+    description: "Unique identifier for the clinical procedure, action, or encounter"
+    aliases:
+      - action_id
+      - encounter_id
+      - service_id
+      - act_id
+      - id
+      - record_id
+      - treatment_id
+      - visit_id
+      - log_id
+      - entry_id
+      - transaction_id
+      - case_id
+      - event_id
+      # Creative/obscure names
+      - tracknum
+      - track_num
+      - track_number
+      - tracking_number
+      - tracking_id
+      - log_entry
+      - clinical_id
+      - cln_id
+      - ref_number
+      - reference_number
+      - seq_num
+      - sequence_number
+      # Hebrew
+      - מזהה_פעולה
+      - מזהה_טיפול
+      - מספר_פעולה
+      - פעולה
+      - מספר_רשומה
+      # Spanish
+      - id_procedimiento
+      - id_accion
+      - procedimiento
+      - numero_accion
+      # Arabic
+      - معرف_الاجراء
+      - إجراء
+      - رقم_العملية
+      # Russian
+      - id_процедуры
+      - процедура
+      - номер_записи
+      # French
+      - id_acte
+      - numero_intervention
+    embedding_text: "procedure action service treatment identifier ID number unique record tracking encounter clinical log entry"
+
+  - name: patient_ref
+    type: string
+    required: true
+    description: "Reference to the patient who received the procedure or treatment"
+    aliases:
+      - patient_id
+      - patient
+      - patient_mrn
+      - mrn
+      - pt_id
+      - patient_num
+      - patient_number
+      - medical_record
+      - chart_ref
+      - chartref
+      - chart_number
+      - chart_id
+      - chart
+      - patient_chart
+      - pt_ref
+      - pt_num
+      - subject_id
+      - recipient_id
+      - client_id
+      - ptx
+      # Hebrew
+      - מספר_מטופל
+      - מזהה_מטופל
+      - מטופל
+      - תיק_רפואי
+      # Spanish
+      - id_paciente
+      - numero_paciente
+      - paciente
+      - expediente
+      # Arabic
+      - رقم_المريض
+      - مريض
+      - ملف_المريض
+      # Russian
+      - id_пациента
+      - пациент
+      - номер_пациента
+      # French
+      - id_patient
+      - dossier_patient
+    embedding_text: "patient person medical record number MRN identifier recipient chart reference subject"
+
+  - name: staff_id
+    type: string
+    required: true
+    description: "Identifier for the healthcare staff member who performed the action"
+    aliases:
+      - performer_id
+      - physician_id
+      - doctor_id
+      - provider_id
+      - prov_id
+      - practitioner_id
+      - clinician_id
+      - provider
+      - nurse_id
+      - healer_badge
+      - healerbadge
+      - badge
+      - badge_id
+      - badge_number
+      - emp_id
+      - employee_id
+      - staff_badge
+      - staff_num
+      - caregiver_id
+      - attendant_id
+      - md_id
+      - np_id
+      - pa_id
+      - rn_id
+      - dr_id
+      - who_did
+      - performed_by
+      - done_by
+      # Hebrew
+      - מזהה_רופא
+      - מזהה_מטפל
+      - קוד_רופא
+      - רופא
+      - מזהה_אחות
+      - מזהה_צוות
+      # Spanish
+      - id_medico
+      - id_proveedor
+      - medico
+      - id_personal
+      - personal
+      # Arabic
+      - معرف_الطبيب
+      - طبيب
+      - معرف_الممرض
+      - معرف_الموظف
+      # Russian
+      - id_врача
+      - врач
+      - id_персонала
+      - персонал
+      # French
+      - id_medecin
+      - id_soignant
+      - praticien
+    embedding_text: "performer provider physician doctor nurse practitioner healthcare worker staff employee badge healer caregiver who did"
+
+  - name: billing_code
+    type: string
+    required: true
+    description: "Procedure or service code for billing (CPT, ICD-10-PCS, HCPCS, SNOMED, local codes)"
+    aliases:
+      - procedure_code
+      - cpt_code
+      - code
+      - service_code
+      - treatment_code
+      - action_code
+      - billing_entry
+      - billingentry
+      - bill_code
+      - charge_code
+      - hcpcs_code
+      - cpt
+      - proc_code
+      - svc_code
+      - charge
+      # Hebrew
+      - קוד_פעולה
+      - קוד_טיפול
+      - קוד_חיוב
+      - קוד
+      # Spanish
+      - codigo_procedimiento
+      - codigo_facturacion
+      - codigo
+      # Arabic
+      - رمز_الاجراء
+      - رمز_الفوترة
+      - رمز
+      # Russian
+      - код_процедуры
+      - код_биллинга
+      - код
+      # French
+      - code_acte
+      - code_facturation
+    embedding_text: "procedure code CPT HCPCS ICD service treatment billing charge reimbursement"
+
+  - name: procedure_description
+    type: string
+    required: false
+    description: "Human readable description of what was done"
+    aliases:
+      - procedure_name
+      - procedure_desc
+      - description
+      - name
+      - service_name
+      - treatment_name
+      - action_name
+      - action_description
+      - what_we_did
+      - whatwedid
+      - what_done
+      - whatdone
+      - activity
+      - intervention
+      - service_desc
+      - action
+      - work_performed
+      - task
+      - task_description
+      # Hebrew
+      - שם_פעולה
+      - תיאור_פעולה
+      - תיאור
+      - שם
+      - מה_בוצע
+      # Spanish
+      - nombre_procedimiento
+      - descripcion
+      - nombre
+      - que_hicimos
+      # Arabic
+      - اسم_الاجراء
+      - وصف
+      - اسم
+      - ماذا_فعلنا
+      # Russian
+      - название_процедуры
+      - описание
+      - название
+      - что_сделали
+      # French
+      - nom_acte
+      - description
+      - intervention
+    embedding_text: "procedure name description title action service treatment what done activity intervention task work performed"
+
+  - name: performed_datetime
+    type: datetime
+    required: true
+    description: "Date and time when the procedure was performed"
+    aliases:
+      - performed_at
+      - action_date
+      - service_datetime
+      - datetime
+      - timestamp
+      - date
+      - service_date
+      - procedure_date
+      - performed_date
+      - happened_when
+      - happenedwhen
+      - when_done
+      - event_time
+      - encounter_date
+      - visit_date
+      - action_time
+      - date_time
+      - service_time
+      # Hebrew
+      - תאריך_ביצוע
+      - זמן_ביצוע
+      - תאריך_פעולה
+      - תאריך
+      - מתי_קרה
+      # Spanish
+      - fecha_procedimiento
+      - fecha_hora
+      - fecha
+      - cuando_paso
+      # Arabic
+      - تاريخ_التنفيذ
+      - تاريخ
+      - متى_حدث
+      # Russian
+      - дата_выполнения
+      - дата
+      - когда_произошло
+      # French
+      - date_execution
+      - horodatage
+    embedding_text: "performed date time when action service timestamp happened occurred done"
+
+  - name: location
+    type: string
+    required: false
+    description: "Department, clinic, or location where procedure was performed"
+    aliases:
+      - department
+      - department_code
+      - dept
+      - service_dept
+      - clinic
+      - unit
+      - facility
+      - where_done
+      - wheredone
+      - room
+      - site
+      - service_location
+      - care_site
+      - venue
+      - ward
+      - area
+      - place
+      # Hebrew
+      - מחלקה
+      - מחלקה_מבצעת
+      - יחידה
+      - מיקום
+      - איפה
+      # Spanish
+      - departamento
+      - ubicacion
+      - clinica
+      - donde
+      # Arabic
+      - القسم
+      - قسم
+      - الموقع
+      - أين
+      # Russian
+      - отделение
+      - отдел
+      - место
+      - где
+      # French
+      - departement
+      - lieu
+      - emplacement
+    embedding_text: "department location clinic unit service area ward where done facility site room"
+
+  - name: diagnosis_code
+    type: string
+    required: false
+    description: "Related diagnosis or reason code (ICD-10, ICD-9)"
+    aliases:
+      - icd10_code
+      - icd_code
+      - dx
+      - diagnosis
+      - dx_code
+      - diagnostic_code
+      - why_needed
+      - whyneeded
+      - reason_code
+      - indication
+      - condition
+      - problem_code
+      # Hebrew
+      - קוד_אבחנה
+      - אבחנה
+      - למה_נדרש
+      # Spanish
+      - codigo_diagnostico
+      - diagnostico
+      - razon
+      # Arabic
+      - رمز_التشخيص
+      - تشخيص
+      - لماذا
+      # Russian
+      - код_диагноза
+      - диагноз
+      - причина
+      # French
+      - code_diagnostic
+      - diagnostic
+      - raison
+    embedding_text: "diagnosis ICD code condition reason indication why needed problem"
+
+  - name: clinical_notes
+    type: string
+    required: false
+    description: "Additional notes, comments, or observations about the procedure"
+    aliases:
+      - notes
+      - comments
+      - remarks
+      - note
+      - observation
+      - extra_notes
+      - extranotes
+      - additional_info
+      - details
+      - narrative
+      - findings
+      - outcome_notes
+      # Hebrew
+      - הערות
+      - הערה
+      - הערות_נוספות
+      # Spanish
+      - notas
+      - observaciones
+      - comentarios
+      # Arabic
+      - ملاحظات
+      - تعليقات
+      # Russian
+      - примечания
+      - заметки
+      # French
+      - remarques
+      - notes
+      - observations
+    embedding_text: "notes comments remarks additional information observations findings narrative details extra"
+

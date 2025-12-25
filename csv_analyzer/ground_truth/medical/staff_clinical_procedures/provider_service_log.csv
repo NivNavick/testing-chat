@@ -1,0 +1,10 @@
+service_id,patient_mrn,provider_id,service_code,service_name,service_datetime,service_dept,icd10_code,comments
+SVC-2024-001,MRN-50001,PROV-DR-101,99213,Established Patient Office Visit,2024-05-01 09:00:00,Internal Medicine,Z00.00,Annual follow-up
+SVC-2024-002,MRN-50002,PROV-NP-201,99214,Office Visit Detailed,2024-05-01 10:00:00,Family Practice,M54.5,Chronic back pain
+SVC-2024-003,MRN-50003,PROV-PA-301,97110,Physical Therapy Session,2024-05-01 11:00:00,Physical Therapy,M62.81,Muscle weakness rehab
+SVC-2024-004,MRN-50004,PROV-DR-102,93000,ECG Recording,2024-05-01 14:00:00,Cardiology,I10,Hypertension monitoring
+SVC-2024-005,MRN-50005,PROV-RN-401,96372,Injection Service,2024-05-01 15:00:00,Injection Clinic,M06.9,RA medication
+SVC-2024-006,MRN-50006,PROV-DR-103,99203,New Patient Encounter,2024-05-02 08:00:00,Primary Care,E11.9,New onset diabetes
+SVC-2024-007,MRN-50007,PROV-DR-104,71046,Radiological Exam Chest,2024-05-02 09:00:00,Radiology,R05,Cough evaluation
+SVC-2024-008,MRN-50008,PROV-DR-105,29881,Arthroscopic Procedure,2024-05-02 10:00:00,Orthopedic Surgery,M23.41,Meniscal tear repair
+

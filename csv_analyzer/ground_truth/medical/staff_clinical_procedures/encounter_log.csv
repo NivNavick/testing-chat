@@ -1,0 +1,10 @@
+encounter_id,chart_number,clinician_id,cpt,description,date,location,dx_code,remarks
+ENC-001,CHT-001,CLN-MD-01,99213,Follow-up visit,2024-06-10 09:00:00,Clinic A,J06.9,Symptoms resolving
+ENC-002,CHT-002,CLN-NP-01,99214,Comprehensive exam,2024-06-10 10:00:00,Clinic B,E11.9,A1C reviewed
+ENC-003,CHT-003,CLN-RN-01,96372,Medication injection,2024-06-10 11:00:00,Injection Bay,M06.9,Biologic administered
+ENC-004,CHT-004,CLN-PA-01,97110,Rehab evaluation,2024-06-10 14:00:00,Rehab Unit,M54.5,PT plan created
+ENC-005,CHT-005,CLN-MD-02,93000,Cardiac evaluation,2024-06-11 08:00:00,Heart Center,I25.10,Stress test normal
+ENC-006,CHT-006,CLN-MD-03,71046,Imaging study,2024-06-11 09:00:00,Imaging Dept,J18.9,Infiltrate seen
+ENC-007,CHT-007,CLN-MD-04,29881,Surgical procedure,2024-06-11 10:00:00,OR Suite 1,M23.41,Knee scope done
+ENC-008,CHT-008,CLN-NP-02,99395,Wellness visit,2024-06-11 11:00:00,Primary Care,Z00.00,All preventive care
+

@@ -1,0 +1,8 @@
+id_procedimiento,id_paciente,id_medico,codigo_procedimiento,nombre_procedimiento,fecha_procedimiento,departamento,codigo_diagnostico,notas
+PROC-ES-001,PAC-001,MED-DR-01,99213,Visita de seguimiento,2024-07-01 09:00:00,Medicina Interna,J06.9,Paciente mejorando
+PROC-ES-002,PAC-002,MED-NP-01,99214,Consulta extendida,2024-07-01 10:00:00,Cardiologia,I25.10,ECG normal
+PROC-ES-003,PAC-003,MED-RN-01,96372,Administracion de inyeccion,2024-07-01 11:00:00,Clinica A,E11.9,Insulina administrada
+PROC-ES-004,PAC-004,MED-PA-01,97110,Evaluacion de fisioterapia,2024-07-01 14:00:00,Rehabilitacion,M54.5,Plan de tratamiento
+PROC-ES-005,PAC-005,MED-DR-02,71046,Radiografia de torax,2024-07-02 08:00:00,Radiologia,J18.9,Hallazgos normales
+PROC-ES-006,PAC-006,MED-DR-03,29881,Artroscopia de rodilla,2024-07-02 10:00:00,Cirugia Ortopedica,M23.41,Reparacion exitosa
+

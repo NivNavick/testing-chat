@@ -1,0 +1,10 @@
+TrackNum,ChartRef,HealerBadge,BillingEntry,WhatWeDid,HappenedWhen,WhereDone,WhyNeeded,ExtraNotes
+CLN-001,PTX-11111,MD-ALPHA-01,99213,Routine health evaluation,2024-03-01 09:00:00,Main Clinic,J06.9,Patient stable
+CLN-002,PTX-22222,NP-BETA-02,99214,Extended health consultation,2024-03-01 10:00:00,Wing B,M54.5,Back pain discussed
+CLN-003,PTX-33333,DR-GAMMA-03,93000,Heart rhythm recording,2024-03-01 11:00:00,Cardio Bay,I25.10,Normal ECG
+CLN-004,PTX-44444,PA-DELTA-04,97110,Mobility restoration work,2024-03-01 14:00:00,Rehab Zone,S83.511A,Post-op PT
+CLN-005,PTX-55555,MD-ALPHA-01,85025,Blood workup ordered,2024-03-01 15:00:00,Lab Wing,D64.9,Anemia check
+CLN-006,PTX-66666,RN-EPSILON-05,96372,Medicine administered,2024-03-01 16:00:00,Injection Room,E11.9,Insulin given
+CLN-007,PTX-77777,DR-ZETA-06,71046,Chest imaging performed,2024-03-02 08:00:00,Imaging Suite,J18.9,Infiltrate noted
+CLN-008,PTX-88888,MD-ETA-07,29881,Scope intervention knee,2024-03-02 10:00:00,OR-2,M23.41,Successful repair
+

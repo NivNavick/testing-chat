@@ -1,0 +1,14 @@
+LogEntry,PatientFile,CaregiverID,ChargeCode,WorkPerformed,EventTime,ServiceArea,ConditionCode,Observations
+LOG-7001,PF-220011,STAFF-DR-MILLER,99213,Routine wellness check with BP measurement,2024-11-05 08:30:00,Outpatient Suite A,Z00.00,Patient in good health - scheduled annual
+LOG-7002,PF-220022,STAFF-NP-SANTOS,99214,Comprehensive diabetes management visit,2024-11-05 09:15:00,Endocrine Clinic,E11.9,A1C elevated - adjusted medication
+LOG-7003,PF-220033,STAFF-RN-CHANG,96372,Vitamin B12 injection administered,2024-11-05 10:00:00,Infusion Bay 2,D51.0,Monthly injection - tolerating well
+LOG-7004,PF-220044,STAFF-PA-REYES,97110,Post-surgical knee rehabilitation session,2024-11-05 11:00:00,PT Center,S83.511A,ROM improving - continue exercises
+LOG-7005,PF-220055,STAFF-DR-WONG,93000,12-lead electrocardiogram performed,2024-11-05 13:00:00,Cardiac Testing,I10,Screening for hypertensive patient - NSR
+LOG-7006,PF-220066,STAFF-DR-KUMAR,71046,PA and lateral chest radiograph,2024-11-05 14:00:00,Imaging Center,R05.9,Chronic cough workup - clear lungs
+LOG-7007,PF-220077,STAFF-NP-ADAMS,99395,Adult preventive medicine encounter,2024-11-05 15:00:00,Family Health,Z00.00,Complete physical - all immunizations current
+LOG-7008,PF-220088,STAFF-DR-OKONKWO,29881,Arthroscopic meniscectomy right knee,2024-11-06 07:30:00,Main OR Suite 3,M23.41,Successful procedure - discharged same day
+LOG-7009,PF-220099,STAFF-RN-PETROV,90471,Influenza vaccine intramuscular,2024-11-06 09:00:00,Vaccine Clinic,Z23,Seasonal flu shot - no adverse reaction
+LOG-7010,PF-220110,STAFF-PA-DUVAL,98941,Cervical spine manipulation therapy,2024-11-06 10:30:00,Chiropractic Suite,M54.2,Neck stiffness improved post-treatment
+LOG-7011,PF-220121,STAFF-DR-CHEN,43239,EGD with biopsy upper GI tract,2024-11-06 11:00:00,Endoscopy Room 1,K21.0,Gastritis noted - biopsies pending
+LOG-7012,PF-220132,STAFF-NP-BROOKS,90837,Individual psychotherapy 60 min,2024-11-06 14:00:00,Behavioral Health,F32.1,Depression improving with therapy
+

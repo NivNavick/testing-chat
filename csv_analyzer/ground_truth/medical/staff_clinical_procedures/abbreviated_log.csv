@@ -1,0 +1,10 @@
+act_id,pt_id,prov_id,cpt_code,action,timestamp,dept,dx
+A-001,P001,MD-01,99213,Eval and Management,2024-02-10 09:00:00,IM,Z00.00
+A-002,P002,MD-02,90834,Psychotherapy 45min,2024-02-10 10:00:00,Psych,F32.1
+A-003,P003,NP-01,97110,PT Eval,2024-02-10 11:00:00,Rehab,M54.5
+A-004,P001,RN-01,96372,Injection Admin,2024-02-10 11:30:00,IM,J06.9
+A-005,P004,MD-03,99215,Complex Visit,2024-02-10 14:00:00,Spec,E11.65
+A-006,P005,PA-01,98941,Chiro Manipulation,2024-02-10 15:00:00,Chiro,M99.01
+A-007,P006,MD-04,99203,New Pt Visit,2024-02-11 08:00:00,FM,Z00.00
+A-008,P007,RN-02,96365,IV Infusion,2024-02-11 09:00:00,Infusion,D64.9
+
