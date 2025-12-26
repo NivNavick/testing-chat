@@ -1,11 +1,12 @@
 """Services for CSV Analyzer."""
 
-from csv_analyzer.services.openai_fallback import (
-    OpenAIFallbackService,
-    create_fallback_service,
+from csv_analyzer.services.dspy_service import (
+    DSPyClassificationService,
+    create_dspy_service,
 )
 
 __all__ = [
-    "OpenAIFallbackService",
-    "create_fallback_service",
+    "DSPyClassificationService",
+    "create_dspy_service",
 ]
+

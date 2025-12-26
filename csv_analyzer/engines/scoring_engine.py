@@ -16,7 +16,7 @@ from csv_analyzer.core.schema_embeddings import SchemaEmbeddingsService
 from csv_analyzer.core.schema_registry import SchemaRegistry, get_schema_registry
 
 if TYPE_CHECKING:
-    from csv_analyzer.services.openai_fallback import OpenAIFallbackService
+    from csv_analyzer.services.dspy_service import DSPyClassificationService
     from csv_analyzer.contexts.registry import VerticalContext
 
 logger = logging.getLogger(__name__)
@@ -110,8 +110,8 @@ class ScoringEngine:
         weight_document: float = None,
         weight_column: float = None,
         weight_coverage: float = None,
-        openai_fallback: Optional["OpenAIFallbackService"] = None,
-        openai_verify_all: bool = False,
+        dspy_service: Optional["DSPyClassificationService"] = None,
+        dspy_verify_all: bool = False,
         vertical_context: Optional["VerticalContext"] = None,
     ):
         """
@@ -123,8 +123,8 @@ class ScoringEngine:
             weight_document: Weight for document similarity (default 0.3)
             weight_column: Weight for column matching (default 0.5)
             weight_coverage: Weight for field coverage (default 0.2)
-            openai_fallback: Optional OpenAI fallback service for unmapped columns
-            openai_verify_all: If True, verify ALL matches with OpenAI (not just low-confidence)
+            dspy_service: Optional DSPy service for column classification
+            dspy_verify_all: If True, verify ALL matches with DSPy (not just low-confidence)
             vertical_context: Optional vertical context for domain terminology
         """
         self.schema_service = schema_embeddings_service
@@ -134,8 +134,8 @@ class ScoringEngine:
         self.weight_column = weight_column or self.WEIGHT_COLUMN
         self.weight_coverage = weight_coverage or self.WEIGHT_COVERAGE
         
-        self.openai_fallback = openai_fallback
-        self.openai_verify_all = openai_verify_all
+        self.dspy_service = dspy_service
+        self.dspy_verify_all = dspy_verify_all
         self.vertical_context = vertical_context
     
     def score(
@@ -380,7 +380,7 @@ class ScoringEngine:
             
             profile = profile_lookup.get(col_name, {})
             
-            if self.openai_verify_all and self.openai_fallback and self.openai_fallback.is_available:
+            if self.dspy_verify_all and self.dspy_service and self.dspy_service.is_available:
                 # Verify-all mode: verify EVERY match, even high-confidence ones
                 columns_to_verify.append({
                     "column_name": col_name,
@@ -431,7 +431,7 @@ class ScoringEngine:
             for col_info in columns_to_verify:
                 col_name = col_info["column_name"]
                 
-                result = self.openai_fallback.verify_and_find_match(
+                result = self.dspy_service.verify_and_find_match(
                     column_name=col_name,
                     column_type=col_info["column_type"],
                     sample_values=col_info["sample_values"],
@@ -475,11 +475,11 @@ class ScoringEngine:
                     }
         
         # Handle normal fallback mode for unmapped columns
-        elif unmapped_columns and self.openai_fallback and self.openai_fallback.is_available:
-            logger.info(f"Sending {len(unmapped_columns)} unmapped columns to OpenAI fallback")
+        elif unmapped_columns and self.dspy_service and self.dspy_service.is_available:
+            logger.info(f"🧠 Classifying {len(unmapped_columns)} unmapped columns with DSPy")
             
-            fallback_results = self.openai_fallback.process_unmapped_columns(
-                unmapped_columns=unmapped_columns,
+            fallback_results = self.dspy_service.classify_columns(
+                columns=unmapped_columns,
                 document_type=winning_doc_type or "unknown",
             )
             
@@ -491,8 +491,7 @@ class ScoringEngine:
                         "confidence": result.get("confidence", 0.75),
                         "field_type": result.get("field_type"),
                         "required": result.get("required", False),
-                        "source": "openai_fallback",
-                        "openai_confidence": result.get("openai_confidence", "medium"),
+                        "source": "dspy",
                         "reason": result.get("reason", ""),
                     }
                     
@@ -670,8 +669,8 @@ class ScoringEngine:
             if field.target_unit and field.accepts_units:
                 # Get OpenAI client for unit detection if available
                 openai_client = None
-                if self.openai_fallback and self.openai_fallback.is_available:
-                    openai_client = getattr(self.openai_fallback, '_client', None)
+                if self.dspy_service and self.dspy_service.is_available:
+                    openai_client = getattr(self.dspy_service, '_classifier', None)
                 
                 # Detect transformation
                 result = detect_transformation(

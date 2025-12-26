@@ -12,8 +12,8 @@ Usage:
     # Classify with vertical filter
     python classify_csv.py --csv data/unknown_file.csv --vertical medical
     
-    # Classify with OpenAI fallback for unmapped columns
-    python classify_csv.py --csv data/unknown_file.csv --hybrid --openai-fallback
+    # Classify with DSPy for column verification
+    python classify_csv.py --csv data/unknown_file.csv --hybrid --dspy
     
     # Output as JSON
     python classify_csv.py --csv data/unknown_file.csv --json
@@ -89,35 +89,43 @@ def classify_csv(args):
         return 1
     
     # Create classification engine
-    openai_fallback = None
-    openai_verify_all = getattr(args, 'openai_verify', False)
+    dspy_service = None
+    dspy_verify_all = getattr(args, 'openai_verify', False)  # --dspy-verify flag
     
-    # Enable OpenAI if either fallback or verify mode is requested
-    if getattr(args, 'openai_fallback', False) or openai_verify_all:
+    # Enable DSPy for LLM-based column classification
+    if getattr(args, 'dspy', False) or dspy_verify_all:
         try:
-            from csv_analyzer.services.openai_fallback import create_fallback_service
-            openai_fallback = create_fallback_service(
-                api_key=getattr(args, 'openai_key', None),  # Use key from args if provided
-                model=getattr(args, 'openai_model', 'gpt-4o-mini'),
+            from csv_analyzer.services.dspy_service import create_dspy_service
+            
+            # Check for compiled model
+            compiled_path = Path(__file__).parent / "models" / "dspy_compiled"
+            dspy_compiled_path = None
+            if compiled_path.exists():
+                dspy_compiled_path = compiled_path
+                logger.info(f"📦 Loading compiled DSPy model from {compiled_path}")
+            
+            dspy_service = create_dspy_service(
+                model=f"openai/{getattr(args, 'model', 'gpt-4o-mini')}",
+                compiled_path=dspy_compiled_path,
                 enabled=True,
             )
-            if openai_fallback.is_available:
-                if openai_verify_all:
-                    logger.info("🔍 OpenAI verify-all mode enabled (will verify every mapping)")
+            if dspy_service.is_available:
+                if dspy_verify_all:
+                    logger.info("🔍 DSPy verify-all mode enabled (will verify every mapping)")
                 else:
-                    logger.info("OpenAI fallback enabled")
+                    logger.info("🚀 DSPy classification enabled")
             else:
-                logger.warning("OpenAI requested but not available (provide --openai-key or set OPENAI_API_KEY)")
-                openai_fallback = None
-                openai_verify_all = False
+                logger.warning("DSPy not available (set OPENAI_API_KEY env var)")
+                dspy_service = None
+                dspy_verify_all = False
         except Exception as e:
-            logger.warning(f"Failed to initialize OpenAI: {e}")
-            openai_verify_all = False
+            logger.warning(f"Failed to initialize DSPy: {e}")
+            dspy_verify_all = False
     
     engine = ClassificationEngine(
         embeddings_client,
-        openai_fallback=openai_fallback,
-        openai_verify_all=openai_verify_all,
+        dspy_service=dspy_service,
+        dspy_verify_all=dspy_verify_all,
     )
     
     # Classify
@@ -300,11 +308,10 @@ def print_hybrid_result(result):
             type_compat = mapping.get("type_compatibility", 1.0)
             raw_sim = mapping.get("raw_similarity", conf)
             
-            # Get OpenAI-related info
+            # Get DSPy-related info
             mapping_source = mapping.get("source", "embeddings")
-            openai_reason = mapping.get("reason", "")
-            openai_attempts = mapping.get("attempts")
-            openai_confidence = mapping.get("openai_confidence", "")
+            dspy_reason = mapping.get("reason", "")
+            dspy_attempts = mapping.get("attempts")
             
             # Color code by confidence
             if conf >= 0.8:
@@ -315,10 +322,10 @@ def print_hybrid_result(result):
                 status = "❓"
             
             # Add source indicator
-            if mapping_source == "openai_verified":
-                source_tag = " [OpenAI verified]"
-            elif mapping_source == "openai_fallback":
-                source_tag = " [OpenAI fallback]"
+            if mapping_source == "dspy_verified":
+                source_tag = " [DSPy verified]"
+            elif mapping_source == "dspy":
+                source_tag = " [DSPy]"
             else:
                 source_tag = ""
             
@@ -333,14 +340,11 @@ def print_hybrid_result(result):
             
             print(f"\n  {source:<23} {'→':<3} {target:<21}{required} {conf_str:<8} {status}{source_tag}{type_tag}")
             
-            # Show OpenAI reasoning if available
-            if openai_reason:
-                print(f"      💬 OpenAI: {openai_reason}")
-            if openai_attempts:
-                print(f"      🔄 Attempts: {openai_attempts} candidate(s) tried")
-            if openai_confidence:
-                conf_icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(openai_confidence, "⚪")
-                print(f"      {conf_icon} OpenAI confidence: {openai_confidence}")
+            # Show DSPy reasoning if available
+            if dspy_reason:
+                print(f"      💬 DSPy: {dspy_reason}")
+            if dspy_attempts:
+                print(f"      🔄 Attempts: {dspy_attempts} candidate(s) tried")
             
             # Show transformation info if needed
             transformation = mapping.get("transformation")
@@ -434,21 +438,21 @@ def print_hybrid_result(result):
                         else:
                             emb_reason = ""
                         
-                        # Show if this was rejected/accepted by OpenAI
-                        if mapping_source in ("openai_verified", "openai_fallback"):
+                        # Show if this was rejected/accepted by DSPy
+                        if mapping_source in ("dspy_verified", "dspy"):
                             if is_selected:
-                                openai_status = " ← accepted"
-                            elif i < (openai_attempts or 1):
-                                openai_status = " ← rejected"
+                                dspy_status = " ← accepted"
+                            elif i < (dspy_attempts or 1):
+                                dspy_status = " ← rejected"
                             else:
-                                openai_status = ""
+                                dspy_status = ""
                         else:
-                            openai_status = ""
+                            dspy_status = ""
                         
                         # Type info string
                         type_str = f"{type_icon} {source_type}→{target_type}" if type_compat < 1.0 else ""
                         reason_str = f"  {emb_reason}" if emb_reason else ""
-                        print(f"      {marker} {i+1}. {field_name:<18} {similarity:>5.1%} {req_icon:<2}{type_str}{reason_str}{openai_status}")
+                        print(f"      {marker} {i+1}. {field_name:<18} {similarity:>5.1%} {req_icon:<2}{type_str}{reason_str}{dspy_status}")
                 else:
                     # Show all candidates if none match winning doc type
                     print("      Candidates (other doc types):")
@@ -585,29 +589,23 @@ def main():
         help="Use hybrid scoring: document similarity (PostgreSQL) + column matching (ChromaDB)"
     )
     parser.add_argument(
-        "--openai-fallback",
+        "--dspy",
         action="store_true",
-        dest="openai_fallback",
-        help="Use OpenAI as fallback for columns that can't be mapped by embeddings"
+        dest="dspy",
+        help="Use DSPy for LLM-based column classification (for low-confidence matches)"
     )
     parser.add_argument(
-        "--openai-verify",
+        "--dspy-verify",
         action="store_true",
         dest="openai_verify",
-        help="Verify ALL column mappings with OpenAI (rejects wrong matches, tries next candidate)"
+        help="Verify ALL column mappings with DSPy (rejects wrong matches, tries next candidate)"
     )
     parser.add_argument(
-        "--openai-key",
-        type=str,
-        dest="openai_key",
-        help="OpenAI API key (or set OPENAI_API_KEY env var)"
-    )
-    parser.add_argument(
-        "--openai-model",
+        "--model",
         type=str,
         default="gpt-4o-mini",
-        dest="openai_model",
-        help="OpenAI model to use for fallback/verify (default: gpt-4o-mini)"
+        dest="model",
+        help="LLM model to use (default: gpt-4o-mini)"
     )
     parser.add_argument(
         "--json",

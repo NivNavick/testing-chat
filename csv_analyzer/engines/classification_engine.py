@@ -194,29 +194,29 @@ class ClassificationEngine:
         print(result.confidence)     # 0.89
         print(result.suggested_mappings)  # {"emp_id": {"target": "employee_id", ...}}
         
-        # With OpenAI fallback for unmapped columns
-        from csv_analyzer.services.openai_fallback import create_fallback_service
-        fallback = create_fallback_service()
-        engine = ClassificationEngine(embeddings_client, openai_fallback=fallback)
+        # With DSPy for column classification
+        from csv_analyzer.services.dspy_service import create_dspy_service
+        dspy = create_dspy_service()
+        engine = ClassificationEngine(embeddings_client, dspy_service=dspy)
     """
     
     def __init__(
         self,
         embeddings_client: MultilingualEmbeddingsClient,
-        openai_fallback=None,
-        openai_verify_all: bool = False,
+        dspy_service=None,
+        dspy_verify_all: bool = False,
     ):
         """
         Initialize the classification engine.
         
         Args:
             embeddings_client: Multilingual embeddings client
-            openai_fallback: Optional OpenAI fallback service for unmapped columns
-            openai_verify_all: If True, verify ALL matches with OpenAI (not just low-confidence)
+            dspy_service: Optional DSPy service for column classification
+            dspy_verify_all: If True, verify ALL matches with DSPy (not just low-confidence)
         """
         self.embeddings_client = embeddings_client
-        self.openai_fallback = openai_fallback
-        self.openai_verify_all = openai_verify_all
+        self.dspy_service = dspy_service
+        self.dspy_verify_all = dspy_verify_all
     
     def classify(
         self,
@@ -446,8 +446,8 @@ class ClassificationEngine:
         # 7. Run hybrid scoring (with optional OpenAI fallback/verification and context)
         scoring_engine = ScoringEngine(
             schema_service,
-            openai_fallback=self.openai_fallback,
-            openai_verify_all=self.openai_verify_all,
+            dspy_service=self.dspy_service,
+            dspy_verify_all=self.dspy_verify_all,
             vertical_context=vertical_context,
         )
         scoring_result = scoring_engine.score(
