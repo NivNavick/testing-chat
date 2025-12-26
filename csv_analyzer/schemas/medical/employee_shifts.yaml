@@ -288,11 +288,11 @@ fields:
   - name: actual_hours
     type: float
     required: false
-    description: "Actual hours worked as recorded"
-    target_unit: hours
+    description: "Actual hours worked, stored as minutes for consistency"
+    target_unit: minutes
     accepts_units:
-      - hours
       - minutes
+      - hours
     aliases:
       - actual_hrs
       - real_hours
