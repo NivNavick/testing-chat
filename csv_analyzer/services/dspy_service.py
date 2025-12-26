@@ -7,11 +7,14 @@ Can be trained on ground truth for better accuracy.
 Modes:
 1. Fallback mode: Only classify columns below embedding confidence threshold
 2. Verify mode: Verify ALL column mappings (rejects wrong matches)
+
+Supports parallel verification for faster processing.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,9 @@ class DSPyClassificationService:
     
     # Number of candidates to evaluate
     TOP_K_CANDIDATES = 5
+    
+    # Default number of parallel workers
+    DEFAULT_WORKERS = 4
     
     def __init__(
         self,
@@ -200,6 +206,83 @@ class DSPyClassificationService:
             f"⚪ '{column_name}' has no valid match after {len(candidates)} candidates"
         )
         return self._no_match(f"All {len(candidates)} candidates rejected")
+    
+    def verify_columns_parallel(
+        self,
+        columns_to_verify: List[Dict[str, Any]],
+        document_type: str,
+        schema_registry: Optional[Any] = None,
+        vertical: Optional[str] = None,
+        vertical_context: Optional[Any] = None,
+        max_workers: int = None,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Verify multiple columns in parallel for faster processing.
+        
+        Args:
+            columns_to_verify: List of column info dicts:
+                - column_name: str
+                - column_type: str
+                - sample_values: List[str]
+                - candidates: List[Dict] - embedding candidates
+            document_type: Target document type
+            schema_registry: Optional schema registry
+            vertical: Optional vertical
+            vertical_context: Optional domain context
+            max_workers: Number of parallel workers (default: 4)
+            
+        Returns:
+            Dict mapping column_name -> verification result
+        """
+        if not self.is_available:
+            logger.debug("DSPy not available for parallel verification")
+            return {}
+        
+        if not columns_to_verify:
+            return {}
+        
+        max_workers = max_workers or self.DEFAULT_WORKERS
+        num_columns = len(columns_to_verify)
+        
+        logger.info(f"🚀 Verifying {num_columns} columns in parallel (max {max_workers} workers)")
+        
+        results = {}
+        
+        def verify_single_column(col_info: Dict) -> Tuple[str, Dict[str, Any]]:
+            """Verify a single column (runs in thread)."""
+            col_name = col_info["column_name"]
+            result = self.verify_and_find_match(
+                column_name=col_name,
+                column_type=col_info.get("column_type", "unknown"),
+                sample_values=col_info.get("sample_values", []),
+                candidates=col_info.get("candidates", []),
+                document_type=document_type,
+                schema_registry=schema_registry,
+                vertical=vertical,
+                vertical_context=vertical_context,
+            )
+            return col_name, result
+        
+        # Use ThreadPoolExecutor for parallel I/O-bound operations
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all verification tasks
+            future_to_column = {
+                executor.submit(verify_single_column, col): col["column_name"]
+                for col in columns_to_verify
+            }
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_column):
+                col_name = future_to_column[future]
+                try:
+                    name, result = future.result()
+                    results[name] = result
+                except Exception as e:
+                    logger.error(f"Error verifying '{col_name}': {e}")
+                    results[col_name] = self._no_match(f"Error: {e}")
+        
+        logger.info(f"✅ Parallel verification complete: {len(results)} columns processed")
+        return results
     
     def _no_match(self, reason: str) -> Dict[str, Any]:
         """Return a 'no match' result."""

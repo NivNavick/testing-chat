@@ -424,31 +424,29 @@ class ScoringEngine:
                 
                 suggestions[col_name] = suggestion
         
-        # Handle verify-all mode
+        # Handle verify-all mode (PARALLEL)
         if columns_to_verify:
-            logger.info(f"🔍 Verifying {len(columns_to_verify)} column mappings with OpenAI...")
+            logger.info(f"🚀 Verifying {len(columns_to_verify)} column mappings in parallel...")
             
-            for col_info in columns_to_verify:
-                col_name = col_info["column_name"]
-                
-                result = self.dspy_service.verify_and_find_match(
-                    column_name=col_name,
-                    column_type=col_info["column_type"],
-                    sample_values=col_info["sample_values"],
-                    candidates=col_info["candidates"],
-                    document_type=winning_doc_type or "unknown",
-                    schema_registry=self.schema_registry,
-                    vertical=self._get_vertical_from_doc_type(winning_doc_type),
-                    vertical_context=self.vertical_context,
-                )
-                
+            # Use parallel verification for speed
+            parallel_results = self.dspy_service.verify_columns_parallel(
+                columns_to_verify=columns_to_verify,
+                document_type=winning_doc_type or "unknown",
+                schema_registry=self.schema_registry,
+                vertical=self._get_vertical_from_doc_type(winning_doc_type),
+                vertical_context=self.vertical_context,
+                max_workers=4,  # Parallel workers
+            )
+            
+            # Process results
+            for col_name, result in parallel_results.items():
                 if result.get("target_field"):
                     suggestion = {
                         "target_field": result["target_field"],
                         "confidence": result.get("confidence", 0.8),
                         "field_type": result.get("field_type"),
                         "required": result.get("required", False),
-                        "source": result.get("source", "openai_verified"),
+                        "source": result.get("source", "dspy"),
                         "attempts": result.get("attempts", 1),
                         "reason": result.get("reason", ""),
                     }
@@ -470,7 +468,7 @@ class ScoringEngine:
                         "confidence": 0.0,
                         "field_type": None,
                         "required": False,
-                        "source": "openai_verified",
+                        "source": "dspy",
                         "reason": result.get("reason", "No valid match found"),
                     }
         
