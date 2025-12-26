@@ -117,8 +117,10 @@ fields:
   - name: shift_start
     type: datetime
     required: true
-    description: "The time when the shift begins, clock in time"
+    description: "The scheduled/planned time when the shift begins"
+    embedding_text: "shift start scheduled planned begin time entry arrival clock in"
     aliases:
+      - scheduled_start
       - start_time
       - clock_in
       - time_in
@@ -154,8 +156,10 @@ fields:
   - name: shift_end
     type: datetime
     required: true
-    description: "The time when the shift ends, clock out time"
+    description: "The scheduled/planned time when the shift ends"
+    embedding_text: "shift end scheduled planned finish time departure exit clock out"
     aliases:
+      - scheduled_end
       - end_time
       - clock_out
       - time_out
