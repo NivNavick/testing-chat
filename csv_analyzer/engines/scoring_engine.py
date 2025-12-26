@@ -407,6 +407,7 @@ class ScoringEngine:
                     "confidence": best_confidence,
                     "field_type": best["field_type"],
                     "required": best["required"],
+                    "sources": ["embeddings"],  # High confidence, no DSPy needed
                     "source_type": best.get("source_type", "unknown"),
                     "type_compatibility": best.get("type_compatibility", 1.0),
                     "raw_similarity": best.get("raw_similarity", best_confidence),
@@ -446,7 +447,7 @@ class ScoringEngine:
                         "confidence": result.get("confidence", 0.8),
                         "field_type": result.get("field_type"),
                         "required": result.get("required", False),
-                        "source": result.get("source", "dspy"),
+                        "sources": ["embeddings", "dspy"],  # Both contributed
                         "attempts": result.get("attempts", 1),
                         "reason": result.get("reason", ""),
                     }
@@ -468,17 +469,18 @@ class ScoringEngine:
                         "confidence": 0.0,
                         "field_type": None,
                         "required": False,
-                        "source": "dspy",
+                        "sources": ["embeddings", "dspy"],  # Both tried, no match
                         "reason": result.get("reason", "No valid match found"),
                     }
         
-        # Handle normal fallback mode for unmapped columns
+        # Handle normal fallback mode for unmapped columns (PARALLEL)
         elif unmapped_columns and self.dspy_service and self.dspy_service.is_available:
-            logger.info(f"🧠 Classifying {len(unmapped_columns)} unmapped columns with DSPy")
+            logger.info(f"🚀 Classifying {len(unmapped_columns)} unmapped columns with DSPy in parallel")
             
-            fallback_results = self.dspy_service.classify_columns(
+            fallback_results = self.dspy_service.classify_columns_parallel(
                 columns=unmapped_columns,
                 document_type=winning_doc_type or "unknown",
+                max_workers=4,
             )
             
             # Merge fallback results
@@ -489,7 +491,7 @@ class ScoringEngine:
                         "confidence": result.get("confidence", 0.75),
                         "field_type": result.get("field_type"),
                         "required": result.get("required", False),
-                        "source": "dspy",
+                        "sources": ["dspy"],  # Unmapped column, classified by DSPy alone
                         "reason": result.get("reason", ""),
                     }
                     
@@ -545,7 +547,7 @@ class ScoringEngine:
                     "confidence": mapping.get("confidence", 0),
                     "field_type": mapping.get("field_type"),
                     "required": mapping.get("required", False),
-                    "source": mapping.get("source", "embeddings"),
+                    "sources": mapping.get("sources", ["embeddings"]),
                     "reason": mapping.get("reason", ""),
                     "attempts": mapping.get("attempts"),
                     "transformation": mapping.get("transformation"),

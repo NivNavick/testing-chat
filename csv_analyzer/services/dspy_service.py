@@ -359,7 +359,7 @@ class DSPyClassificationService:
                 "confidence": numeric_confidence if result.target_field else 0.0,
                 "field_type": field_type,
                 "required": required,
-                "source": "dspy",
+                "sources": ["dspy"],
                 "reason": result.reason,
             }
             
@@ -369,6 +369,98 @@ class DSPyClassificationService:
                 )
             else:
                 logger.info(f"⚪ '{col_name}' has no match")
+        
+        return results
+    
+    def classify_columns_parallel(
+        self,
+        columns: List[Dict[str, Any]],
+        document_type: str,
+        max_workers: int = 4,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Classify multiple columns in PARALLEL using DSPy.
+        
+        Args:
+            columns: List of column info dicts
+            document_type: Target document type
+            max_workers: Number of parallel workers
+            
+        Returns:
+            Dict mapping column_name -> classification result
+        """
+        if not self.is_available:
+            logger.debug("DSPy not available")
+            return {}
+        
+        if not columns:
+            return {}
+        
+        logger.info(f"🚀 Classifying {len(columns)} columns in parallel (workers={max_workers})")
+        
+        results = {}
+        
+        def _classify_single(col: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+            """Classify a single column."""
+            col_name = col["column_name"]
+            col_type = col.get("column_type", "unknown")
+            sample_values = col.get("sample_values", [])
+            candidates = col.get("candidates", [])
+            
+            try:
+                result = self._classifier.classify_column(
+                    column_name=col_name,
+                    column_type=col_type,
+                    sample_values=sample_values,
+                    candidates=candidates,
+                    document_type=document_type,
+                )
+                
+                # Convert confidence to numeric
+                confidence_map = {"high": 0.90, "medium": 0.75, "low": 0.60}
+                numeric_confidence = confidence_map.get(result.confidence, 0.5)
+                
+                # Find field type from candidates
+                field_type = None
+                required = False
+                if result.target_field:
+                    for candidate in candidates:
+                        if candidate.get("field_name") == result.target_field:
+                            field_type = candidate.get("field_type")
+                            required = candidate.get("required", False)
+                            break
+                
+                return col_name, {
+                    "target_field": result.target_field,
+                    "confidence": numeric_confidence if result.target_field else 0.0,
+                    "field_type": field_type,
+                    "required": required,
+                    "sources": ["dspy"],
+                    "reason": result.reason,
+                }
+            except Exception as e:
+                logger.error(f"Error classifying '{col_name}': {e}")
+                return col_name, {
+                    "target_field": None,
+                    "confidence": 0.0,
+                    "field_type": None,
+                    "required": False,
+                    "sources": ["dspy"],
+                    "reason": f"Error: {str(e)}",
+                }
+        
+        # Run in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_classify_single, col): col for col in columns}
+            
+            for future in as_completed(futures):
+                col_name, result = future.result()
+                results[col_name] = result
+                
+                if result.get("target_field"):
+                    logger.info(f"✅ '{col_name}' → '{result['target_field']}'")
+                else:
+                    logger.info(f"⚪ '{col_name}' has no match")
         
         return results
 

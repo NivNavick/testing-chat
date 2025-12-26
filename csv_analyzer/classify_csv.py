@@ -309,7 +309,7 @@ def print_hybrid_result(result):
             raw_sim = mapping.get("raw_similarity", conf)
             
             # Get DSPy-related info
-            mapping_source = mapping.get("source", "embeddings")
+            mapping_sources = mapping.get("sources", ["embeddings"])
             dspy_reason = mapping.get("reason", "")
             dspy_attempts = mapping.get("attempts")
             
@@ -321,11 +321,11 @@ def print_hybrid_result(result):
             else:
                 status = "❓"
             
-            # Add source indicator
-            if mapping_source == "dspy_verified":
-                source_tag = " [DSPy verified]"
-            elif mapping_source == "dspy":
-                source_tag = " [DSPy]"
+            # Add source indicator based on sources array
+            if "dspy" in mapping_sources and "embeddings" in mapping_sources:
+                source_tag = " [embeddings+dspy]"
+            elif "dspy" in mapping_sources:
+                source_tag = " [dspy]"
             else:
                 source_tag = ""
             
@@ -439,7 +439,7 @@ def print_hybrid_result(result):
                             emb_reason = ""
                         
                         # Show if this was rejected/accepted by DSPy
-                        if mapping_source in ("dspy_verified", "dspy"):
+                        if "dspy" in mapping_sources:
                             if is_selected:
                                 dspy_status = " ← accepted"
                             elif i < (dspy_attempts or 1):
