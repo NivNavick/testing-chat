@@ -111,7 +111,11 @@ class DSPyClassificationService:
         vertical_context: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
-        Verify candidates one by one until finding a correct match.
+        NON-GREEDY: Send ALL candidates to DSPy and let it pick the best one.
+        
+        This is more accurate than greedy verification because DSPy sees
+        ALL options before deciding (e.g., can choose shift_end over actual_end
+        when column is "Scheduled_End").
         
         Args:
             column_name: Source column name
@@ -130,7 +134,7 @@ class DSPyClassificationService:
                 "field_type": str or None,
                 "required": bool,
                 "source": "dspy",
-                "attempts": int,
+                "attempts": 1,
                 "reason": str
             }
         """
@@ -149,63 +153,57 @@ class DSPyClassificationService:
                 }
             return self._no_match("No candidates available")
         
+        if not candidates:
+            return self._no_match("No candidates available")
+        
         # Get domain context if available
         domain_context = None
         if vertical_context:
             domain_context = vertical_context.get_openai_context()
         
-        # Try each candidate in order
-        for attempt, candidate in enumerate(candidates, 1):
-            field_name = candidate.get("field_name")
-            field_description = candidate.get("description", "")
-            
-            # Get transformation info from schema if available
-            accepts_units = None
-            target_unit = None
-            if schema_registry and vertical:
-                schema = schema_registry.get_schema(vertical, document_type)
-                if schema:
-                    field = schema.get_field(field_name)
-                    if field:
-                        accepts_units = getattr(field, 'accepts_units', None)
-                        target_unit = getattr(field, 'target_unit', None)
-            
-            # Verify with DSPy
-            result = self._classifier.verify_mapping(
-                column_name=column_name,
-                column_type=column_type,
-                sample_values=sample_values,
-                proposed_field=field_name,
-                field_description=field_description,
-                document_type=document_type,
-                domain_context=domain_context,
-                accepts_units=accepts_units,
-                target_unit=target_unit,
-            )
-            
-            if result.is_correct:
-                logger.info(
-                    f"✅ '{column_name}' → '{field_name}' verified ({attempt} attempt(s))"
-                )
-                return {
-                    "target_field": field_name,
-                    "confidence": candidate.get("similarity", 0.8),
-                    "field_type": candidate.get("field_type"),
-                    "required": candidate.get("required", False),
-                    "source": "dspy",
-                    "attempts": attempt,
-                    "reason": result.reason,
-                    "needs_transformation": result.needs_transformation,
-                }
-            else:
-                logger.info(
-                    f"❌ '{column_name}' → '{field_name}' rejected: {result.reason}"
-                )
-        
-        logger.info(
-            f"⚪ '{column_name}' has no valid match after {len(candidates)} candidates"
+        # NON-GREEDY: Send ALL candidates to DSPy in one call
+        # DSPy sees the full picture and picks the BEST match
+        result = self._classifier.classify_column(
+            column_name=column_name,
+            column_type=column_type,
+            sample_values=sample_values,
+            candidates=candidates,
+            document_type=document_type,
+            domain_context=domain_context,
         )
-        return self._no_match(f"All {len(candidates)} candidates rejected")
+        
+        if result.target_field:
+            # Find the matching candidate to get field_type and required
+            field_type = None
+            required = False
+            similarity = 0.8
+            for candidate in candidates:
+                if candidate.get("field_name") == result.target_field:
+                    field_type = candidate.get("field_type")
+                    required = candidate.get("required", False)
+                    similarity = candidate.get("similarity", 0.8)
+                    break
+            
+            # Convert confidence level to numeric
+            confidence_map = {"high": 0.95, "medium": 0.80, "low": 0.65}
+            numeric_confidence = confidence_map.get(result.confidence, similarity)
+            
+            logger.info(
+                f"✅ '{column_name}' → '{result.target_field}' "
+                f"(non-greedy, {result.confidence} confidence)"
+            )
+            return {
+                "target_field": result.target_field,
+                "confidence": numeric_confidence,
+                "field_type": field_type,
+                "required": required,
+                "source": "dspy",
+                "attempts": 1,  # Single call, non-greedy
+                "reason": result.reason,
+            }
+        
+        logger.info(f"⚪ '{column_name}' has no valid match (DSPy returned none)")
+        return self._no_match(result.reason or "No suitable match found")
     
     def verify_columns_parallel(
         self,
