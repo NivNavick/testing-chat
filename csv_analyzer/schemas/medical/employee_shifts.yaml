@@ -151,7 +151,6 @@ fields:
       - heure_debut
       # Portuguese
       - início
-    embedding_text: "shift start begin clock in time entry arrival punch"
 
   - name: shift_end
     type: datetime
@@ -190,7 +189,6 @@ fields:
       - heure_fin
       # Portuguese
       - fim
-    embedding_text: "shift end finish clock out time departure punch leave"
 
   - name: duration_minutes
     type: integer
