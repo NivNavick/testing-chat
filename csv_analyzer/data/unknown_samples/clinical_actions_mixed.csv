@@ -1,9 +1,0 @@
-act_id,pt_id,prov_id,code,name,timestamp,location,dx
-A10001,PT-001,MD-50,99213,Evaluation and Management,2024-08-15 09:00:00,Clinic A,Z00.00
-A10002,PT-002,MD-51,90834,Psychotherapy 45min,2024-08-15 10:00:00,Behavioral Health,F32.1
-A10003,PT-003,MD-52,97110,Physical Therapy,2024-08-15 11:00:00,Rehab Center,M54.5
-A10004,PT-001,RN-20,96372,Injection Admin,2024-08-15 09:30:00,Clinic A,J06.9
-A10005,PT-004,MD-53,99215,Complex Visit,2024-08-15 14:00:00,Specialty Clinic,E11.65
-A10006,PT-005,MD-54,90837,Psychotherapy 60min,2024-08-15 15:00:00,Behavioral Health,F41.1
-A10007,PT-006,MD-55,99203,New Patient Visit,2024-08-16 08:00:00,Primary Care,Z00.00
-A10008,PT-002,RN-21,96372,Vaccine Admin,2024-08-16 09:00:00,Immunization Clinic,Z23

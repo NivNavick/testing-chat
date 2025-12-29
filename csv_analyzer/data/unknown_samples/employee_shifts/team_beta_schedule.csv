@@ -1,0 +1,12 @@
+staff_id,full_name,shift_date,start_time,end_time,department,shift_type
+S101,Alice Brown,2024-03-01,08:00,16:00,Emergency,Day
+S102,Bob Martinez,2024-03-01,16:00,00:00,Surgery,Evening
+S103,Carol White,2024-03-01,00:00,08:00,ICU,Night
+S104,Dan Lee,2024-03-01,08:00,16:00,Radiology,Day
+S105,Eva Chen,2024-03-01,16:00,00:00,Oncology,Evening
+S101,Alice Brown,2024-03-02,16:00,00:00,Emergency,Evening
+S102,Bob Martinez,2024-03-02,00:00,08:00,Surgery,Night
+S103,Carol White,2024-03-02,08:00,16:00,ICU,Day
+S104,Dan Lee,2024-03-02,16:00,00:00,Radiology,Evening
+S105,Eva Chen,2024-03-02,08:00,16:00,Oncology,Day
+

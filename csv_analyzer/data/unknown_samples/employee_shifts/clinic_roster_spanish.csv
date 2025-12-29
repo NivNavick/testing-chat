@@ -1,0 +1,16 @@
+turno_id,nombre_empleado,numero_empleado,departamento,fecha_trabajo,hora_entrada,hora_salida,horas_trabajadas,tipo_turno,es_supervisor
+T001,María García López,E1001,Urgencias,2026-01-20,07:00,15:00,8.0,Mañana,Sí
+T002,Carlos Rodríguez Martín,E1002,Pediatría,2026-01-20,07:30,19:30,12.0,Completo,No
+T003,Ana Fernández Silva,E1003,Cirugía,2026-01-20,14:00,22:00,8.0,Tarde,Sí
+T004,José Martínez Ruiz,E1004,UCI,2026-01-20,19:00,07:00,12.0,Noche,No
+T005,Laura Sánchez Díaz,E1005,Cardiología,2026-01-20,08:00,14:00,6.0,Parcial,No
+T006,Miguel González Pérez,E1006,Urgencias,2026-01-20,15:00,23:00,8.0,Tarde,No
+T007,Carmen López García,E1007,Neurología,2026-01-21,07:00,15:00,8.0,Mañana,Sí
+T008,David Hernández Castro,E1008,Oncología,2026-01-21,06:00,18:00,12.0,Completo,No
+T009,Isabel Torres Moreno,E1009,Radiología,2026-01-21,14:00,22:00,8.0,Tarde,No
+T010,Francisco Ramírez Vega,E1010,Maternidad,2026-01-21,22:00,06:00,8.0,Noche,No
+T011,Elena Romero Blanco,E1011,Urgencias,2026-01-21,08:00,12:00,4.0,Parcial,No
+T012,Antonio Navarro Cruz,E1012,Pediatría,2026-01-21,12:00,20:00,8.0,Tarde,Sí
+T013,Patricia Molina Ortiz,E1013,Cirugía,2026-01-22,07:00,19:00,12.0,Completo,No
+T014,Sergio Jiménez Serrano,E1014,UCI,2026-01-22,19:00,07:00,12.0,Noche,Sí
+T015,Rosa Medina Vargas,E1015,Cardiología,2026-01-22,07:30,15:30,8.0,Mañana,No

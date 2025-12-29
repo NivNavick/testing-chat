@@ -1,0 +1,7 @@
+staff_id,full_name,emp_status,base_salary,hourly_rate,monthly_hours,loaded_cost,department,position
+S101,Alice Brown,salaried,14500,,186,97.45,Emergency,RN
+S102,Bob Martinez,contractor,,135,150,135.00,Surgery,Surgical Tech
+S103,Carol White,salaried,17000,,186,114.25,ICU,Senior RN
+S104,Dan Lee,contractor,,95,175,95.00,Radiology,X-Ray Tech
+S105,Eva Chen,salaried,20000,,186,134.41,Oncology,Head Nurse
+

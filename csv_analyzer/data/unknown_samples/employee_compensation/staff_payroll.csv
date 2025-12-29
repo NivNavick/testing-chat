@@ -1,0 +1,7 @@
+staff_code,worker_name,category,monthly_pay,rate,hrs_month,real_cost,unit,role,joined
+S101,Alice Brown,employee,14500,,186,97.45,ER,RN,2023-01-15
+S102,Bob Martinez,freelance,,135,150,135.00,Surgery,Tech,2023-08-20
+S103,Carol White,employee,17000,,186,114.25,ICU,Senior RN,2022-05-10
+S104,Dan Lee,freelance,,95,175,95.00,Radiology,X-Ray,2024-02-01
+S105,Eva Chen,employee,20000,,186,134.41,Oncology,Head Nurse,2021-11-30
+

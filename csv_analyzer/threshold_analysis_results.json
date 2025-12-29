@@ -1,0 +1,2175 @@
+{
+  "total_columns": 144,
+  "test_files": [
+    "hospital_a_shifts.csv",
+    "staff_medical_actions.csv",
+    "procedures_log.csv",
+    "hebrew_shifts_test.csv",
+    "nurse_schedule_hebrew.csv",
+    "clinic_schedule_hebrew.csv",
+    "hebrew_ambiguous.csv",
+    "creative_employee_shifts.csv",
+    "custom_weird_names.csv",
+    "creative_shift_names.csv",
+    "hard_conflicts.csv",
+    "conflict_test_shifts.csv",
+    "lab_test_results.csv",
+    "patient_vitals_fahrenheit.csv",
+    "hospital_shifts_hours.csv"
+  ],
+  "current_threshold": 0.82,
+  "columns": [
+    {
+      "file": "hospital_a_shifts.csv",
+      "column": "employee_number",
+      "type": "text",
+      "best_score": 0.8407,
+      "best_field": "employee_id",
+      "second_score": 0.8126,
+      "second_field": "nurse_id",
+      "gap": 0.0281,
+      "would_dspy_at_82": false,
+      "samples": [
+        "EMP1001",
+        "EMP1002"
+      ]
+    },
+    {
+      "file": "hospital_a_shifts.csv",
+      "column": "work_date",
+      "type": "date",
+      "best_score": 0.877,
+      "best_field": "shift_date",
+      "second_score": 0.7157,
+      "second_field": "resulted_at",
+      "gap": 0.1613,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-03-15",
+        "2024-03-16"
+      ]
+    },
+    {
+      "file": "hospital_a_shifts.csv",
+      "column": "time_in",
+      "type": "time_of_day",
+      "best_score": 0.7977,
+      "best_field": "resulted_at",
+      "second_score": 0.7973,
+      "second_field": "shift_start",
+      "gap": 0.0004,
+      "would_dspy_at_82": true,
+      "samples": [
+        "07:00",
+        "08:00"
+      ]
+    },
+    {
+      "file": "hospital_a_shifts.csv",
+      "column": "time_out",
+      "type": "time_of_day",
+      "best_score": 0.8095,
+      "best_field": "actual_end",
+      "second_score": 0.8015,
+      "second_field": "shift_end",
+      "gap": 0.008,
+      "would_dspy_at_82": true,
+      "samples": [
+        "15:00",
+        "16:00"
+      ]
+    },
+    {
+      "file": "hospital_a_shifts.csv",
+      "column": "unit",
+      "type": "text",
+      "best_score": 0.8561,
+      "best_field": "ward",
+      "second_score": 0.8545,
+      "second_field": "department_code",
+      "gap": 0.0016,
+      "would_dspy_at_82": "department_code",
+      "samples": [
+        "Emergency",
+        "ICU"
+      ]
+    },
+    {
+      "file": "hospital_a_shifts.csv",
+      "column": "hours_worked",
+      "type": "integer",
+      "best_score": 0.8587,
+      "best_field": "duration_minutes",
+      "second_score": 0.8231,
+      "second_field": "actual_hours",
+      "gap": 0.0356,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "action_id",
+      "type": "id_like",
+      "best_score": 0.8404,
+      "best_field": "procedure_id",
+      "second_score": 0.8264,
+      "second_field": "result_id",
+      "gap": 0.014,
+      "would_dspy_at_82": "result_id",
+      "samples": [
+        "ACT-001",
+        "ACT-002"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "patient_id",
+      "type": "id_like",
+      "best_score": 0.8635,
+      "best_field": "patient_id",
+      "second_score": 0.8594,
+      "second_field": "patient_ref",
+      "gap": 0.0041,
+      "would_dspy_at_82": "patient_ref",
+      "samples": [
+        "P-1001",
+        "P-1002"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "staff_id",
+      "type": "id_like",
+      "best_score": 0.8517,
+      "best_field": "staff_id",
+      "second_score": 0.8484,
+      "second_field": "employee_id",
+      "gap": 0.0033,
+      "would_dspy_at_82": "employee_id",
+      "samples": [
+        "DR-101",
+        "DR-102"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "procedure_code",
+      "type": "integer",
+      "best_score": 0.6363,
+      "best_field": "procedure_id",
+      "second_score": 0.6299,
+      "second_field": "billing_code",
+      "gap": 0.0064,
+      "would_dspy_at_82": true,
+      "samples": [
+        "99213",
+        "99214"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "procedure_name",
+      "type": "free_text",
+      "best_score": 0.8661,
+      "best_field": "procedure_description",
+      "second_score": 0.8547,
+      "second_field": "procedure_id",
+      "gap": 0.0114,
+      "would_dspy_at_82": "procedure_id",
+      "samples": [
+        "Office Visit - Established Patient",
+        "Office Visit - Detailed"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "performed_at",
+      "type": "datetime",
+      "best_score": 0.8734,
+      "best_field": "performed_datetime",
+      "second_score": 0.8519,
+      "second_field": "resulted_at",
+      "gap": 0.0215,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-12-10 08:30:00",
+        "2024-12-10 09:15:00"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "department",
+      "type": "text",
+      "best_score": 0.8305,
+      "best_field": "department_code",
+      "second_score": 0.8222,
+      "second_field": "ward",
+      "gap": 0.0083,
+      "would_dspy_at_82": "ward",
+      "samples": [
+        "Internal Medicine",
+        "Cardiology"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "diagnosis_code",
+      "type": "text",
+      "best_score": 0.8572,
+      "best_field": "diagnosis_code",
+      "second_score": 0.8162,
+      "second_field": "billing_code",
+      "gap": 0.041,
+      "would_dspy_at_82": false,
+      "samples": [
+        "J06.9",
+        "I10"
+      ]
+    },
+    {
+      "file": "staff_medical_actions.csv",
+      "column": "notes",
+      "type": "free_text",
+      "best_score": 0.8431,
+      "best_field": "clinical_notes",
+      "second_score": 0.7982,
+      "second_field": "nurse_id",
+      "gap": 0.0449,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Routine follow-up for upper respiratory infection",
+        "Blood pressure management review"
+      ]
+    },
+    {
+      "file": "procedures_log.csv",
+      "column": "procedure_id",
+      "type": "id_like",
+      "best_score": 0.8591,
+      "best_field": "procedure_id",
+      "second_score": 0.8405,
+      "second_field": "result_id",
+      "gap": 0.0186,
+      "would_dspy_at_82": "result_id",
+      "samples": [
+        "PROC-2024-001",
+        "PROC-2024-002"
+      ]
+    },
+    {
+      "file": "procedures_log.csv",
+      "column": "patient_mrn",
+      "type": "text",
+      "best_score": 0.8637,
+      "best_field": "patient_id",
+      "second_score": 0.8636,
+      "second_field": "patient_ref",
+      "gap": 0.0001,
+      "would_dspy_at_82": "patient_ref",
+      "samples": [
+        "MRN12345",
+        "MRN12346"
+      ]
+    },
+    {
+      "file": "procedures_log.csv",
+      "column": "physician_id",
+      "type": "text",
+      "best_score": 0.8389,
+      "best_field": "staff_id",
+      "second_score": 0.8376,
+      "second_field": "patient_ref",
+      "gap": 0.0013,
+      "would_dspy_at_82": "patient_ref",
+      "samples": [
+        "DR-101",
+        "DR-102"
+      ]
+    },
+    {
+      "file": "procedures_log.csv",
+      "column": "cpt_code",
+      "type": "integer",
+      "best_score": 0.6187,
+      "best_field": "billing_code",
+      "second_score": 0.6113,
+      "second_field": "test_code",
+      "gap": 0.0074,
+      "would_dspy_at_82": true,
+      "samples": [
+        "99213",
+        "93000"
+      ]
+    },
+    {
+      "file": "procedures_log.csv",
+      "column": "procedure_desc",
+      "type": "free_text",
+      "best_score": 0.8715,
+      "best_field": "procedure_description",
+      "second_score": 0.8292,
+      "second_field": "procedure_id",
+      "gap": 0.0423,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Office Visit - Established",
+        "Electrocardiogram Complete"
+      ]
+    },
+    {
+      "file": "procedures_log.csv",
+      "column": "service_datetime",
+      "type": "datetime",
+      "best_score": 0.8723,
+      "best_field": "performed_datetime",
+      "second_score": 0.8289,
+      "second_field": "resulted_at",
+      "gap": 0.0434,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-06-01 09:30:00",
+        "2024-06-01 10:15:00"
+      ]
+    },
+    {
+      "file": "procedures_log.csv",
+      "column": "service_dept",
+      "type": "id_like",
+      "best_score": 0.8424,
+      "best_field": "procedure_id",
+      "second_score": 0.8414,
+      "second_field": "staff_id",
+      "gap": 0.001,
+      "would_dspy_at_82": "staff_id",
+      "samples": [
+        "Internal Medicine",
+        "Cardiology"
+      ]
+    },
+    {
+      "file": "procedures_log.csv",
+      "column": "icd10_code",
+      "type": "text",
+      "best_score": 0.8448,
+      "best_field": "diagnosis_code",
+      "second_score": 0.8344,
+      "second_field": "billing_code",
+      "gap": 0.0104,
+      "would_dspy_at_82": "billing_code",
+      "samples": [
+        "Z00.00",
+        "I25.10"
+      ]
+    },
+    {
+      "file": "hebrew_shifts_test.csv",
+      "column": "ת.ז._עובד",
+      "type": "integer",
+      "best_score": 0.7899,
+      "best_field": "actual_hours",
+      "second_score": 0.6242,
+      "second_field": "employee_id",
+      "gap": 0.1657,
+      "would_dspy_at_82": true,
+      "samples": [
+        "12345",
+        "12346"
+      ]
+    },
+    {
+      "file": "hebrew_shifts_test.csv",
+      "column": "יום",
+      "type": "date",
+      "best_score": 0.8201,
+      "best_field": "shift_date",
+      "second_score": 0.7052,
+      "second_field": "collected_at",
+      "gap": 0.1149,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-05-01",
+        "2024-05-02"
+      ]
+    },
+    {
+      "file": "hebrew_shifts_test.csv",
+      "column": "שעת_הגעה",
+      "type": "time_of_day",
+      "best_score": 0.8112,
+      "best_field": "resulted_at",
+      "second_score": 0.8068,
+      "second_field": "collected_at",
+      "gap": 0.0044,
+      "would_dspy_at_82": true,
+      "samples": [
+        "07:30",
+        "15:30"
+      ]
+    },
+    {
+      "file": "hebrew_shifts_test.csv",
+      "column": "שעת_יציאה",
+      "type": "time_of_day",
+      "best_score": 0.8221,
+      "best_field": "shift_end",
+      "second_score": 0.8169,
+      "second_field": "actual_end",
+      "gap": 0.0052,
+      "would_dspy_at_82": "actual_end",
+      "samples": [
+        "15:30",
+        "23:30"
+      ]
+    },
+    {
+      "file": "hebrew_shifts_test.csv",
+      "column": "אגף_עבודה",
+      "type": "text",
+      "best_score": 0.8361,
+      "best_field": "staff_id",
+      "second_score": 0.8317,
+      "second_field": "employee_id",
+      "gap": 0.0044,
+      "would_dspy_at_82": "employee_id",
+      "samples": [
+        "לב",
+        "מיון"
+      ]
+    },
+    {
+      "file": "hebrew_shifts_test.csv",
+      "column": "סוג_תורנות",
+      "type": "text",
+      "best_score": 0.8718,
+      "best_field": "shift_type",
+      "second_score": 0.3353,
+      "second_field": "collected_at",
+      "gap": 0.5365,
+      "would_dspy_at_82": false,
+      "samples": [
+        "בוקר",
+        "ערב"
+      ]
+    },
+    {
+      "file": "hebrew_shifts_test.csv",
+      "column": "שם_מלא",
+      "type": "text",
+      "best_score": 0.8168,
+      "best_field": "employee_name",
+      "second_score": 0.8125,
+      "second_field": "result_id",
+      "gap": 0.0043,
+      "would_dspy_at_82": true,
+      "samples": [
+        "דני כהן",
+        "שירה לוי"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "מזהה_משמרת",
+      "type": "id_like",
+      "best_score": 0.8619,
+      "best_field": "result_id",
+      "second_score": 0.8474,
+      "second_field": "staff_id",
+      "gap": 0.0145,
+      "would_dspy_at_82": "staff_id",
+      "samples": [
+        "M001",
+        "M002"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "שם_עובד",
+      "type": "text",
+      "best_score": 0.8332,
+      "best_field": "staff_id",
+      "second_score": 0.8258,
+      "second_field": "result_id",
+      "gap": 0.0074,
+      "would_dspy_at_82": "result_id",
+      "samples": [
+        "רונית כהן",
+        "יוסי לוי"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "מספר_עובד",
+      "type": "text",
+      "best_score": 0.8403,
+      "best_field": "employee_id",
+      "second_score": 0.8394,
+      "second_field": "result_id",
+      "gap": 0.0009,
+      "would_dspy_at_82": "result_id",
+      "samples": [
+        "ע001",
+        "ע002"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "שם_מחלקה",
+      "type": "text",
+      "best_score": 0.8478,
+      "best_field": "staff_id",
+      "second_score": 0.8457,
+      "second_field": "ward",
+      "gap": 0.0021,
+      "would_dspy_at_82": "ward",
+      "samples": [
+        "מיון",
+        "ילדים"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "תאריך",
+      "type": "date",
+      "best_score": 0.8266,
+      "best_field": "shift_date",
+      "second_score": 0.7226,
+      "second_field": "resulted_at",
+      "gap": 0.104,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2026-01-25",
+        "2026-01-26"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "שעת_כניסה",
+      "type": "time_of_day",
+      "best_score": 0.8141,
+      "best_field": "shift_start",
+      "second_score": 0.8102,
+      "second_field": "actual_start",
+      "gap": 0.0039,
+      "would_dspy_at_82": true,
+      "samples": [
+        "07:00",
+        "07:30"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "שעת_יציאה",
+      "type": "time_of_day",
+      "best_score": 0.8221,
+      "best_field": "shift_end",
+      "second_score": 0.8169,
+      "second_field": "actual_end",
+      "gap": 0.0052,
+      "would_dspy_at_82": "actual_end",
+      "samples": [
+        "15:00",
+        "19:30"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "שעות_עבודה",
+      "type": "integer",
+      "best_score": 0.853,
+      "best_field": "duration_minutes",
+      "second_score": 0.8241,
+      "second_field": "actual_hours",
+      "gap": 0.0289,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8.0",
+        "12.0"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "סוג",
+      "type": "text",
+      "best_score": 0.8508,
+      "best_field": "shift_type",
+      "second_score": 0.8236,
+      "second_field": "result_id",
+      "gap": 0.0272,
+      "would_dspy_at_82": false,
+      "samples": [
+        "בוקר",
+        "מלא"
+      ]
+    },
+    {
+      "file": "nurse_schedule_hebrew.csv",
+      "column": "אחראי",
+      "type": "categorical",
+      "best_score": 0.7957,
+      "best_field": "staff_id",
+      "second_score": 0.7867,
+      "second_field": "nurse_id",
+      "gap": 0.009,
+      "would_dspy_at_82": true,
+      "samples": [
+        "כן",
+        "לא"
+      ]
+    },
+    {
+      "file": "clinic_schedule_hebrew.csv",
+      "column": "קוד_עובד",
+      "type": "text",
+      "best_score": 0.8354,
+      "best_field": "employee_id",
+      "second_score": 0.8352,
+      "second_field": "result_id",
+      "gap": 0.0002,
+      "would_dspy_at_82": "result_id",
+      "samples": [
+        "ע-100",
+        "ע-101"
+      ]
+    },
+    {
+      "file": "clinic_schedule_hebrew.csv",
+      "column": "תאריך_עבודה",
+      "type": "date",
+      "best_score": 0.8595,
+      "best_field": "shift_date",
+      "second_score": 0.7295,
+      "second_field": "resulted_at",
+      "gap": 0.13,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-04-01",
+        "2024-04-02"
+      ]
+    },
+    {
+      "file": "clinic_schedule_hebrew.csv",
+      "column": "שעת_כניסה",
+      "type": "time_of_day",
+      "best_score": 0.8141,
+      "best_field": "shift_start",
+      "second_score": 0.8102,
+      "second_field": "actual_start",
+      "gap": 0.0039,
+      "would_dspy_at_82": true,
+      "samples": [
+        "08:00",
+        "16:00"
+      ]
+    },
+    {
+      "file": "clinic_schedule_hebrew.csv",
+      "column": "שעת_יציאה",
+      "type": "time_of_day",
+      "best_score": 0.8221,
+      "best_field": "shift_end",
+      "second_score": 0.8169,
+      "second_field": "actual_end",
+      "gap": 0.0052,
+      "would_dspy_at_82": "actual_end",
+      "samples": [
+        "16:00",
+        "00:00"
+      ]
+    },
+    {
+      "file": "clinic_schedule_hebrew.csv",
+      "column": "שם_מחלקה",
+      "type": "text",
+      "best_score": 0.8553,
+      "best_field": "ward",
+      "second_score": 0.8508,
+      "second_field": "staff_id",
+      "gap": 0.0045,
+      "would_dspy_at_82": "staff_id",
+      "samples": [
+        "קרדיולוגיה",
+        "חדר_מיון"
+      ]
+    },
+    {
+      "file": "clinic_schedule_hebrew.csv",
+      "column": "סוג_משמרת",
+      "type": "text",
+      "best_score": 0.8835,
+      "best_field": "shift_type",
+      "second_score": 0.337,
+      "second_field": "actual_hours",
+      "gap": 0.5465,
+      "would_dspy_at_82": false,
+      "samples": [
+        "בוקר",
+        "ערב"
+      ]
+    },
+    {
+      "file": "hebrew_ambiguous.csv",
+      "column": "קוד_איש",
+      "type": "id_like",
+      "best_score": 0.8506,
+      "best_field": "staff_id",
+      "second_score": 0.8486,
+      "second_field": "employee_id",
+      "gap": 0.002,
+      "would_dspy_at_82": "employee_id",
+      "samples": [
+        "P001",
+        "P002"
+      ]
+    },
+    {
+      "file": "hebrew_ambiguous.csv",
+      "column": "תאריך_פעילות",
+      "type": "date",
+      "best_score": 0.84,
+      "best_field": "shift_date",
+      "second_score": 0.7303,
+      "second_field": "performed_datetime",
+      "gap": 0.1097,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-05-01",
+        "2024-05-02"
+      ]
+    },
+    {
+      "file": "hebrew_ambiguous.csv",
+      "column": "שעה_מ",
+      "type": "time_of_day",
+      "best_score": 0.8096,
+      "best_field": "resulted_at",
+      "second_score": 0.8076,
+      "second_field": "collected_at",
+      "gap": 0.002,
+      "would_dspy_at_82": true,
+      "samples": [
+        "08:00",
+        "09:00"
+      ]
+    },
+    {
+      "file": "hebrew_ambiguous.csv",
+      "column": "שעה_עד",
+      "type": "time_of_day",
+      "best_score": 0.805,
+      "best_field": "resulted_at",
+      "second_score": 0.7961,
+      "second_field": "collected_at",
+      "gap": 0.0089,
+      "would_dspy_at_82": true,
+      "samples": [
+        "16:00",
+        "17:00"
+      ]
+    },
+    {
+      "file": "hebrew_ambiguous.csv",
+      "column": "יחידה",
+      "type": "text",
+      "best_score": 0.8404,
+      "best_field": "result_unit",
+      "second_score": 0.8365,
+      "second_field": "result_id",
+      "gap": 0.0039,
+      "would_dspy_at_82": "result_id",
+      "samples": [
+        "לב",
+        "מיון"
+      ]
+    },
+    {
+      "file": "hebrew_ambiguous.csv",
+      "column": "תיאור",
+      "type": "text",
+      "best_score": 0.8432,
+      "best_field": "procedure_description",
+      "second_score": 0.8369,
+      "second_field": "shift_type",
+      "gap": 0.0063,
+      "would_dspy_at_82": "shift_type",
+      "samples": [
+        "עבודה_רגילה",
+        "החלפה"
+      ]
+    },
+    {
+      "file": "hebrew_ambiguous.csv",
+      "column": "סטטוס",
+      "type": "text",
+      "best_score": 0.8462,
+      "best_field": "status",
+      "second_score": 0.8289,
+      "second_field": "procedure_description",
+      "gap": 0.0173,
+      "would_dspy_at_82": "procedure_description",
+      "samples": [
+        "פעיל",
+        "לא_פעיל"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Personnel_Code",
+      "type": "id_like",
+      "best_score": 0.8409,
+      "best_field": "employee_id",
+      "second_score": 0.8345,
+      "second_field": "staff_id",
+      "gap": 0.0064,
+      "would_dspy_at_82": "staff_id",
+      "samples": [
+        "P-001",
+        "P-002"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "ID_Badge",
+      "type": "id_like",
+      "best_score": 0.8273,
+      "best_field": "result_id",
+      "second_score": 0.8247,
+      "second_field": "employee_id",
+      "gap": 0.0026,
+      "would_dspy_at_82": "employee_id",
+      "samples": [
+        "BDG-1001",
+        "BDG-1002"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Workday",
+      "type": "date",
+      "best_score": 0.8619,
+      "best_field": "shift_date",
+      "second_score": 0.6927,
+      "second_field": "performed_datetime",
+      "gap": 0.1692,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-02-10",
+        "2024-02-11"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Clock_In_Planned",
+      "type": "time_of_day",
+      "best_score": 0.8347,
+      "best_field": "shift_start",
+      "second_score": 0.813,
+      "second_field": "shift_end",
+      "gap": 0.0217,
+      "would_dspy_at_82": false,
+      "samples": [
+        "07:00",
+        "15:00"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Clock_Out_Planned",
+      "type": "time_of_day",
+      "best_score": 0.8343,
+      "best_field": "shift_end",
+      "second_score": 0.8161,
+      "second_field": "actual_end",
+      "gap": 0.0182,
+      "would_dspy_at_82": "actual_end",
+      "samples": [
+        "15:00",
+        "23:00"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Punched_In",
+      "type": "time_of_day",
+      "best_score": 0.8046,
+      "best_field": "actual_start",
+      "second_score": 0.8008,
+      "second_field": "actual_end",
+      "gap": 0.0038,
+      "would_dspy_at_82": true,
+      "samples": [
+        "06:55",
+        "15:05"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Punched_Out",
+      "type": "time_of_day",
+      "best_score": 0.8238,
+      "best_field": "actual_end",
+      "second_score": 0.7997,
+      "second_field": "resulted_at",
+      "gap": 0.0241,
+      "would_dspy_at_82": false,
+      "samples": [
+        "15:10",
+        "23:00"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Hours_Expected",
+      "type": "integer",
+      "best_score": 0.8323,
+      "best_field": "duration_minutes",
+      "second_score": 0.8076,
+      "second_field": "actual_hours",
+      "gap": 0.0247,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8.0"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Hours_Worked",
+      "type": "float",
+      "best_score": 0.8643,
+      "best_field": "actual_hours",
+      "second_score": 0.6778,
+      "second_field": "duration_minutes",
+      "gap": 0.1865,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8.25",
+        "7.92"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Unit_Name",
+      "type": "id_like",
+      "best_score": 0.8436,
+      "best_field": "procedure_id",
+      "second_score": 0.8428,
+      "second_field": "ward",
+      "gap": 0.0008,
+      "would_dspy_at_82": "ward",
+      "samples": [
+        "Cardiology",
+        "Emergency"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Role_Type",
+      "type": "text",
+      "best_score": 0.828,
+      "best_field": "nurse_id",
+      "second_score": 0.8271,
+      "second_field": "staff_id",
+      "gap": 0.0009,
+      "would_dspy_at_82": "staff_id",
+      "samples": [
+        "Registered Nurse",
+        "Physician"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Morning_Evening_Night",
+      "type": "text",
+      "best_score": 0.8318,
+      "best_field": "shift_type",
+      "second_score": 0.3262,
+      "second_field": "collected_at",
+      "gap": 0.5056,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Morning",
+        "Evening"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Worker_Full_Name",
+      "type": "text",
+      "best_score": 0.8174,
+      "best_field": "employee_name",
+      "second_score": 0.8084,
+      "second_field": "employee_id",
+      "gap": 0.009,
+      "would_dspy_at_82": true,
+      "samples": [
+        "Sarah Johnson",
+        "Michael Chen"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Team_Leader",
+      "type": "boolean",
+      "best_score": 0.8205,
+      "best_field": "is_supervisor",
+      "second_score": 0.6471,
+      "second_field": "status",
+      "gap": 0.1734,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Manager_Flag",
+      "type": "boolean",
+      "best_score": 0.8177,
+      "best_field": "is_supervisor",
+      "second_score": 0.6526,
+      "second_field": "status",
+      "gap": 0.1651,
+      "would_dspy_at_82": true,
+      "samples": [
+        "No",
+        "Yes"
+      ]
+    },
+    {
+      "file": "creative_employee_shifts.csv",
+      "column": "Remarks",
+      "type": "text",
+      "best_score": 0.8272,
+      "best_field": "clinical_notes",
+      "second_score": 0.332,
+      "second_field": "actual_start",
+      "gap": 0.4952,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Early arrival",
+        "Department head"
+      ]
+    },
+    {
+      "file": "custom_weird_names.csv",
+      "column": "personal_code",
+      "type": "id_like",
+      "best_score": 0.8362,
+      "best_field": "employee_id",
+      "second_score": 0.8317,
+      "second_field": "patient_id",
+      "gap": 0.0045,
+      "would_dspy_at_82": "patient_id",
+      "samples": [
+        "P001",
+        "P002"
+      ]
+    },
+    {
+      "file": "custom_weird_names.csv",
+      "column": "duty_day",
+      "type": "date",
+      "best_score": 0.8462,
+      "best_field": "shift_date",
+      "second_score": 0.7064,
+      "second_field": "performed_datetime",
+      "gap": 0.1398,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-01-15",
+        "2024-01-16"
+      ]
+    },
+    {
+      "file": "custom_weird_names.csv",
+      "column": "clock_start",
+      "type": "time_of_day",
+      "best_score": 0.8273,
+      "best_field": "shift_start",
+      "second_score": 0.8121,
+      "second_field": "actual_start",
+      "gap": 0.0152,
+      "would_dspy_at_82": "actual_start",
+      "samples": [
+        "08:00",
+        "16:00"
+      ]
+    },
+    {
+      "file": "custom_weird_names.csv",
+      "column": "clock_finish",
+      "type": "time_of_day",
+      "best_score": 0.8215,
+      "best_field": "actual_end",
+      "second_score": 0.8187,
+      "second_field": "shift_end",
+      "gap": 0.0028,
+      "would_dspy_at_82": "shift_end",
+      "samples": [
+        "16:00",
+        "00:00"
+      ]
+    },
+    {
+      "file": "custom_weird_names.csv",
+      "column": "wing",
+      "type": "id_like",
+      "best_score": 0.8379,
+      "best_field": "procedure_id",
+      "second_score": 0.8325,
+      "second_field": "patient_ref",
+      "gap": 0.0054,
+      "would_dspy_at_82": "patient_ref",
+      "samples": [
+        "Cardiology",
+        "Oncology"
+      ]
+    },
+    {
+      "file": "custom_weird_names.csv",
+      "column": "total_hrs",
+      "type": "integer",
+      "best_score": 0.8458,
+      "best_field": "duration_minutes",
+      "second_score": 0.8106,
+      "second_field": "actual_hours",
+      "gap": 0.0352,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "roster_entry",
+      "type": "id_like",
+      "best_score": 0.8438,
+      "best_field": "shift_id",
+      "second_score": 0.8216,
+      "second_field": "result_id",
+      "gap": 0.0222,
+      "would_dspy_at_82": false,
+      "samples": [
+        "RST-001",
+        "RST-002"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "personnel_badge",
+      "type": "id_like",
+      "best_score": 0.8495,
+      "best_field": "employee_id",
+      "second_score": 0.8397,
+      "second_field": "staff_id",
+      "gap": 0.0098,
+      "would_dspy_at_82": "staff_id",
+      "samples": [
+        "BADGE-4421",
+        "BADGE-4422"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "duty_date",
+      "type": "date",
+      "best_score": 0.8498,
+      "best_field": "shift_date",
+      "second_score": 0.7148,
+      "second_field": "performed_datetime",
+      "gap": 0.135,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-03-15",
+        "2024-03-16"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "duty_begins",
+      "type": "time_of_day",
+      "best_score": 0.8031,
+      "best_field": "shift_start",
+      "second_score": 0.7867,
+      "second_field": "collected_at",
+      "gap": 0.0164,
+      "would_dspy_at_82": true,
+      "samples": [
+        "07:00",
+        "07:30"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "duty_ends",
+      "type": "time_of_day",
+      "best_score": 0.8036,
+      "best_field": "shift_end",
+      "second_score": 0.7925,
+      "second_field": "actual_end",
+      "gap": 0.0111,
+      "would_dspy_at_82": true,
+      "samples": [
+        "15:30",
+        "16:00"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "time_on_floor_hrs",
+      "type": "float",
+      "best_score": 0.843,
+      "best_field": "actual_hours",
+      "second_score": 0.667,
+      "second_field": "duration_minutes",
+      "gap": 0.176,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8.5"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "care_zone",
+      "type": "text",
+      "best_score": 0.8444,
+      "best_field": "department_code",
+      "second_score": 0.8188,
+      "second_field": "ward",
+      "gap": 0.0256,
+      "would_dspy_at_82": false,
+      "samples": [
+        "East Pavilion",
+        "Cardiac Wing"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "work_block",
+      "type": "text",
+      "best_score": 0.8338,
+      "best_field": "shift_type",
+      "second_score": 0.3297,
+      "second_field": "actual_hours",
+      "gap": 0.5041,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Morning",
+        "Evening"
+      ]
+    },
+    {
+      "file": "creative_shift_names.csv",
+      "column": "team_leader",
+      "type": "boolean",
+      "best_score": 0.8297,
+      "best_field": "is_supervisor",
+      "second_score": 0.6408,
+      "second_field": "status",
+      "gap": 0.1889,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Yes",
+        "No"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "EmpID",
+      "type": "id_like",
+      "best_score": 0.8469,
+      "best_field": "employee_id",
+      "second_score": 0.8247,
+      "second_field": "result_id",
+      "gap": 0.0222,
+      "would_dspy_at_82": false,
+      "samples": [
+        "E001",
+        "E002"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Badge_Number",
+      "type": "id_like",
+      "best_score": 0.8295,
+      "best_field": "employee_id",
+      "second_score": 0.8282,
+      "second_field": "result_id",
+      "gap": 0.0013,
+      "would_dspy_at_82": "result_id",
+      "samples": [
+        "B-1001",
+        "B-1002"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Worker_Code",
+      "type": "id_like",
+      "best_score": 0.8516,
+      "best_field": "employee_id",
+      "second_score": 0.8302,
+      "second_field": "shift_id",
+      "gap": 0.0214,
+      "would_dspy_at_82": false,
+      "samples": [
+        "WRK001",
+        "WRK002"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Date",
+      "type": "date",
+      "best_score": 0.8207,
+      "best_field": "shift_date",
+      "second_score": 0.7133,
+      "second_field": "resulted_at",
+      "gap": 0.1074,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-01-15",
+        "2024-01-16"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Scheduled_Start",
+      "type": "time_of_day",
+      "best_score": 0.8271,
+      "best_field": "shift_start",
+      "second_score": 0.8003,
+      "second_field": "shift_end",
+      "gap": 0.0268,
+      "would_dspy_at_82": false,
+      "samples": [
+        "08:00",
+        "09:00"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Scheduled_End",
+      "type": "time_of_day",
+      "best_score": 0.83,
+      "best_field": "shift_end",
+      "second_score": 0.8086,
+      "second_field": "resulted_at",
+      "gap": 0.0214,
+      "would_dspy_at_82": false,
+      "samples": [
+        "16:00",
+        "17:00"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Actual_Start",
+      "type": "time_of_day",
+      "best_score": 0.8405,
+      "best_field": "actual_start",
+      "second_score": 0.8166,
+      "second_field": "actual_end",
+      "gap": 0.0239,
+      "would_dspy_at_82": false,
+      "samples": [
+        "08:05",
+        "08:55"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Actual_End",
+      "type": "time_of_day",
+      "best_score": 0.8419,
+      "best_field": "actual_end",
+      "second_score": 0.818,
+      "second_field": "actual_start",
+      "gap": 0.0239,
+      "would_dspy_at_82": false,
+      "samples": [
+        "16:10",
+        "17:05"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Scheduled_Hrs",
+      "type": "integer",
+      "best_score": 0.786,
+      "best_field": "actual_hours",
+      "second_score": 0.62,
+      "second_field": "shift_id",
+      "gap": 0.166,
+      "would_dspy_at_82": true,
+      "samples": [
+        "8.0"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Actual_Hrs",
+      "type": "float",
+      "best_score": 0.8625,
+      "best_field": "actual_hours",
+      "second_score": 0.3339,
+      "second_field": "actual_start",
+      "gap": 0.5286,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8.08",
+        "8.17"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Planned_Dept",
+      "type": "id_like",
+      "best_score": 0.8356,
+      "best_field": "patient_ref",
+      "second_score": 0.8349,
+      "second_field": "procedure_id",
+      "gap": 0.0007,
+      "would_dspy_at_82": "procedure_id",
+      "samples": [
+        "Cardiology",
+        "Radiology"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Work_Unit",
+      "type": "text",
+      "best_score": 0.8273,
+      "best_field": "employee_id",
+      "second_score": 0.8233,
+      "second_field": "ward",
+      "gap": 0.004,
+      "would_dspy_at_82": "ward",
+      "samples": [
+        "CARD",
+        "RAD"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Shift_Category",
+      "type": "text",
+      "best_score": 0.8824,
+      "best_field": "shift_type",
+      "second_score": 0.3272,
+      "second_field": "shift_date",
+      "gap": 0.5552,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Morning",
+        "Evening"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Shift_Type",
+      "type": "text",
+      "best_score": 0.8856,
+      "best_field": "shift_type",
+      "second_score": 0.3321,
+      "second_field": "shift_date",
+      "gap": 0.5535,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Day",
+        "Night"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Staff_Name",
+      "type": "text",
+      "best_score": 0.8045,
+      "best_field": "employee_name",
+      "second_score": 0.797,
+      "second_field": "nurse_id",
+      "gap": 0.0075,
+      "would_dspy_at_82": true,
+      "samples": [
+        "John Smith",
+        "Jane Doe"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Employee_Name",
+      "type": "text",
+      "best_score": 0.8019,
+      "best_field": "employee_name",
+      "second_score": 0.7883,
+      "second_field": "nurse_id",
+      "gap": 0.0136,
+      "would_dspy_at_82": true,
+      "samples": [
+        "J. Smith",
+        "J. Doe"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Is_Lead",
+      "type": "boolean",
+      "best_score": 0.6506,
+      "best_field": "status",
+      "second_score": 0.6406,
+      "second_field": "result_id",
+      "gap": 0.01,
+      "would_dspy_at_82": true,
+      "samples": [
+        "True",
+        "False"
+      ]
+    },
+    {
+      "file": "hard_conflicts.csv",
+      "column": "Supervisor",
+      "type": "boolean",
+      "best_score": 0.8257,
+      "best_field": "is_supervisor",
+      "second_score": 0.643,
+      "second_field": "status",
+      "gap": 0.1827,
+      "would_dspy_at_82": false,
+      "samples": [
+        "False",
+        "True"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "emp_num",
+      "type": "id_like",
+      "best_score": 0.848,
+      "best_field": "employee_id",
+      "second_score": 0.826,
+      "second_field": "nurse_id",
+      "gap": 0.022,
+      "would_dspy_at_82": false,
+      "samples": [
+        "E001",
+        "E002"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "worker_code",
+      "type": "id_like",
+      "best_score": 0.8526,
+      "best_field": "employee_id",
+      "second_score": 0.8333,
+      "second_field": "shift_id",
+      "gap": 0.0193,
+      "would_dspy_at_82": "shift_id",
+      "samples": [
+        "WRK-001",
+        "WRK-002"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "date",
+      "type": "date",
+      "best_score": 0.8297,
+      "best_field": "shift_date",
+      "second_score": 0.7094,
+      "second_field": "resulted_at",
+      "gap": 0.1203,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-01-15",
+        "2024-01-16"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "clock_in",
+      "type": "time_of_day",
+      "best_score": 0.8284,
+      "best_field": "shift_start",
+      "second_score": 0.8065,
+      "second_field": "actual_start",
+      "gap": 0.0219,
+      "would_dspy_at_82": false,
+      "samples": [
+        "08:00",
+        "09:00"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "start_time",
+      "type": "time_of_day",
+      "best_score": 0.8081,
+      "best_field": "shift_start",
+      "second_score": 0.803,
+      "second_field": "actual_start",
+      "gap": 0.0051,
+      "would_dspy_at_82": true,
+      "samples": [
+        "08:00",
+        "09:00"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "clock_out",
+      "type": "time_of_day",
+      "best_score": 0.8248,
+      "best_field": "shift_end",
+      "second_score": 0.8217,
+      "second_field": "actual_end",
+      "gap": 0.0031,
+      "would_dspy_at_82": "actual_end",
+      "samples": [
+        "16:00",
+        "17:00"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "dept",
+      "type": "id_like",
+      "best_score": 0.843,
+      "best_field": "department_code",
+      "second_score": 0.8379,
+      "second_field": "employee_id",
+      "gap": 0.0051,
+      "would_dspy_at_82": "employee_id",
+      "samples": [
+        "Cardiology",
+        "Radiology"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "unit",
+      "type": "text",
+      "best_score": 0.8482,
+      "best_field": "result_unit",
+      "second_score": 0.8375,
+      "second_field": "ward",
+      "gap": 0.0107,
+      "would_dspy_at_82": "ward",
+      "samples": [
+        "CARD",
+        "RAD"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "hours_worked",
+      "type": "integer",
+      "best_score": 0.8587,
+      "best_field": "duration_minutes",
+      "second_score": 0.8231,
+      "second_field": "actual_hours",
+      "gap": 0.0356,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8.0"
+      ]
+    },
+    {
+      "file": "conflict_test_shifts.csv",
+      "column": "duration",
+      "type": "integer",
+      "best_score": 0.8417,
+      "best_field": "duration_minutes",
+      "second_score": 0.7822,
+      "second_field": "actual_hours",
+      "gap": 0.0595,
+      "would_dspy_at_82": false,
+      "samples": [
+        "480"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "specimen_id",
+      "type": "id_like",
+      "best_score": 0.8815,
+      "best_field": "result_id",
+      "second_score": 0.8311,
+      "second_field": "procedure_id",
+      "gap": 0.0504,
+      "would_dspy_at_82": false,
+      "samples": [
+        "LAB-001",
+        "LAB-002"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "patient_id",
+      "type": "text",
+      "best_score": 0.8555,
+      "best_field": "patient_ref",
+      "second_score": 0.8476,
+      "second_field": "patient_id",
+      "gap": 0.0079,
+      "would_dspy_at_82": "patient_id",
+      "samples": [
+        "PT-100",
+        "PT-101"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "test_cd",
+      "type": "text",
+      "best_score": 0.8312,
+      "best_field": "test_code",
+      "second_score": 0.8259,
+      "second_field": "result_unit",
+      "gap": 0.0053,
+      "would_dspy_at_82": "result_unit",
+      "samples": [
+        "CBC",
+        "BMP"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "test_description",
+      "type": "text",
+      "best_score": 0.8503,
+      "best_field": "test_name",
+      "second_score": 0.8268,
+      "second_field": "reference_range",
+      "gap": 0.0235,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Complete Blood Count",
+        "Basic Metabolic Panel"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "value",
+      "type": "float",
+      "best_score": 0.6218,
+      "best_field": "result_value",
+      "second_score": 0.6058,
+      "second_field": "reference_range",
+      "gap": 0.016,
+      "would_dspy_at_82": true,
+      "samples": [
+        "14.2",
+        "98"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "units",
+      "type": "text",
+      "best_score": 0.9026,
+      "best_field": "result_unit",
+      "second_score": 0.8301,
+      "second_field": "reference_range",
+      "gap": 0.0725,
+      "would_dspy_at_82": false,
+      "samples": [
+        "g/dL",
+        "mg/dL"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "ref_range",
+      "type": "text",
+      "best_score": 0.8487,
+      "best_field": "reference_range",
+      "second_score": 0.7943,
+      "second_field": "patient_ref",
+      "gap": 0.0544,
+      "would_dspy_at_82": false,
+      "samples": [
+        "12.0-16.0",
+        "70-100"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "collection_time",
+      "type": "datetime",
+      "best_score": 0.8713,
+      "best_field": "collected_at",
+      "second_score": 0.8471,
+      "second_field": "performed_datetime",
+      "gap": 0.0242,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2024-09-01 07:30:00",
+        "2024-09-01 08:00:00"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "result_time",
+      "type": "datetime",
+      "best_score": 0.8725,
+      "best_field": "resulted_at",
+      "second_score": 0.86,
+      "second_field": "performed_datetime",
+      "gap": 0.0125,
+      "would_dspy_at_82": "performed_datetime",
+      "samples": [
+        "2024-09-01 10:00:00",
+        "2024-09-01 11:00:00"
+      ]
+    },
+    {
+      "file": "lab_test_results.csv",
+      "column": "flag",
+      "type": "text",
+      "best_score": 0.821,
+      "best_field": "reference_range",
+      "second_score": 0.8114,
+      "second_field": "status",
+      "gap": 0.0096,
+      "would_dspy_at_82": "status",
+      "samples": [
+        "Normal",
+        "High"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "reading_id",
+      "type": "id_like",
+      "best_score": 0.8419,
+      "best_field": "result_id",
+      "second_score": 0.8231,
+      "second_field": "patient_id",
+      "gap": 0.0188,
+      "would_dspy_at_82": "patient_id",
+      "samples": [
+        "V001",
+        "V002"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "patient_id",
+      "type": "text",
+      "best_score": 0.8562,
+      "best_field": "patient_ref",
+      "second_score": 0.8532,
+      "second_field": "patient_id",
+      "gap": 0.003,
+      "would_dspy_at_82": "patient_id",
+      "samples": [
+        "P1001",
+        "P1002"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "patient_name",
+      "type": "text",
+      "best_score": 0.8238,
+      "best_field": "patient_ref",
+      "second_score": 0.8161,
+      "second_field": "patient_id",
+      "gap": 0.0077,
+      "would_dspy_at_82": "patient_id",
+      "samples": [
+        "John Williams",
+        "Mary Johnson"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "ward",
+      "type": "text",
+      "best_score": 0.8551,
+      "best_field": "ward",
+      "second_score": 0.8538,
+      "second_field": "department_code",
+      "gap": 0.0013,
+      "would_dspy_at_82": "department_code",
+      "samples": [
+        "ICU",
+        "Cardio"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "reading_date",
+      "type": "date",
+      "best_score": 0.8244,
+      "best_field": "shift_date",
+      "second_score": 0.729,
+      "second_field": "collected_at",
+      "gap": 0.0954,
+      "would_dspy_at_82": false,
+      "samples": [
+        "2026-01-15"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "reading_time",
+      "type": "time_of_day",
+      "best_score": 0.8186,
+      "best_field": "collected_at",
+      "second_score": 0.8046,
+      "second_field": "resulted_at",
+      "gap": 0.014,
+      "would_dspy_at_82": true,
+      "samples": [
+        "08:00",
+        "08:15"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "temp_f",
+      "type": "float",
+      "best_score": 0.7932,
+      "best_field": "actual_hours",
+      "second_score": 0.5857,
+      "second_field": "reference_range",
+      "gap": 0.2075,
+      "would_dspy_at_82": true,
+      "samples": [
+        "98.6",
+        "99.1"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "weight_lbs",
+      "type": "float",
+      "best_score": 0.8114,
+      "best_field": "actual_hours",
+      "second_score": 0.6189,
+      "second_field": "result_unit",
+      "gap": 0.1925,
+      "would_dspy_at_82": true,
+      "samples": [
+        "176.4",
+        "143.3"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "heart_rate",
+      "type": "integer",
+      "best_score": 0.7669,
+      "best_field": "actual_hours",
+      "second_score": 0.6175,
+      "second_field": "patient_ref",
+      "gap": 0.1494,
+      "would_dspy_at_82": true,
+      "samples": [
+        "72",
+        "78"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "bp_systolic",
+      "type": "integer",
+      "best_score": 0.6187,
+      "best_field": "patient_ref",
+      "second_score": 0.6119,
+      "second_field": "patient_id",
+      "gap": 0.0068,
+      "would_dspy_at_82": true,
+      "samples": [
+        "120",
+        "135"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "bp_diastolic",
+      "type": "integer",
+      "best_score": 0.6194,
+      "best_field": "patient_ref",
+      "second_score": 0.6172,
+      "second_field": "diagnosis_code",
+      "gap": 0.0022,
+      "would_dspy_at_82": true,
+      "samples": [
+        "80",
+        "85"
+      ]
+    },
+    {
+      "file": "patient_vitals_fahrenheit.csv",
+      "column": "nurse_id",
+      "type": "text",
+      "best_score": 0.8475,
+      "best_field": "nurse_id",
+      "second_score": 0.8467,
+      "second_field": "employee_id",
+      "gap": 0.0008,
+      "would_dspy_at_82": "employee_id",
+      "samples": [
+        "N001",
+        "N002"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "record_id",
+      "type": "id_like",
+      "best_score": 0.8424,
+      "best_field": "result_id",
+      "second_score": 0.8392,
+      "second_field": "shift_id",
+      "gap": 0.0032,
+      "would_dspy_at_82": "shift_id",
+      "samples": [
+        "SH001",
+        "SH002"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "staff_name",
+      "type": "text",
+      "best_score": 0.8325,
+      "best_field": "staff_id",
+      "second_score": 0.8261,
+      "second_field": "employee_name",
+      "gap": 0.0064,
+      "would_dspy_at_82": "employee_name",
+      "samples": [
+        "Dr. Sarah Cohen",
+        "Nurse David Levi"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "staff_id",
+      "type": "id_like",
+      "best_score": 0.863,
+      "best_field": "employee_id",
+      "second_score": 0.8495,
+      "second_field": "staff_id",
+      "gap": 0.0135,
+      "would_dspy_at_82": "staff_id",
+      "samples": [
+        "EMP001",
+        "EMP002"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "dept",
+      "type": "text",
+      "best_score": 0.8432,
+      "best_field": "department_code",
+      "second_score": 0.8352,
+      "second_field": "ward",
+      "gap": 0.008,
+      "would_dspy_at_82": "ward",
+      "samples": [
+        "Emergency",
+        "Pediatrics"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "work_date",
+      "type": "date",
+      "best_score": 0.877,
+      "best_field": "shift_date",
+      "second_score": 0.7157,
+      "second_field": "resulted_at",
+      "gap": 0.1613,
+      "would_dspy_at_82": false,
+      "samples": [
+        "15/01/2026",
+        "16/01/2026"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "clock_in",
+      "type": "time_of_day",
+      "best_score": 0.8284,
+      "best_field": "shift_start",
+      "second_score": 0.8065,
+      "second_field": "actual_start",
+      "gap": 0.0219,
+      "would_dspy_at_82": false,
+      "samples": [
+        "07:00",
+        "07:30"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "clock_out",
+      "type": "time_of_day",
+      "best_score": 0.8248,
+      "best_field": "shift_end",
+      "second_score": 0.8217,
+      "second_field": "actual_end",
+      "gap": 0.0031,
+      "would_dspy_at_82": "actual_end",
+      "samples": [
+        "15:00",
+        "19:30"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "dur_hrs",
+      "type": "integer",
+      "best_score": 0.8411,
+      "best_field": "duration_minutes",
+      "second_score": 0.8003,
+      "second_field": "break_minutes",
+      "gap": 0.0408,
+      "would_dspy_at_82": false,
+      "samples": [
+        "8.0",
+        "12.0"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "shift_category",
+      "type": "text",
+      "best_score": 0.8729,
+      "best_field": "shift_type",
+      "second_score": 0.3304,
+      "second_field": "shift_date",
+      "gap": 0.5425,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Day",
+        "Evening"
+      ]
+    },
+    {
+      "file": "hospital_shifts_hours.csv",
+      "column": "is_supervisor",
+      "type": "boolean",
+      "best_score": 0.8391,
+      "best_field": "is_supervisor",
+      "second_score": 0.6499,
+      "second_field": "status",
+      "gap": 0.1892,
+      "would_dspy_at_82": false,
+      "samples": [
+        "Yes",
+        "No"
+      ]
+    }
+  ]
+}

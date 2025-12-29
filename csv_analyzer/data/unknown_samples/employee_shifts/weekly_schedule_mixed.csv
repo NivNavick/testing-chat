@@ -1,0 +1,21 @@
+schedule_id,staff_member,personnel_no,area,work_day,arrival,departure,worked_hrs,break_hrs,assignment,team_lead
+WS001,Dr. Rebecca Stone,MED001,Trauma Center,Monday,06:45,14:45,8.0,0.5,Day Shift,TRUE
+WS002,Nurse Kevin Park,NRS001,Children's Ward,Monday,07:00,19:00,12.0,1.0,Extended,FALSE
+WS003,Dr. Amanda Foster,MED002,Operating Room,Monday,13:45,21:45,8.0,0.5,Swing,TRUE
+WS004,Nurse Brian Lee,NRS002,Critical Care,Monday,18:45,06:45,12.0,0.75,Overnight,FALSE
+WS005,Dr. Christina Yang,MED003,Heart Center,Monday,08:00,14:00,6.0,0.25,Half Day,FALSE
+WS006,Nurse Derek Shaw,NRS003,Trauma Center,Monday,14:45,22:45,8.0,0.5,Swing,FALSE
+WS007,Dr. Gregory House,MED004,Diagnostics,Tuesday,06:45,14:45,8.0,0.5,Day Shift,TRUE
+WS008,Nurse Meredith Grey,NRS004,Cancer Center,Tuesday,05:45,17:45,12.0,1.0,Extended,FALSE
+WS009,Dr. John Carter,MED005,X-Ray Dept,Tuesday,13:45,21:45,8.0,0.5,Swing,FALSE
+WS010,Nurse Carla Espinosa,NRS005,Labor & Delivery,Tuesday,21:45,05:45,8.0,0.5,Overnight,FALSE
+WS011,Dr. Elliot Reid,MED006,Trauma Center,Tuesday,08:00,12:00,4.0,0.25,Half Day,FALSE
+WS012,Nurse Jackie Peyton,NRS006,Children's Ward,Tuesday,11:45,19:45,8.0,0.5,Swing,TRUE
+WS013,Dr. Miranda Bailey,MED007,Operating Room,Wednesday,06:45,18:45,12.0,1.0,Extended,FALSE
+WS014,Nurse Sam Taggart,NRS007,Critical Care,Wednesday,18:45,06:45,12.0,0.75,Overnight,TRUE
+WS015,Dr. Alex Karev,MED008,Heart Center,Wednesday,07:15,15:15,8.0,0.5,Day Shift,FALSE
+WS016,Nurse Zoey Barkow,NRS008,Trauma Center,Wednesday,14:45,22:45,8.0,0.5,Swing,FALSE
+WS017,Dr. Izzie Stevens,MED009,Diagnostics,Wednesday,22:45,06:45,8.0,0.5,Overnight,FALSE
+WS018,Nurse Thor Lundgren,NRS009,Cancer Center,Thursday,05:45,13:45,8.0,0.5,Day Shift,FALSE
+WS019,Dr. Cristina Yang,MED010,X-Ray Dept,Thursday,13:45,19:45,6.0,0.33,Swing,FALSE
+WS020,Nurse Gloria Akalitus,NRS010,Labor & Delivery,Thursday,19:45,07:45,12.0,1.0,Overnight,TRUE

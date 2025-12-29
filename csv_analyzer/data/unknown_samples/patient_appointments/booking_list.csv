@@ -1,0 +1,9 @@
+reservation_id,mrn,patient,scheduled_date,hour,length,physician_name,service,category,booking_status,location,contact
+RES-10001,MRN-5001,Thompson Emma,2024-06-01,08:00,30,Dr. Robert Williams,Primary Care,annual physical,confirmed,Suite 100,555-0001
+RES-10002,MRN-5002,Garcia Carlos,2024-06-01,08:30,45,Dr. Jennifer Lee,Orthopedics,new patient,scheduled,Suite 200,555-0002
+RES-10003,MRN-5003,Johnson Maria,2024-06-01,09:15,20,Dr. Robert Williams,Primary Care,sick visit,completed,Suite 100,555-0003
+RES-10004,MRN-5004,Smith Andrew,2024-06-01,09:30,60,Dr. Michael Chang,Gastroenterology,endoscopy consult,confirmed,Endo Center,555-0004
+RES-10005,MRN-5005,Brown Jessica,2024-06-01,10:30,30,Dr. Jennifer Lee,Orthopedics,follow-up,no-show,Suite 200,555-0005
+RES-10006,MRN-5006,Davis Ryan,2024-06-01,11:00,45,Dr. Sarah Ahmed,Pulmonology,consultation,cancelled,Suite 300,555-0006
+RES-10007,MRN-5007,Miller Nicole,2024-06-01,13:00,30,Dr. Michael Chang,Gastroenterology,follow-up,confirmed,Suite 150,555-0007
+

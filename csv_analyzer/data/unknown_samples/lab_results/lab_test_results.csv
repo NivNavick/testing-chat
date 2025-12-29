@@ -1,0 +1,9 @@
+specimen_id,patient_id,test_cd,test_description,value,units,ref_range,collection_time,result_time,flag
+LAB-001,PT-100,CBC,Complete Blood Count,14.2,g/dL,12.0-16.0,2024-09-01 07:30:00,2024-09-01 10:00:00,Normal
+LAB-002,PT-100,BMP,Basic Metabolic Panel,98,mg/dL,70-100,2024-09-01 07:30:00,2024-09-01 11:00:00,Normal
+LAB-003,PT-101,TSH,Thyroid Stimulating Hormone,5.8,mIU/L,0.4-4.0,2024-09-01 08:00:00,2024-09-01 14:00:00,High
+LAB-004,PT-102,HbA1c,Hemoglobin A1C,7.2,%,<5.7,2024-09-01 08:30:00,2024-09-02 09:00:00,High
+LAB-005,PT-103,LDL,LDL Cholesterol,145,mg/dL,<100,2024-09-01 07:00:00,2024-09-01 15:00:00,High
+LAB-006,PT-101,FT4,Free T4,1.1,ng/dL,0.8-1.8,2024-09-01 08:00:00,2024-09-01 14:30:00,Normal
+LAB-007,PT-104,UA,Urinalysis,Negative,,Negative,2024-09-02 09:00:00,2024-09-02 11:00:00,Normal
+LAB-008,PT-105,Lipid,Lipid Panel,210,mg/dL,<200,2024-09-02 07:30:00,2024-09-02 12:00:00,High

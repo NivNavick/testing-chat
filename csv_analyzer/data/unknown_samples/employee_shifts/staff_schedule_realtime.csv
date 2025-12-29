@@ -1,0 +1,27 @@
+Schedule_ID,Employee_Name,Employee_No,Position,Unit,Scheduled_Date,Scheduled_Start,Scheduled_End,Actual_Start,Actual_End,Scheduled_Hrs,Actual_Hrs,Shift_Type,Status,Pay_Code,Assigned_By
+SCH-2026-0001,Amanda Richards,N-4521,Registered Nurse,Med-Surg 3A,2026-01-20,07:00,19:00,06:52,19:15,12.0,12.25,Day,Completed,Regular,Charge Nurse Williams
+SCH-2026-0002,Brian Torres,N-4522,Licensed Practical Nurse,Orthopedics,2026-01-20,07:00,15:00,07:05,15:02,8.0,8.0,Day,Completed,Regular,Charge Nurse Williams
+SCH-2026-0003,Catherine Liu,N-4523,Registered Nurse,ICU,2026-01-20,19:00,07:00,18:55,07:10,12.0,12.25,Night,Completed,Regular,Supervisor Chen
+SCH-2026-0004,David Okonkwo,N-4524,Nursing Assistant,Telemetry,2026-01-20,15:00,23:00,15:00,23:30,8.0,8.5,Evening,Completed,Regular,Charge Nurse Adams
+SCH-2026-0005,Elena Vasquez,N-4525,Charge Nurse,Emergency Dept,2026-01-20,07:00,19:00,06:45,19:45,12.0,13.0,Day,Completed,Overtime,Director Martinez
+SCH-2026-0006,Frank Morrison,N-4526,Registered Nurse,Post-Op Recovery,2026-01-20,11:00,19:00,11:00,19:00,8.0,8.0,Swing,Completed,Regular,Charge Nurse Williams
+SCH-2026-0007,Grace Kim,N-4527,Patient Care Tech,Cardiac Care,2026-01-20,07:00,15:00,07:00,15:00,8.0,8.0,Day,Completed,Regular,Charge Nurse Lee
+SCH-2026-0008,Henry Patel,N-4528,Registered Nurse,Neuro ICU,2026-01-20,19:00,07:00,19:00,07:00,12.0,12.0,Night,Completed,Regular,Supervisor Chen
+SCH-2026-0009,Isabel Santos,N-4529,Licensed Practical Nurse,Pediatrics,2026-01-21,07:00,15:00,07:10,15:00,8.0,7.83,Day,Completed,Regular,Charge Nurse Adams
+SCH-2026-0010,James Wright,N-4530,Registered Nurse,Med-Surg 4B,2026-01-21,07:00,19:00,,,,Day,Called Out,Regular,Charge Nurse Williams
+SCH-2026-0011,Kelly O'Brien,N-4531,Nursing Assistant,Rehab Unit,2026-01-21,15:00,23:00,15:00,23:00,8.0,8.0,Evening,Completed,Regular,Charge Nurse Lee
+SCH-2026-0012,Luis Garcia,N-4532,Charge Nurse,Labor & Delivery,2026-01-21,19:00,07:00,18:50,07:20,12.0,12.5,Night,Completed,Regular,Director Martinez
+SCH-2026-0013,Michelle Thompson,N-4533,Registered Nurse,Oncology,2026-01-21,07:00,19:00,07:00,19:00,12.0,12.0,Day,Completed,Holiday,Supervisor Chen
+SCH-2026-0014,Nathan Brooks,N-4534,Licensed Practical Nurse,Wound Care,2026-01-21,11:00,19:00,11:15,19:15,8.0,8.0,Swing,Completed,Regular,Charge Nurse Adams
+SCH-2026-0015,Olivia Johnson,N-4535,Patient Care Tech,Emergency Dept,2026-01-21,15:00,23:00,14:55,23:45,8.0,8.83,Evening,Completed,Overtime,Charge Nurse Williams
+SCH-2026-0016,Peter Hoffman,N-4536,Registered Nurse,Step-Down Unit,2026-01-22,07:00,19:00,07:00,19:00,12.0,12.0,Day,Confirmed,Regular,Charge Nurse Lee
+SCH-2026-0017,Quinn Taylor,N-4537,Nursing Assistant,Dialysis,2026-01-22,07:00,15:00,,,8.0,,Day,Pending,Regular,Supervisor Chen
+SCH-2026-0018,Rachel Foster,N-4538,Registered Nurse,NICU,2026-01-22,19:00,07:00,,,12.0,,Night,Confirmed,Regular,Director Martinez
+SCH-2026-0019,Samuel Lee,N-4539,Charge Nurse,Med-Surg 3A,2026-01-22,07:00,19:00,07:00,19:30,12.0,12.5,Day,Completed,Regular,Director Martinez
+SCH-2026-0020,Tanya Robinson,N-4540,Licensed Practical Nurse,Geriatrics,2026-01-22,15:00,23:00,15:00,23:00,8.0,8.0,Evening,Completed,Regular,Charge Nurse Adams
+SCH-2026-0021,Umar Hassan,N-4541,Registered Nurse,Burn Unit,2026-01-22,11:00,23:00,10:50,23:15,12.0,12.42,Swing,Completed,Regular,Charge Nurse Williams
+SCH-2026-0022,Victoria Chen,N-4542,Patient Care Tech,Orthopedics,2026-01-22,07:00,15:00,07:00,15:00,8.0,8.0,Day,Completed,Regular,Charge Nurse Lee
+SCH-2026-0023,William Davis,N-4543,Registered Nurse,Surgical ICU,2026-01-23,19:00,07:00,19:05,07:00,12.0,11.92,Night,Completed,Regular,Supervisor Chen
+SCH-2026-0024,Xena Kowalski,N-4544,Nursing Assistant,Cardiac Care,2026-01-23,15:00,23:00,,,,Evening,No Show,Regular,Charge Nurse Adams
+SCH-2026-0025,Yolanda Price,N-4545,Registered Nurse,Emergency Dept,2026-01-23,07:00,19:00,06:50,20:00,12.0,13.17,Day,Completed,Overtime,Director Martinez
+

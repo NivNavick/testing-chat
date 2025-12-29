@@ -1,0 +1,346 @@
+name: employee_compensation
+vertical: medical
+version: "1.0"
+description: "Employee and contractor compensation data including hourly costs, salary details, and employment type"
+
+# Business Rule: For salaried employees, 25% should be added to gross salary to calculate true hourly cost
+
+fields:
+  - name: employee_id
+    type: string
+    required: true
+    description: "Unique identifier for the employee or contractor"
+    aliases:
+      # English variations
+      - emp_id
+      - staff_id
+      - worker_id
+      - emp_num
+      - employee_number
+      - contractor_id
+      - personnel_id
+      - personnel_no
+      - badge
+      - emp_code
+      - id
+      # Hebrew (עברית)
+      - מספר_עובד
+      - קוד_עובד
+      - מזהה_עובד
+      - עובד
+      - מזהה
+      - ת_ז
+      - מס_עובד
+      - קוד
+      - מספר_קבלן
+      # Spanish (Español)
+      - numero_empleado
+      - id_empleado
+      - codigo_trabajador
+      # Arabic (العربية)
+      - رقم_الموظف
+      - معرف_العامل
+      # Russian (Русский)
+      - номер_сотрудника
+      - id_работника
+      # French (Français)
+      - numero_employe
+      - id_employe
+    embedding_text: "employee worker staff contractor identifier ID number code unique personnel"
+
+  - name: employee_name
+    type: string
+    required: true
+    description: "Full name of the employee or contractor"
+    aliases:
+      - name
+      - full_name
+      - staff_name
+      - worker_name
+      - contractor_name
+      - person_name
+      # Hebrew
+      - שם_עובד
+      - שם
+      - שם_מלא
+      - שם_קבלן
+      # Spanish
+      - nombre_empleado
+      - nombre
+      - nombre_contratista
+      # Arabic
+      - اسم_الموظف
+      - اسم
+      # Russian
+      - имя_сотрудника
+      - имя
+      # French
+      - nom_employe
+      - nom
+    embedding_text: "employee name full name staff worker contractor person"
+
+  - name: employment_type
+    type: string
+    required: true
+    description: "Type of employment - salaried employee or contractor (freelancer)"
+    aliases:
+      - emp_type
+      - worker_type
+      - type
+      - category
+      - status
+      - employment_status
+      - contract_type
+      - worker_category
+      # Hebrew
+      - סוג_העסקה
+      - סוג_עובד
+      - סוג
+      - סטטוס
+      - סיווג
+      - קבלן_או_שכיר
+      # Spanish
+      - tipo_empleado
+      - tipo_contrato
+      - tipo
+      # Arabic
+      - نوع_التوظيف
+      - نوع
+      # Russian
+      - тип_занятости
+      - тип
+      # French
+      - type_emploi
+      - type
+    embedding_text: "employment type salaried contractor freelancer employee worker category status"
+    # Common values: salaried, contractor, freelancer, employee, שכיר, קבלן, עצמאי
+
+  - name: gross_salary
+    type: float
+    required: false
+    description: "Gross monthly salary for salaried employees (before benefits calculation)"
+    aliases:
+      - salary
+      - monthly_salary
+      - base_salary
+      - gross_pay
+      - monthly_gross
+      - base_pay
+      # Hebrew
+      - שכר_ברוטו
+      - משכורת
+      - שכר_בסיס
+      - שכר_חודשי
+      - ברוטו
+      # Spanish
+      - salario_bruto
+      - salario
+      - sueldo
+      # Arabic
+      - الراتب_الإجمالي
+      - راتب
+      # Russian
+      - валовая_зарплата
+      - зарплата
+      # French
+      - salaire_brut
+      - salaire
+    embedding_text: "gross salary monthly pay base wage compensation salaried employee"
+
+  - name: hourly_rate
+    type: float
+    required: false
+    description: "Hourly rate for contractors or calculated hourly cost"
+    aliases:
+      - rate
+      - hourly_cost
+      - hour_rate
+      - cost_per_hour
+      - hourly_pay
+      - rate_per_hour
+      # Hebrew
+      - תעריף_שעתי
+      - עלות_שעה
+      - שכר_שעתי
+      - תעריף
+      - עלות_לשעה
+      # Spanish
+      - tarifa_hora
+      - costo_hora
+      - pago_hora
+      # Arabic
+      - سعر_الساعة
+      - تكلفة_الساعة
+      # Russian
+      - почасовая_ставка
+      - ставка
+      # French
+      - taux_horaire
+      - cout_heure
+    embedding_text: "hourly rate cost per hour wage contractor freelancer pay"
+
+  - name: monthly_hours
+    type: integer
+    required: false
+    description: "Expected or contracted monthly working hours"
+    aliases:
+      - hours
+      - work_hours
+      - contracted_hours
+      - expected_hours
+      - hours_per_month
+      # Hebrew
+      - שעות_חודשיות
+      - שעות_עבודה
+      - שעות
+      - היקף_משרה_שעות
+      # Spanish
+      - horas_mensuales
+      - horas
+      # Arabic
+      - ساعات_شهرية
+      - ساعات
+      # Russian
+      - месячные_часы
+      - часы
+      # French
+      - heures_mensuelles
+      - heures
+    embedding_text: "monthly hours work hours contracted expected per month"
+
+  - name: effective_hourly_cost
+    type: float
+    required: false
+    description: "Calculated effective hourly cost (for salaried: gross * 1.25 / monthly_hours)"
+    aliases:
+      - total_hourly_cost
+      - real_hourly_cost
+      - actual_cost
+      - true_cost
+      - loaded_rate
+      # Hebrew
+      - עלות_שעה_אפקטיבית
+      - עלות_שעה_כוללת
+      - עלות_אמיתית
+      - עלות_מלאה
+      # Spanish
+      - costo_hora_efectivo
+      - costo_real
+      # Arabic
+      - التكلفة_الفعلية
+      - تكلفة_حقيقية
+      # Russian
+      - эффективная_ставка
+      # French
+      - cout_reel
+    embedding_text: "effective hourly cost total real actual loaded rate true cost"
+
+  - name: department
+    type: string
+    required: false
+    description: "Department or unit where the employee works"
+    aliases:
+      - dept
+      - department_name
+      - unit
+      - division
+      - team
+      - section
+      # Hebrew
+      - מחלקה
+      - יחידה
+      - צוות
+      - אגף
+      # Spanish
+      - departamento
+      - unidad
+      # Arabic
+      - القسم
+      - قسم
+      # Russian
+      - отдел
+      - подразделение
+      # French
+      - departement
+      - service
+    embedding_text: "department unit division team section where works"
+
+  - name: position
+    type: string
+    required: false
+    description: "Job title or position of the employee"
+    aliases:
+      - job_title
+      - title
+      - role
+      - job
+      - occupation
+      # Hebrew
+      - תפקיד
+      - משרה
+      - תואר_תפקיד
+      # Spanish
+      - puesto
+      - cargo
+      - titulo
+      # Arabic
+      - المنصب
+      - وظيفة
+      # Russian
+      - должность
+      - позиция
+      # French
+      - poste
+      - fonction
+    embedding_text: "position job title role occupation what does"
+
+  - name: start_date
+    type: date
+    required: false
+    description: "Employment or contract start date"
+    target_format: "YYYY-MM-DD"
+    accepts_formats:
+      - "YYYY-MM-DD"
+      - "DD/MM/YYYY"
+      - "MM/DD/YYYY"
+      - "DD-MM-YYYY"
+    aliases:
+      - hire_date
+      - contract_start
+      - employment_date
+      - date_started
+      # Hebrew
+      - תאריך_התחלה
+      - תאריך_קליטה
+      - תחילת_עבודה
+      # Spanish
+      - fecha_inicio
+      - fecha_contratacion
+      # Arabic
+      - تاريخ_البدء
+      # Russian
+      - дата_начала
+      # French
+      - date_debut
+    embedding_text: "start date hire employment contract begin when started"
+
+  - name: currency
+    type: string
+    required: false
+    description: "Currency for salary and rate values"
+    aliases:
+      - curr
+      - money
+      - payment_currency
+      # Hebrew
+      - מטבע
+      # Spanish
+      - moneda
+      # Arabic
+      - عملة
+      # Russian
+      - валюта
+      # French
+      - devise
+    embedding_text: "currency money ILS USD EUR payment"
+

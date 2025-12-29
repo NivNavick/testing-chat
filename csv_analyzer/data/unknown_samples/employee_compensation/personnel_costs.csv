@@ -1,0 +1,8 @@
+badge_num,full_name,emp_status,base_monthly,per_hour,expected_hrs,loaded_hourly,division,job,start
+P001,Jennifer Smith,permanent,15500,,186,104.17,Emergency,Nurse Practitioner,2022-06-15
+P002,Michael Johnson,temp,,125,165,125.00,Orthopedics,PT Assistant,2023-10-01
+P003,Sarah Williams,permanent,21000,,186,141.13,Cardiology,Charge Nurse,2020-03-20
+P004,James Brown,temp,,180,130,180.00,Surgery,Surgical Tech,2024-01-10
+P005,Emily Davis,permanent,13000,,186,87.37,Pediatrics,Staff Nurse,2023-04-25
+P006,Robert Miller,contractor,,105,180,105.00,Lab,Lab Tech,2023-07-15
+

@@ -1,0 +1,12 @@
+emp_id,name,employment_type,gross_salary,hourly_rate,monthly_hours,effective_hourly_cost,department,position,start_date,currency
+E001,John Smith,salaried,15000,,186,100.81,Emergency,Nurse,2022-03-15,ILS
+E002,Sarah Johnson,salaried,18000,,186,120.97,ICU,Senior Nurse,2021-01-10,ILS
+E003,Michael Brown,contractor,,120,160,120.00,Surgery,Surgical Tech,2023-06-01,ILS
+E004,Emily Davis,salaried,12000,,186,80.65,Pediatrics,Nurse,2023-02-20,ILS
+E005,David Wilson,contractor,,150,140,150.00,Radiology,Technician,2022-11-05,ILS
+E006,Rachel Green,salaried,22000,,186,147.85,Cardiology,Head Nurse,2019-08-12,ILS
+E007,Tom Anderson,contractor,,95,180,95.00,Emergency,Paramedic,2024-01-08,ILS
+E008,Lisa Martinez,salaried,16500,,186,110.89,Neurology,Nurse,2020-05-22,ILS
+E009,James Taylor,contractor,,180,120,180.00,Orthopedics,Specialist,2023-09-15,ILS
+E010,Anna White,salaried,14000,,186,94.09,Internal Medicine,Nurse,2021-07-03,ILS
+

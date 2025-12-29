@@ -1,0 +1,8 @@
+visit_id,pt_num,client_name,date,time,mins,provider,specialty,reason,state,office
+VS001,C101,David Cohen,2024-05-01,09:00,30,Dr. Miller,Cardiology,checkup,confirmed,Room A
+VS002,C102,Sarah Levi,2024-05-01,09:30,45,Dr. Chen,Dermatology,new visit,scheduled,Room B
+VS003,C103,Michael Brown,2024-05-01,10:00,20,Dr. Miller,Cardiology,follow-up,completed,Room A
+VS004,C104,Emily Davis,2024-05-01,10:30,60,Dr. Park,Surgery,pre-op,confirmed,OR Consult
+VS005,C105,James Wilson,2024-05-01,11:30,30,Dr. Chen,Dermatology,follow-up,cancelled,Room B
+VS006,C106,Lisa Martinez,2024-05-01,13:00,45,Dr. Kim,Neurology,consultation,no-show,Room C
+

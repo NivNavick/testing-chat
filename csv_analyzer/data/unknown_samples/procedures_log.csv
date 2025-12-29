@@ -1,9 +1,0 @@
-procedure_id,patient_mrn,physician_id,cpt_code,procedure_desc,service_datetime,service_dept,icd10_code
-PROC-2024-001,MRN12345,DR-101,99213,Office Visit - Established,2024-06-01 09:30:00,Internal Medicine,Z00.00
-PROC-2024-002,MRN12346,DR-102,93000,Electrocardiogram Complete,2024-06-01 10:15:00,Cardiology,I25.10
-PROC-2024-003,MRN12345,DR-101,36415,Blood Draw Venipuncture,2024-06-01 09:45:00,Laboratory,Z00.00
-PROC-2024-004,MRN12347,DR-103,71046,Chest X-Ray 2 Views,2024-06-01 11:00:00,Radiology,J06.9
-PROC-2024-005,MRN12348,DR-104,99214,Office Visit Extended,2024-06-01 14:00:00,Family Medicine,E11.9
-PROC-2024-006,MRN12346,DR-102,93306,Echocardiogram Complete,2024-06-01 14:30:00,Cardiology,I25.10
-PROC-2024-007,MRN12349,DR-105,29881,Knee Arthroscopy,2024-06-01 08:00:00,Orthopedics,M23.41
-PROC-2024-008,MRN12350,DR-106,43239,Upper GI Endoscopy,2024-06-02 07:30:00,Gastroenterology,K21.0

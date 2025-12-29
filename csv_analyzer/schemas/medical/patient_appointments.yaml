@@ -1,0 +1,516 @@
+name: patient_appointments
+vertical: medical
+version: "1.0"
+description: "Patient appointment scheduling, clinic visits, medical consultations, and booking records"
+
+fields:
+  - name: appointment_id
+    type: string
+    required: true
+    description: "Unique identifier for the appointment or booking"
+    aliases:
+      # English variations
+      - appt_id
+      - booking_id
+      - visit_id
+      - schedule_id
+      - reservation_id
+      - appt_num
+      - appt_no
+      - id
+      # Hebrew (עברית)
+      - מזהה_תור
+      - מספר_תור
+      - קוד_תור
+      - מזהה_פגישה
+      - מזהה
+      - תור
+      # Spanish (Español)
+      - id_cita
+      - numero_cita
+      - cita
+      # Arabic (العربية)
+      - رقم_الموعد
+      - معرف_الموعد
+      # Russian (Русский)
+      - id_записи
+      - номер_приема
+      # French (Français)
+      - id_rdv
+      - numero_rdv
+    embedding_text: "appointment booking visit schedule reservation identifier ID number unique"
+
+  - name: patient_id
+    type: string
+    required: true
+    description: "Unique identifier for the patient"
+    aliases:
+      # English variations
+      - patient_num
+      - patient_number
+      - pt_id
+      - mrn
+      - medical_record_number
+      - patient_code
+      - client_id
+      # Hebrew
+      - מספר_מטופל
+      - מזהה_מטופל
+      - ת_ז
+      - תעודת_זהות
+      - קוד_מטופל
+      - מטופל
+      # Spanish
+      - id_paciente
+      - numero_paciente
+      - paciente
+      # Arabic
+      - رقم_المريض
+      - معرف_المريض
+      # Russian
+      - id_пациента
+      - номер_пациента
+      # French
+      - id_patient
+      - numero_patient
+    embedding_text: "patient identifier ID number MRN medical record client unique"
+
+  - name: patient_name
+    type: string
+    required: false
+    description: "Full name of the patient"
+    aliases:
+      # English
+      - name
+      - full_name
+      - patient
+      - client_name
+      # Hebrew
+      - שם_מטופל
+      - שם
+      - שם_מלא
+      - שם_לקוח
+      # Spanish
+      - nombre_paciente
+      - nombre
+      # Arabic
+      - اسم_المريض
+      - اسم
+      # Russian
+      - имя_пациента
+      - имя
+      # French
+      - nom_patient
+      - nom
+    embedding_text: "patient name full name client person"
+
+  - name: appointment_date
+    type: date
+    required: true
+    description: "The date of the scheduled appointment"
+    target_format: "YYYY-MM-DD"
+    accepts_formats:
+      - "YYYY-MM-DD"
+      - "DD/MM/YYYY"
+      - "MM/DD/YYYY"
+      - "DD-MM-YYYY"
+    aliases:
+      # English
+      - appt_date
+      - date
+      - visit_date
+      - scheduled_date
+      - booking_date
+      # Hebrew
+      - תאריך_תור
+      - תאריך
+      - תאריך_פגישה
+      - תאריך_ביקור
+      - יום
+      # Spanish
+      - fecha_cita
+      - fecha
+      - fecha_visita
+      # Arabic
+      - تاريخ_الموعد
+      - تاريخ
+      # Russian
+      - дата_приема
+      - дата
+      # French
+      - date_rdv
+      - date
+    embedding_text: "appointment date scheduled visit booking when day"
+
+  - name: appointment_time
+    type: datetime
+    required: true
+    description: "The scheduled time of the appointment"
+    aliases:
+      # English
+      - appt_time
+      - time
+      - scheduled_time
+      - start_time
+      - visit_time
+      - hour
+      # Hebrew
+      - שעת_תור
+      - שעה
+      - שעת_פגישה
+      - זמן
+      - מועד
+      # Spanish
+      - hora_cita
+      - hora
+      - horario
+      # Arabic
+      - وقت_الموعد
+      - ساعة
+      # Russian
+      - время_приема
+      - время
+      # French
+      - heure_rdv
+      - heure
+    embedding_text: "appointment time scheduled hour when start visit"
+
+  - name: end_time
+    type: datetime
+    required: false
+    description: "The scheduled end time of the appointment"
+    aliases:
+      # English
+      - appt_end
+      - finish_time
+      - end
+      - until
+      # Hebrew
+      - שעת_סיום
+      - סיום
+      - עד_שעה
+      # Spanish
+      - hora_fin
+      - fin
+      # Arabic
+      - وقت_النهاية
+      # Russian
+      - время_окончания
+      # French
+      - heure_fin
+    embedding_text: "end finish time until appointment duration"
+
+  - name: duration_minutes
+    type: integer
+    required: false
+    description: "Duration of the appointment in minutes"
+    target_unit: minutes
+    accepts_units:
+      - minutes
+      - hours
+    aliases:
+      # English
+      - duration
+      - length
+      - appt_length
+      - minutes
+      - time_slot
+      # Hebrew
+      - משך
+      - משך_תור
+      - דקות
+      - אורך
+      # Spanish
+      - duracion
+      - minutos
+      # Arabic
+      - المدة
+      - دقائق
+      # Russian
+      - длительность
+      - минуты
+      # French
+      - duree
+      - minutes
+    embedding_text: "duration length minutes time how long appointment"
+
+  - name: doctor_id
+    type: string
+    required: false
+    description: "Identifier of the doctor or healthcare provider"
+    aliases:
+      # English
+      - physician_id
+      - provider_id
+      - dr_id
+      - doctor_code
+      - practitioner_id
+      - clinician_id
+      # Hebrew
+      - מזהה_רופא
+      - קוד_רופא
+      - מספר_רופא
+      - רופא_מזהה
+      # Spanish
+      - id_medico
+      - id_doctor
+      - codigo_medico
+      # Arabic
+      - رقم_الطبيب
+      - معرف_الطبيب
+      # Russian
+      - id_врача
+      - код_врача
+      # French
+      - id_medecin
+      - code_medecin
+    embedding_text: "doctor physician provider practitioner clinician identifier ID"
+
+  - name: doctor_name
+    type: string
+    required: false
+    description: "Name of the doctor or healthcare provider"
+    aliases:
+      # English
+      - physician
+      - provider
+      - doctor
+      - dr_name
+      - practitioner
+      - clinician
+      - provider_name
+      - treating_physician
+      # Hebrew
+      - שם_רופא
+      - רופא
+      - רופא_מטפל
+      - מטפל
+      - שם_מטפל
+      # Spanish
+      - nombre_medico
+      - medico
+      - doctor
+      # Arabic
+      - اسم_الطبيب
+      - طبيب
+      # Russian
+      - имя_врача
+      - врач
+      # French
+      - nom_medecin
+      - medecin
+    embedding_text: "doctor physician provider name practitioner clinician treating"
+
+  - name: department
+    type: string
+    required: false
+    description: "Department or clinic where the appointment takes place"
+    aliases:
+      # English
+      - dept
+      - clinic
+      - unit
+      - specialty
+      - service
+      - ward
+      - location
+      # Hebrew
+      - מחלקה
+      - מרפאה
+      - יחידה
+      - התמחות
+      - קליניקה
+      # Spanish
+      - departamento
+      - clinica
+      - especialidad
+      # Arabic
+      - القسم
+      - العيادة
+      - التخصص
+      # Russian
+      - отделение
+      - клиника
+      - специальность
+      # French
+      - departement
+      - clinique
+      - specialite
+    embedding_text: "department clinic unit specialty service ward location where"
+
+  - name: appointment_type
+    type: string
+    required: false
+    description: "Type of appointment (new patient, follow-up, consultation, procedure)"
+    aliases:
+      # English
+      - appt_type
+      - visit_type
+      - type
+      - reason
+      - category
+      - purpose
+      # Hebrew
+      - סוג_תור
+      - סוג
+      - סוג_ביקור
+      - מטרה
+      - סיבה
+      # Spanish
+      - tipo_cita
+      - tipo
+      - motivo
+      # Arabic
+      - نوع_الموعد
+      - نوع
+      # Russian
+      - тип_приема
+      - тип
+      # French
+      - type_rdv
+      - type
+      - motif
+    embedding_text: "appointment type visit category new follow-up consultation procedure reason"
+
+  - name: status
+    type: string
+    required: false
+    description: "Status of the appointment (scheduled, confirmed, cancelled, completed, no-show)"
+    aliases:
+      # English
+      - appt_status
+      - state
+      - booking_status
+      # Hebrew
+      - סטטוס
+      - מצב
+      - מצב_תור
+      - סטטוס_תור
+      # Spanish
+      - estado
+      - estado_cita
+      # Arabic
+      - الحالة
+      - حالة
+      # Russian
+      - статус
+      - состояние
+      # French
+      - statut
+      - etat
+    embedding_text: "status state scheduled confirmed cancelled completed no-show pending"
+
+  - name: room
+    type: string
+    required: false
+    description: "Room or location where the appointment will take place"
+    aliases:
+      # English
+      - room_number
+      - room_no
+      - office
+      - location
+      - exam_room
+      # Hebrew
+      - חדר
+      - מספר_חדר
+      - חדר_בדיקה
+      - מיקום
+      # Spanish
+      - sala
+      - habitacion
+      - consultorio
+      # Arabic
+      - غرفة
+      - رقم_الغرفة
+      # Russian
+      - кабинет
+      - комната
+      # French
+      - salle
+      - cabinet
+    embedding_text: "room office location exam consultation number where"
+
+  - name: notes
+    type: string
+    required: false
+    description: "Additional notes or comments about the appointment"
+    aliases:
+      # English
+      - comments
+      - remarks
+      - description
+      - memo
+      # Hebrew
+      - הערות
+      - הערה
+      - תיאור
+      # Spanish
+      - notas
+      - comentarios
+      # Arabic
+      - ملاحظات
+      # Russian
+      - заметки
+      - комментарии
+      # French
+      - notes
+      - remarques
+    embedding_text: "notes comments remarks description additional information"
+
+  - name: phone
+    type: string
+    required: false
+    description: "Patient contact phone number"
+    aliases:
+      # English
+      - phone_number
+      - contact
+      - telephone
+      - mobile
+      - cell
+      # Hebrew
+      - טלפון
+      - מספר_טלפון
+      - נייד
+      - פלאפון
+      # Spanish
+      - telefono
+      - celular
+      - movil
+      # Arabic
+      - هاتف
+      - رقم_الهاتف
+      # Russian
+      - телефон
+      - мобильный
+      # French
+      - telephone
+      - portable
+    embedding_text: "phone telephone mobile contact number cell"
+
+  - name: created_at
+    type: datetime
+    required: false
+    description: "When the appointment was created/booked"
+    aliases:
+      # English
+      - booking_time
+      - created
+      - booked_at
+      - registered_at
+      # Hebrew
+      - נוצר_בתאריך
+      - תאריך_הזמנה
+      - זמן_הזמנה
+      # Spanish
+      - fecha_creacion
+      - creado
+      # Arabic
+      - تاريخ_الإنشاء
+      # Russian
+      - дата_создания
+      # French
+      - date_creation
+    embedding_text: "created booked registered when booking time"
+

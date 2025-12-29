@@ -1,0 +1,10 @@
+employee_number,full_name,worker_type,base_salary,cost_per_hour,work_hours,total_hourly_cost,dept,job_title,hire_date,curr
+EMP-101,Dr. Robert Chen,salaried,25000,,186,168.01,Cardiology,Cardiologist,2018-04-10,ILS
+EMP-102,Maria Garcia,contractor,,200,150,200.00,Surgery,Surgical Assistant,2023-03-22,ILS
+EMP-103,Hannah Lee,salaried,13500,,186,90.73,Pediatrics,Pediatric Nurse,2022-08-15,ILS
+EMP-104,Ahmed Hassan,contractor,,85,180,85.00,Emergency,EMT,2024-02-01,ILS
+EMP-105,Jennifer Kim,salaried,19500,,186,131.05,Oncology,Oncology Nurse,2020-11-30,ILS
+EMP-106,Carlos Rivera,contractor,,110,160,110.00,Radiology,X-Ray Tech,2023-07-18,ILS
+EMP-107,Sophie Bernard,salaried,17000,,186,114.25,Neurology,Neuro Nurse,2021-06-05,ILS
+EMP-108,Mark Thompson,contractor,,145,140,145.00,Orthopedics,Physical Therapist,2022-12-12,ILS
+
