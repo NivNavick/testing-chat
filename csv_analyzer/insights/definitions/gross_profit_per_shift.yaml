@@ -1,0 +1,124 @@
+# Insight: Gross profit per shift
+# Revenue from procedures minus physician and staff costs
+
+name: gross_profit_per_shift
+version: "1.0"
+description: "Gross profit per shift: procedure revenue minus physician and staff costs"
+category: profitability
+tags:
+  - profit
+  - revenue
+  - shifts
+
+requires:
+  - employee_shifts
+  - employee_compensation
+  - staff_clinical_procedures
+
+parameters:
+  - name: start_date
+    type: date
+    required: false
+    description: "Filter from this date"
+  - name: end_date
+    type: date
+    required: false
+    description: "Filter until this date"
+  - name: department
+    type: string
+    required: false
+    description: "Filter by department"
+
+sql: |
+  -- Calculate shift costs
+  WITH shift_costs AS (
+    SELECT 
+      s.employee_id,
+      s.shift_date,
+      s.department_code,
+      s.shift_start,
+      s.shift_end,
+      c.employee_name,
+      c.employment_type,
+      c.position,
+      -- Use duration_minutes if available, else default to 8 hours
+      COALESCE(s.duration_minutes / 60.0, 8.0) AS shift_hours,
+      COALESCE(c.effective_hourly_cost, c.hourly_rate, 0) AS hourly_cost
+    FROM employee_shifts s
+    LEFT JOIN employee_compensation c ON s.employee_id = c.employee_id
+    WHERE 1=1
+      {? AND s.shift_date >= '{{start_date}}' ?}
+      {? AND s.shift_date <= '{{end_date}}' ?}
+      {? AND s.department_code = '{{department}}' ?}
+  ),
+  -- Calculate revenue from procedures
+  procedure_revenue AS (
+    SELECT 
+      staff_id,
+      CAST(performed_datetime AS DATE) AS procedure_date,
+      location AS department,
+      COUNT(*) AS procedure_count,
+      SUM(COALESCE(CAST(price AS DOUBLE), 0)) AS total_revenue,
+      STRING_AGG(billing_code || ' ($' || CAST(COALESCE(price, 0) AS VARCHAR) || ')', '; ') AS procedure_details
+    FROM staff_clinical_procedures
+    WHERE 1=1
+      {? AND CAST(performed_datetime AS DATE) >= '{{start_date}}' ?}
+      {? AND CAST(performed_datetime AS DATE) <= '{{end_date}}' ?}
+      {? AND location = '{{department}}' ?}
+    GROUP BY staff_id, CAST(performed_datetime AS DATE), location
+  ),
+  -- Join and calculate
+  shift_analysis AS (
+    SELECT 
+      sc.shift_date,
+      sc.department_code,
+      sc.employee_id,
+      sc.employee_name,
+      sc.employment_type,
+      sc.position,
+      sc.shift_hours,
+      sc.hourly_cost,
+      ROUND(sc.shift_hours * sc.hourly_cost, 2) AS shift_cost,
+      COALESCE(pr.procedure_count, 0) AS procedures_performed,
+      COALESCE(pr.total_revenue, 0) AS procedure_revenue,
+      pr.procedure_details
+    FROM shift_costs sc
+    LEFT JOIN procedure_revenue pr 
+      ON sc.employee_id = pr.staff_id 
+      AND sc.shift_date = pr.procedure_date
+  )
+  SELECT 
+    shift_date,
+    department_code,
+    employee_id,
+    employee_name,
+    employment_type,
+    position,
+    shift_hours,
+    shift_cost,
+    procedures_performed,
+    procedure_revenue,
+    ROUND(procedure_revenue - shift_cost, 2) AS gross_profit,
+    CASE 
+      WHEN procedure_revenue > 0 THEN 
+        ROUND((procedure_revenue - shift_cost) / procedure_revenue * 100, 1)
+      ELSE 0 
+    END AS profit_margin_pct,
+    -- EVIDENCE: Explain the profit calculation
+    CASE 
+      WHEN procedures_performed = 0 THEN
+        employee_id || ' (' || COALESCE(employee_name, 'Unknown') || ', ' || COALESCE(position, 'N/A') || ') ' ||
+        'worked ' || shift_hours || 'h shift on ' || shift_date || '. ' ||
+        'Shift cost: $' || shift_cost || ' (' || shift_hours || 'h × $' || hourly_cost || '/h). ' ||
+        'No procedures recorded - support/admin role or documentation gap. Net cost: -$' || shift_cost || '.'
+      ELSE
+        employee_id || ' (' || COALESCE(employee_name, 'Unknown') || ', ' || COALESCE(position, 'N/A') || ') ' ||
+        'worked ' || shift_hours || 'h shift on ' || shift_date || '. ' ||
+        'Shift cost: $' || shift_cost || '. ' ||
+        'Performed ' || procedures_performed || ' procedure(s) generating $' || procedure_revenue || ' revenue. ' ||
+        'Procedures: ' || COALESCE(procedure_details, 'N/A') || '. ' ||
+        'Gross profit: $' || ROUND(procedure_revenue - shift_cost, 2) || 
+        ' (' || CASE WHEN procedure_revenue > 0 THEN ROUND((procedure_revenue - shift_cost) / procedure_revenue * 100, 1) ELSE 0 END || '% margin).'
+    END AS evidence
+  FROM shift_analysis
+  ORDER BY shift_date, department_code, employee_id

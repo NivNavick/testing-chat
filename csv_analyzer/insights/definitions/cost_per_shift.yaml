@@ -1,0 +1,72 @@
+# Insight: Manpower cost per shift
+# Calculates the cost of each shift by joining shift hours with employee compensation
+
+name: cost_per_shift
+version: "1.0"
+description: "Calculate manpower cost for each shift by joining shifts with compensation data"
+category: costs
+tags:
+  - manpower
+  - cost
+  - shifts
+
+requires:
+  - employee_shifts
+  - employee_compensation
+
+parameters:
+  - name: start_date
+    type: date
+    required: false
+    description: "Filter shifts from this date (YYYY-MM-DD)"
+  - name: end_date
+    type: date
+    required: false
+    description: "Filter shifts until this date (YYYY-MM-DD)"
+  - name: department
+    type: string
+    required: false
+    description: "Filter by department code"
+
+sql: |
+  SELECT 
+    s.shift_date,
+    s.employee_id,
+    c.employee_name,
+    s.shift_start,
+    s.shift_end,
+    s.department_code,
+    c.employment_type,
+    c.hourly_rate,
+    c.effective_hourly_cost,
+    -- Calculate shift duration in hours (use duration_minutes if available, else default to 8)
+    COALESCE(s.duration_minutes / 60.0, 8.0) AS shift_hours,
+    -- Calculate shift cost using effective hourly cost (includes benefits for salaried)
+    ROUND(
+      COALESCE(s.duration_minutes / 60.0, 8.0) 
+      * COALESCE(c.effective_hourly_cost, c.hourly_rate, 0), 
+      2
+    ) AS shift_cost,
+    -- EVIDENCE: Explain the cost calculation
+    'Cost calculated as: ' || 
+    ROUND(COALESCE(s.duration_minutes / 60.0, 8.0), 1) || ' hours × $' || 
+    ROUND(COALESCE(c.effective_hourly_cost, c.hourly_rate, 0), 2) || '/hour' ||
+    CASE 
+      WHEN c.employment_type = 'salaried' THEN 
+        ' (effective rate includes 25% benefits loading on gross salary of $' || 
+        COALESCE(CAST(c.gross_salary AS VARCHAR), 'N/A') || ')'
+      WHEN c.employment_type = 'contractor' THEN 
+        ' (contractor rate, no benefits loading)'
+      ELSE ''
+    END ||
+    ' = $' || ROUND(COALESCE(s.duration_minutes / 60.0, 8.0) * COALESCE(c.effective_hourly_cost, c.hourly_rate, 0), 2) ||
+    '. Shift: ' || s.shift_start || '-' || s.shift_end || ' on ' || s.shift_date || '.'
+    AS evidence
+  FROM employee_shifts s
+  LEFT JOIN employee_compensation c 
+    ON s.employee_id = c.employee_id
+  WHERE 1=1
+    {? AND s.shift_date >= '{{start_date}}' ?}
+    {? AND s.shift_date <= '{{end_date}}' ?}
+    {? AND s.department_code = '{{department}}' ?}
+  ORDER BY s.shift_date, s.shift_start

@@ -1,0 +1,19 @@
+employee_id,employee_name,shift_date,shift_start,shift_end,actual_start,actual_end,duration_minutes,department_code,shift_type
+GI001,Dr. Rachel Cohen,2024-06-01,08:00,16:00,07:55,16:10,480,Gastroenterology,day
+GI001,Dr. Rachel Cohen,2024-06-02,08:00,16:00,08:35,16:00,480,Gastroenterology,day
+GI001,Dr. Rachel Cohen,2024-06-03,08:00,16:00,07:50,16:05,480,Gastroenterology,day
+GI002,Dr. David Levi,2024-06-01,08:00,16:00,08:00,16:00,480,Gastroenterology,day
+GI002,Dr. David Levi,2024-06-02,08:00,16:00,08:45,15:30,480,Gastroenterology,day
+GI002,Dr. David Levi,2024-06-03,08:00,16:00,08:00,16:00,480,Gastroenterology,day
+GI003,Nurse Sarah Green,2024-06-01,07:00,15:00,06:55,15:00,480,Gastroenterology,morning
+GI003,Nurse Sarah Green,2024-06-02,07:00,15:00,07:40,15:00,480,Gastroenterology,morning
+GI003,Nurse Sarah Green,2024-06-03,07:00,15:00,07:00,15:00,480,Gastroenterology,morning
+GI004,Nurse Michael Kim,2024-06-01,07:00,15:00,07:00,15:00,480,Gastroenterology,morning
+GI004,Nurse Michael Kim,2024-06-02,07:00,15:00,07:55,14:45,480,Gastroenterology,morning
+GI004,Nurse Michael Kim,2024-06-03,07:00,15:00,06:00,15:00,480,Gastroenterology,morning
+GI005,PA Emma Wilson,2024-06-01,09:00,17:00,09:00,17:00,480,Gastroenterology,day
+GI005,PA Emma Wilson,2024-06-02,09:00,17:00,09:30,16:45,480,Gastroenterology,day
+GI005,PA Emma Wilson,2024-06-03,09:00,17:00,09:00,17:00,480,Gastroenterology,day
+GI006,Tech John Smith,2024-06-01,08:00,16:00,07:50,16:00,480,Gastroenterology,day
+GI006,Tech John Smith,2024-06-02,08:00,16:00,08:00,15:30,480,Gastroenterology,day
+GI006,Tech John Smith,2024-06-03,08:00,16:00,08:00,16:00,480,Gastroenterology,day

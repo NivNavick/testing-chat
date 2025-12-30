@@ -403,6 +403,49 @@ fields:
       - raison
     embedding_text: "diagnosis ICD code condition reason indication why needed problem"
 
+  - name: price
+    type: float
+    required: false
+    description: "Price or revenue for the procedure (billing amount)"
+    aliases:
+      - revenue
+      - charge
+      - amount
+      - fee
+      - cost
+      - billing_amount
+      - charge_amount
+      - procedure_price
+      - procedure_cost
+      - service_price
+      - service_fee
+      - unit_price
+      # Hebrew
+      - מחיר
+      - עלות
+      - תעריף
+      - סכום
+      - חיוב
+      # Spanish
+      - precio
+      - costo
+      - importe
+      - tarifa
+      # Arabic
+      - السعر
+      - التكلفة
+      - المبلغ
+      # Russian
+      - цена
+      - стоимость
+      - сумма
+      # French
+      - prix
+      - cout
+      - montant
+      - tarif
+    embedding_text: "price revenue charge amount fee cost billing procedure service money payment"
+
   - name: clinical_notes
     type: string
     required: false

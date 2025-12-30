@@ -1,0 +1,107 @@
+# Insight: Attendance vs Activity Discrepancies
+# Identifies gaps between scheduled shift times and actual procedure activity
+
+name: attendance_discrepancies
+version: "1.0"
+description: "Review discrepancies between employee attendance hours and procedure activity times"
+category: compliance
+tags:
+  - attendance
+  - discrepancy
+  - activity
+
+requires:
+  - employee_shifts
+  - staff_clinical_procedures
+
+parameters:
+  - name: start_date
+    type: date
+    required: false
+    description: "Filter from this date"
+  - name: end_date
+    type: date
+    required: false
+    description: "Filter until this date"
+
+sql: |
+  -- Get scheduled shifts
+  WITH shifts AS (
+    SELECT 
+      employee_id,
+      employee_name,
+      shift_date,
+      shift_start,
+      shift_end,
+      department_code
+    FROM employee_shifts
+    WHERE 1=1
+      {? AND shift_date >= '{{start_date}}' ?}
+      {? AND shift_date <= '{{end_date}}' ?}
+  ),
+  -- Get first and last procedure activity per employee per day
+  activity_times AS (
+    SELECT 
+      staff_id AS employee_id,
+      CAST(performed_datetime AS DATE) AS activity_date,
+      MIN(CAST(performed_datetime AS TIMESTAMP)) AS first_activity,
+      MAX(CAST(performed_datetime AS TIMESTAMP)) AS last_activity,
+      COUNT(*) AS procedure_count,
+      STRING_AGG(DISTINCT billing_code, ', ') AS procedure_codes
+    FROM staff_clinical_procedures
+    WHERE 1=1
+      {? AND CAST(performed_datetime AS DATE) >= '{{start_date}}' ?}
+      {? AND CAST(performed_datetime AS DATE) <= '{{end_date}}' ?}
+    GROUP BY staff_id, CAST(performed_datetime AS DATE)
+  ),
+  -- Compare shifts with activity
+  comparison AS (
+    SELECT 
+      s.employee_id,
+      s.employee_name,
+      s.shift_date,
+      s.department_code,
+      s.shift_start,
+      s.shift_end,
+      a.first_activity,
+      a.last_activity,
+      a.procedure_count,
+      a.procedure_codes
+    FROM shifts s
+    LEFT JOIN activity_times a 
+      ON s.employee_id = a.employee_id 
+      AND s.shift_date = a.activity_date
+  )
+  SELECT 
+    employee_id,
+    employee_name,
+    shift_date,
+    department_code,
+    shift_start,
+    shift_end,
+    first_activity,
+    last_activity,
+    COALESCE(procedure_count, 0) AS procedure_count,
+    -- Flag issues
+    CASE 
+      WHEN procedure_count IS NULL OR procedure_count = 0 THEN 'NO_ACTIVITY_RECORDED'
+      ELSE 'HAS_ACTIVITY'
+    END AS activity_status,
+    -- EVIDENCE: Explain how the finding was determined
+    CASE 
+      WHEN procedure_count IS NULL OR procedure_count = 0 THEN 
+        'Employee ' || employee_id || ' (' || COALESCE(employee_name, 'Unknown') || ') was scheduled for shift ' || 
+        shift_start || '-' || shift_end || ' on ' || shift_date || ' in ' || department_code || 
+        ', but NO clinical procedures were recorded for this employee on this date. ' ||
+        'This may indicate: (1) documentation gap, (2) non-clinical role, or (3) absence not recorded.'
+      ELSE 
+        'Employee ' || employee_id || ' worked shift ' || shift_start || '-' || shift_end || 
+        ' and performed ' || procedure_count || ' procedure(s). First activity at ' || 
+        SUBSTR(CAST(first_activity AS VARCHAR), 12, 5) || ', last activity at ' || 
+        SUBSTR(CAST(last_activity AS VARCHAR), 12, 5) || '. Procedures: ' || COALESCE(procedure_codes, 'N/A') || '.'
+    END AS evidence
+  FROM comparison
+  ORDER BY 
+    CASE WHEN procedure_count IS NULL OR procedure_count = 0 THEN 0 ELSE 1 END,
+    shift_date, 
+    employee_id

@@ -1,0 +1,79 @@
+# Insight: Average cost per procedure type
+# Calculates staff cost per clinical procedure by correlating procedures with shifts
+
+name: avg_cost_per_procedure
+version: "1.0"
+description: "Average staff cost per clinical procedure type, based on staff hourly costs"
+category: costs
+tags:
+  - procedures
+  - cost
+  - clinical
+
+requires:
+  - staff_clinical_procedures
+  - employee_compensation
+
+parameters:
+  - name: start_date
+    type: date
+    required: false
+    description: "Filter procedures from this date"
+  - name: end_date
+    type: date
+    required: false
+    description: "Filter procedures until this date"
+  - name: location
+    type: string
+    required: false
+    description: "Filter by department/location"
+
+sql: |
+  WITH procedure_costs AS (
+    SELECT 
+      p.procedure_id,
+      p.billing_code,
+      p.procedure_description,
+      p.staff_id,
+      p.performed_datetime,
+      p.location,
+      COALESCE(p.price, 0) AS procedure_revenue,
+      c.employee_name,
+      c.employment_type,
+      COALESCE(c.effective_hourly_cost, c.hourly_rate, 0) AS hourly_cost,
+      -- Assume average procedure takes 0.5 hours if not specified
+      0.5 AS estimated_hours_per_procedure
+    FROM staff_clinical_procedures p
+    LEFT JOIN employee_compensation c 
+      ON p.staff_id = c.employee_id
+    WHERE 1=1
+      {? AND CAST(p.performed_datetime AS DATE) >= '{{start_date}}' ?}
+      {? AND CAST(p.performed_datetime AS DATE) <= '{{end_date}}' ?}
+      {? AND p.location = '{{location}}' ?}
+  )
+  SELECT 
+    billing_code,
+    MAX(procedure_description) AS procedure_description,
+    COUNT(*) AS procedure_count,
+    COUNT(DISTINCT staff_id) AS unique_performers,
+    ROUND(AVG(hourly_cost * estimated_hours_per_procedure), 2) AS avg_staff_cost,
+    ROUND(MIN(hourly_cost * estimated_hours_per_procedure), 2) AS min_cost,
+    ROUND(MAX(hourly_cost * estimated_hours_per_procedure), 2) AS max_cost,
+    ROUND(SUM(hourly_cost * estimated_hours_per_procedure), 2) AS total_staff_cost,
+    ROUND(AVG(procedure_revenue), 2) AS avg_revenue,
+    ROUND(SUM(procedure_revenue), 2) AS total_revenue,
+    -- EVIDENCE: Explain the calculation
+    'Procedure ' || billing_code || ' (' || MAX(procedure_description) || '): ' ||
+    'Performed ' || COUNT(*) || ' times by ' || COUNT(DISTINCT staff_id) || ' staff member(s). ' ||
+    'Staff cost calculation: 0.5 hours (estimated) × hourly rate. ' ||
+    'Avg staff cost: $' || ROUND(AVG(hourly_cost * estimated_hours_per_procedure), 2) || 
+    ' (range: $' || ROUND(MIN(hourly_cost * estimated_hours_per_procedure), 2) || 
+    ' - $' || ROUND(MAX(hourly_cost * estimated_hours_per_procedure), 2) || '). ' ||
+    'Avg revenue per procedure: $' || ROUND(AVG(procedure_revenue), 2) || '. ' ||
+    'Gross margin: $' || ROUND(AVG(procedure_revenue) - AVG(hourly_cost * estimated_hours_per_procedure), 2) || 
+    ' (' || ROUND((AVG(procedure_revenue) - AVG(hourly_cost * estimated_hours_per_procedure)) / NULLIF(AVG(procedure_revenue), 0) * 100, 1) || '%).'
+    AS evidence
+  FROM procedure_costs
+  WHERE hourly_cost > 0
+  GROUP BY billing_code
+  ORDER BY procedure_count DESC

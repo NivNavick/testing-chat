@@ -1,0 +1,69 @@
+# Insight: Shift Summary Statistics
+# Provides overview statistics of shifts and costs
+
+name: shift_summary
+version: "1.0"
+description: "Summary statistics: total shifts, costs, and key metrics by department and period"
+category: summary
+tags:
+  - summary
+  - statistics
+  - overview
+
+requires:
+  - employee_shifts
+  - employee_compensation
+
+parameters:
+  - name: start_date
+    type: date
+    required: false
+    description: "Filter from this date"
+  - name: end_date
+    type: date
+    required: false
+    description: "Filter until this date"
+
+sql: |
+  WITH shift_data AS (
+    SELECT 
+      s.shift_date,
+      s.department_code,
+      s.employee_id,
+      c.employee_name,
+      c.employment_type,
+      -- Use duration_minutes if available, else default to 8 hours
+      COALESCE(s.duration_minutes / 60.0, 8.0) AS hours,
+      COALESCE(c.effective_hourly_cost, c.hourly_rate, 0) AS hourly_cost
+    FROM employee_shifts s
+    LEFT JOIN employee_compensation c ON s.employee_id = c.employee_id
+    WHERE 1=1
+      {? AND s.shift_date >= '{{start_date}}' ?}
+      {? AND s.shift_date <= '{{end_date}}' ?}
+  )
+  SELECT 
+    department_code,
+    COUNT(*) AS total_shifts,
+    COUNT(DISTINCT employee_id) AS unique_employees,
+    ROUND(SUM(hours), 1) AS total_hours,
+    ROUND(AVG(hours), 2) AS avg_shift_hours,
+    ROUND(SUM(hours * hourly_cost), 2) AS total_cost,
+    ROUND(AVG(hours * hourly_cost), 2) AS avg_shift_cost,
+    COUNT(CASE WHEN employment_type = 'salaried' THEN 1 END) AS salaried_shifts,
+    COUNT(CASE WHEN employment_type = 'contractor' THEN 1 END) AS contractor_shifts,
+    MIN(shift_date) AS first_shift,
+    MAX(shift_date) AS last_shift,
+    -- EVIDENCE: Explain the summary calculation
+    'Summary for ' || department_code || ' department: ' ||
+    COUNT(*) || ' shifts by ' || COUNT(DISTINCT employee_id) || ' employees ' ||
+    'from ' || MIN(shift_date) || ' to ' || MAX(shift_date) || '. ' ||
+    'Total hours: ' || ROUND(SUM(hours), 1) || 'h. ' ||
+    'Staff mix: ' || COUNT(CASE WHEN employment_type = 'salaried' THEN 1 END) || ' salaried shifts ($' ||
+    ROUND(AVG(CASE WHEN employment_type = 'salaried' THEN hours * hourly_cost END), 2) || ' avg) + ' ||
+    COUNT(CASE WHEN employment_type = 'contractor' THEN 1 END) || ' contractor shifts ($' ||
+    ROUND(AVG(CASE WHEN employment_type = 'contractor' THEN hours * hourly_cost END), 2) || ' avg). ' ||
+    'Total labor cost: $' || ROUND(SUM(hours * hourly_cost), 2) || '.'
+    AS evidence
+  FROM shift_data
+  GROUP BY department_code
+  ORDER BY total_cost DESC
