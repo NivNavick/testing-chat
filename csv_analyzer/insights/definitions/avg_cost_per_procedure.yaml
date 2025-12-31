@@ -1,18 +1,21 @@
 # Insight: Average cost per procedure type
 # Calculates staff cost per clinical procedure by correlating procedures with shifts
+# Duration is calculated from shift hours / procedure count (data-driven, not hardcoded)
 
 name: avg_cost_per_procedure
-version: "1.0"
-description: "Average staff cost per clinical procedure type, based on staff hourly costs"
+version: "2.0"
+description: "Average staff cost per clinical procedure type, calculated from actual shift data and procedure counts"
 category: costs
 tags:
   - procedures
   - cost
   - clinical
+  - data_driven
 
 requires:
   - staff_clinical_procedures
   - employee_compensation
+  - employee_shifts
 
 parameters:
   - name: start_date
@@ -29,7 +32,45 @@ parameters:
     description: "Filter by department/location"
 
 sql: |
-  WITH procedure_costs AS (
+  -- Step 1: Calculate shift duration and procedure count per shift
+  WITH shift_workload AS (
+    SELECT 
+      s.employee_id,
+      s.shift_date,
+      s.department_code,
+      -- Shift duration in hours
+      COALESCE(s.duration_minutes / 60.0, 8.0) AS shift_hours,
+      -- Count procedures during this shift
+      COUNT(p.procedure_id) AS procedures_in_shift,
+      c.effective_hourly_cost,
+      c.hourly_rate,
+      c.employee_name,
+      c.employment_type
+    FROM employee_shifts s
+    LEFT JOIN staff_clinical_procedures p 
+      ON s.employee_id = p.staff_id 
+      AND CAST(p.performed_datetime AS DATE) = s.shift_date
+      AND CAST(p.performed_datetime AS TIME) BETWEEN CAST(s.shift_start AS TIME) AND CAST(s.shift_end AS TIME)
+    LEFT JOIN employee_compensation c ON s.employee_id = c.employee_id
+    WHERE 1=1
+      {? AND s.shift_date >= '{{start_date}}' ?}
+      {? AND s.shift_date <= '{{end_date}}' ?}
+      {? AND s.department_code = '{{location}}' ?}
+    GROUP BY s.employee_id, s.shift_date, s.department_code, s.duration_minutes, c.effective_hourly_cost, c.hourly_rate, c.employee_name, c.employment_type
+  ),
+  -- Step 2: Calculate estimated hours per procedure for each shift
+  shift_durations AS (
+    SELECT 
+      *,
+      -- Estimated hours per procedure = shift hours / procedure count
+      CASE 
+        WHEN procedures_in_shift > 0 THEN shift_hours / procedures_in_shift
+        ELSE NULL
+      END AS estimated_hours_per_procedure
+    FROM shift_workload
+  ),
+  -- Step 3: Join procedures with their estimated duration
+  procedure_costs AS (
     SELECT 
       p.procedure_id,
       p.billing_code,
@@ -38,12 +79,17 @@ sql: |
       p.performed_datetime,
       p.location,
       COALESCE(p.price, 0) AS procedure_revenue,
-      c.employee_name,
-      c.employment_type,
-      COALESCE(c.effective_hourly_cost, c.hourly_rate, 0) AS hourly_cost,
-      -- Assume average procedure takes 0.5 hours if not specified
-      0.5 AS estimated_hours_per_procedure
+      sd.employee_name,
+      sd.employment_type,
+      COALESCE(sd.effective_hourly_cost, sd.hourly_rate, 0) AS hourly_cost,
+      -- Use calculated duration from shift, or fallback to 0.5h if procedure is outside tracked shifts
+      COALESCE(sd.estimated_hours_per_procedure, 0.5) AS estimated_hours_per_procedure,
+      sd.shift_date,
+      sd.procedures_in_shift
     FROM staff_clinical_procedures p
+    LEFT JOIN shift_durations sd 
+      ON p.staff_id = sd.employee_id 
+      AND CAST(p.performed_datetime AS DATE) = sd.shift_date
     LEFT JOIN employee_compensation c 
       ON p.staff_id = c.employee_id
     WHERE 1=1
@@ -60,12 +106,14 @@ sql: |
     ROUND(MIN(hourly_cost * estimated_hours_per_procedure), 2) AS min_cost,
     ROUND(MAX(hourly_cost * estimated_hours_per_procedure), 2) AS max_cost,
     ROUND(SUM(hourly_cost * estimated_hours_per_procedure), 2) AS total_staff_cost,
+    ROUND(AVG(estimated_hours_per_procedure), 2) AS avg_duration_hours,
     ROUND(AVG(procedure_revenue), 2) AS avg_revenue,
     ROUND(SUM(procedure_revenue), 2) AS total_revenue,
-    -- EVIDENCE: Explain the calculation
+    -- EVIDENCE: Explain the calculation with data-driven approach
     'Procedure ' || billing_code || ' (' || MAX(procedure_description) || '): ' ||
     'Performed ' || COUNT(*) || ' times by ' || COUNT(DISTINCT staff_id) || ' staff member(s). ' ||
-    'Staff cost calculation: 0.5 hours (estimated) × hourly rate. ' ||
+    'Staff cost calculation: Avg ' || ROUND(AVG(estimated_hours_per_procedure), 2) || ' hours per procedure ' ||
+    '(calculated from shift duration ÷ procedures in shift) × hourly rate. ' ||
     'Avg staff cost: $' || ROUND(AVG(hourly_cost * estimated_hours_per_procedure), 2) || 
     ' (range: $' || ROUND(MIN(hourly_cost * estimated_hours_per_procedure), 2) || 
     ' - $' || ROUND(MAX(hourly_cost * estimated_hours_per_procedure), 2) || '). ' ||
