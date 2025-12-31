@@ -17,3 +17,12 @@ GI005,PA Emma Wilson,2024-06-03,09:00,17:00,09:00,17:00,480,Gastroenterology,day
 GI006,Tech John Smith,2024-06-01,08:00,16:00,07:50,16:00,480,Gastroenterology,day
 GI006,Tech John Smith,2024-06-02,08:00,16:00,08:00,15:30,480,Gastroenterology,day
 GI006,Tech John Smith,2024-06-03,08:00,16:00,08:00,16:00,480,Gastroenterology,day
+GI007,Nurse Lisa Park,2024-06-01,15:00,23:00,15:00,23:00,480,Gastroenterology,afternoon
+GI007,Nurse Lisa Park,2024-06-02,15:00,23:00,15:20,23:00,480,Gastroenterology,afternoon
+GI007,Nurse Lisa Park,2024-06-03,15:00,23:00,15:00,23:00,480,Gastroenterology,afternoon
+GI008,Dr. Mark Thompson,2024-06-01,14:00,22:00,14:00,22:00,480,Gastroenterology,afternoon
+GI008,Dr. Mark Thompson,2024-06-02,14:00,22:00,14:15,22:00,480,Gastroenterology,afternoon
+GI008,Dr. Mark Thompson,2024-06-03,14:00,22:00,13:55,22:05,480,Gastroenterology,afternoon
+GI009,Tech Amy Chen,2024-06-01,15:00,23:00,15:05,23:00,480,Gastroenterology,afternoon
+GI009,Tech Amy Chen,2024-06-02,15:00,23:00,14:50,22:30,480,Gastroenterology,afternoon
+GI009,Tech Amy Chen,2024-06-03,15:00,23:00,15:00,23:00,480,Gastroenterology,afternoon

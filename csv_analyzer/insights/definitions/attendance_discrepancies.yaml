@@ -1,14 +1,16 @@
 # Insight: Attendance vs Activity Discrepancies
 # Identifies gaps between scheduled shift times and actual procedure activity
+# Now includes detected shift patterns
 
 name: attendance_discrepancies
-version: "1.0"
-description: "Review discrepancies between employee attendance hours and procedure activity times"
+version: "1.1"
+description: "Review discrepancies between employee attendance hours and procedure activity times, by shift pattern"
 category: compliance
 tags:
   - attendance
   - discrepancy
   - activity
+  - shift_patterns
 
 requires:
   - employee_shifts
@@ -23,6 +25,10 @@ parameters:
     type: date
     required: false
     description: "Filter until this date"
+  - name: shift_type
+    type: string
+    required: false
+    description: "Filter by detected shift type (MORNING, AFTERNOON, EVENING, NIGHT)"
 
 sql: |
   -- Get scheduled shifts
@@ -33,11 +39,14 @@ sql: |
       shift_date,
       shift_start,
       shift_end,
-      department_code
+      department_code,
+      -- Use detected shift type if available
+      COALESCE(detected_shift_type, shift_type, 'UNKNOWN') AS detected_shift_type
     FROM employee_shifts
     WHERE 1=1
       {? AND shift_date >= '{{start_date}}' ?}
       {? AND shift_date <= '{{end_date}}' ?}
+      {? AND detected_shift_type = '{{shift_type}}' ?}
   ),
   -- Get first and last procedure activity per employee per day
   activity_times AS (
@@ -61,6 +70,7 @@ sql: |
       s.employee_name,
       s.shift_date,
       s.department_code,
+      s.detected_shift_type,
       s.shift_start,
       s.shift_end,
       a.first_activity,
@@ -77,6 +87,7 @@ sql: |
     employee_name,
     shift_date,
     department_code,
+    detected_shift_type,
     shift_start,
     shift_end,
     first_activity,
@@ -87,21 +98,32 @@ sql: |
       WHEN procedure_count IS NULL OR procedure_count = 0 THEN 'NO_ACTIVITY_RECORDED'
       ELSE 'HAS_ACTIVITY'
     END AS activity_status,
-    -- EVIDENCE: Explain how the finding was determined
+    -- EVIDENCE: Explain how the finding was determined (includes shift type)
+    '[' || detected_shift_type || ' SHIFT] ' ||
     CASE 
       WHEN procedure_count IS NULL OR procedure_count = 0 THEN 
-        'Employee ' || employee_id || ' (' || COALESCE(employee_name, 'Unknown') || ') was scheduled for shift ' || 
-        shift_start || '-' || shift_end || ' on ' || shift_date || ' in ' || department_code || 
-        ', but NO clinical procedures were recorded for this employee on this date. ' ||
+        'Employee ' || employee_id || ' (' || COALESCE(employee_name, 'Unknown') || ') was scheduled for ' ||
+        detected_shift_type || ' shift ' || shift_start || '-' || shift_end || ' on ' || shift_date || 
+        ' in ' || department_code || ', but NO clinical procedures were recorded. ' ||
         'This may indicate: (1) documentation gap, (2) non-clinical role, or (3) absence not recorded.'
       ELSE 
-        'Employee ' || employee_id || ' worked shift ' || shift_start || '-' || shift_end || 
-        ' and performed ' || procedure_count || ' procedure(s). First activity at ' || 
-        SUBSTR(CAST(first_activity AS VARCHAR), 12, 5) || ', last activity at ' || 
-        SUBSTR(CAST(last_activity AS VARCHAR), 12, 5) || '. Procedures: ' || COALESCE(procedure_codes, 'N/A') || '.'
+        'Employee ' || employee_id || ' worked ' || detected_shift_type || ' shift ' || 
+        shift_start || '-' || shift_end || ' and performed ' || procedure_count || ' procedure(s). ' ||
+        'First activity at ' || SUBSTR(CAST(first_activity AS VARCHAR), 12, 5) || 
+        ', last activity at ' || SUBSTR(CAST(last_activity AS VARCHAR), 12, 5) || '. ' ||
+        'Procedures: ' || COALESCE(procedure_codes, 'N/A') || '.'
     END AS evidence
   FROM comparison
   ORDER BY 
+    -- Group by shift type first
+    CASE detected_shift_type 
+      WHEN 'MORNING' THEN 1 
+      WHEN 'MID_DAY' THEN 2 
+      WHEN 'AFTERNOON' THEN 3 
+      WHEN 'EVENING' THEN 4 
+      WHEN 'NIGHT' THEN 5 
+      ELSE 6 
+    END,
     CASE WHEN procedure_count IS NULL OR procedure_count = 0 THEN 0 ELSE 1 END,
     shift_date, 
     employee_id

@@ -1,31 +1,39 @@
-procedure_id,patient_ref,staff_id,billing_code,procedure_description,performed_datetime,location,diagnosis_code,price
-PROC-001,PT20001,GI001,43239,Upper GI Endoscopy,2024-06-01 08:30:00,Gastroenterology,K21.0,1200.00
-PROC-002,PT20002,GI001,45378,Diagnostic Colonoscopy,2024-06-01 10:00:00,Gastroenterology,K63.5,1500.00
-PROC-003,PT20003,GI001,43235,EGD with Biopsy,2024-06-01 13:00:00,Gastroenterology,K29.70,1350.00
-PROC-004,PT20004,GI001,45385,Colonoscopy with Biopsy,2024-06-01 14:30:00,Gastroenterology,K51.90,1800.00
-PROC-005,PT20005,GI002,43239,Upper GI Endoscopy,2024-06-01 09:00:00,Gastroenterology,K21.9,1200.00
-PROC-006,PT20006,GI002,45380,Colonoscopy with Polypectomy,2024-06-01 11:00:00,Gastroenterology,K63.5,2200.00
-PROC-007,PT20007,GI002,43249,ERCP,2024-06-01 13:30:00,Gastroenterology,K83.1,3500.00
-PROC-008,PT20008,GI005,99213,GI Consult,2024-06-01 09:30:00,Gastroenterology,K59.00,85.00
-PROC-009,PT20009,GI005,99214,Extended GI Consult,2024-06-01 11:30:00,Gastroenterology,R10.9,125.00
-PROC-010,PT20010,GI005,99213,GI Consult,2024-06-01 14:00:00,Gastroenterology,K58.9,85.00
-PROC-011,PT20011,GI005,99213,Follow-up Visit,2024-06-01 15:30:00,Gastroenterology,K21.0,85.00
-PROC-012,PT20001,GI001,43239,Upper GI Endoscopy,2024-06-02 09:00:00,Gastroenterology,K21.0,1200.00
-PROC-013,PT20012,GI001,45378,Diagnostic Colonoscopy,2024-06-02 11:00:00,Gastroenterology,K62.5,1500.00
-PROC-014,PT20013,GI001,43235,EGD with Biopsy,2024-06-02 13:30:00,Gastroenterology,K31.89,1350.00
-PROC-015,PT20014,GI002,45385,Colonoscopy with Biopsy,2024-06-02 09:30:00,Gastroenterology,K50.90,1800.00
-PROC-016,PT20015,GI002,43239,Upper GI Endoscopy,2024-06-02 11:30:00,Gastroenterology,K22.70,1200.00
-PROC-017,PT20016,GI002,45380,Colonoscopy with Polypectomy,2024-06-02 14:00:00,Gastroenterology,D12.6,2200.00
-PROC-018,PT20017,GI005,99213,GI Consult,2024-06-02 10:00:00,Gastroenterology,K52.9,85.00
-PROC-019,PT20018,GI005,99214,Extended GI Consult,2024-06-02 13:00:00,Gastroenterology,R19.7,125.00
-PROC-020,PT20019,GI005,99215,Complex GI Consult,2024-06-02 15:00:00,Gastroenterology,K92.2,175.00
-PROC-021,PT20020,GI001,43239,Upper GI Endoscopy,2024-06-03 08:30:00,Gastroenterology,K21.0,1200.00
-PROC-022,PT20021,GI001,45378,Diagnostic Colonoscopy,2024-06-03 10:30:00,Gastroenterology,K63.5,1500.00
-PROC-023,PT20022,GI001,43235,EGD with Biopsy,2024-06-03 13:00:00,Gastroenterology,K25.9,1350.00
-PROC-024,PT20023,GI002,45385,Colonoscopy with Biopsy,2024-06-03 09:00:00,Gastroenterology,K51.90,1800.00
-PROC-025,PT20024,GI002,43249,ERCP,2024-06-03 11:30:00,Gastroenterology,K80.50,3500.00
-PROC-026,PT20025,GI002,45380,Colonoscopy with Polypectomy,2024-06-03 14:30:00,Gastroenterology,K63.5,2200.00
-PROC-027,PT20026,GI005,99213,GI Consult,2024-06-03 09:30:00,Gastroenterology,K59.00,85.00
-PROC-028,PT20027,GI005,99214,Extended GI Consult,2024-06-03 11:00:00,Gastroenterology,R10.0,125.00
-PROC-029,PT20028,GI005,99213,Follow-up Visit,2024-06-03 14:00:00,Gastroenterology,K58.9,85.00
-PROC-030,PT20029,GI005,99213,GI Consult,2024-06-03 15:30:00,Gastroenterology,K52.9,85.00
+procedure_id,patient_ref,staff_id,billing_code,procedure_description,performed_datetime,location,price
+P001,PAT-001,GI001,43239,Upper GI Endoscopy,2024-06-01 08:30:00,Gastroenterology,1200.00
+P002,PAT-002,GI001,45378,Diagnostic Colonoscopy,2024-06-01 10:00:00,Gastroenterology,1500.00
+P003,PAT-003,GI001,43235,EGD with Biopsy,2024-06-01 11:30:00,Gastroenterology,1350.00
+P004,PAT-004,GI001,45385,Colonoscopy with Biopsy,2024-06-01 14:00:00,Gastroenterology,1800.00
+P005,PAT-005,GI002,43239,Upper GI Endoscopy,2024-06-01 08:45:00,Gastroenterology,1200.00
+P006,PAT-006,GI002,45380,Colonoscopy with Polypectomy,2024-06-01 10:30:00,Gastroenterology,2200.00
+P007,PAT-007,GI002,43249,ERCP,2024-06-01 13:00:00,Gastroenterology,3500.00
+P008,PAT-008,GI005,99213,GI Consult,2024-06-01 09:15:00,Gastroenterology,85.00
+P009,PAT-009,GI005,99214,Extended GI Consult,2024-06-01 10:45:00,Gastroenterology,125.00
+P010,PAT-010,GI005,99213,GI Consult,2024-06-01 14:00:00,Gastroenterology,85.00
+P011,PAT-011,GI005,99213,GI Consult,2024-06-01 15:30:00,Gastroenterology,85.00
+P012,PAT-012,GI001,43239,Upper GI Endoscopy,2024-06-02 09:00:00,Gastroenterology,1200.00
+P013,PAT-013,GI001,45378,Diagnostic Colonoscopy,2024-06-02 11:00:00,Gastroenterology,1500.00
+P014,PAT-014,GI001,43235,EGD with Biopsy,2024-06-02 13:30:00,Gastroenterology,1350.00
+P015,PAT-015,GI002,45385,Colonoscopy with Biopsy,2024-06-02 08:30:00,Gastroenterology,1800.00
+P016,PAT-016,GI002,43239,Upper GI Endoscopy,2024-06-02 10:30:00,Gastroenterology,1200.00
+P017,PAT-017,GI002,45380,Colonoscopy with Polypectomy,2024-06-02 13:00:00,Gastroenterology,2200.00
+P018,PAT-018,GI005,99213,GI Consult,2024-06-02 09:30:00,Gastroenterology,85.00
+P019,PAT-019,GI005,99214,Extended GI Consult,2024-06-02 11:00:00,Gastroenterology,125.00
+P020,PAT-020,GI005,99215,Complex GI Consult,2024-06-02 14:00:00,Gastroenterology,175.00
+P021,PAT-021,GI001,43239,Upper GI Endoscopy,2024-06-03 08:30:00,Gastroenterology,1200.00
+P022,PAT-022,GI001,45378,Diagnostic Colonoscopy,2024-06-03 10:00:00,Gastroenterology,1500.00
+P023,PAT-023,GI001,43235,EGD with Biopsy,2024-06-03 13:00:00,Gastroenterology,1350.00
+P024,PAT-024,GI002,45385,Colonoscopy with Biopsy,2024-06-03 09:00:00,Gastroenterology,1800.00
+P025,PAT-025,GI002,43249,ERCP,2024-06-03 11:30:00,Gastroenterology,3500.00
+P026,PAT-026,GI002,45380,Colonoscopy with Polypectomy,2024-06-03 14:00:00,Gastroenterology,2200.00
+P027,PAT-027,GI005,99213,GI Consult,2024-06-03 09:00:00,Gastroenterology,85.00
+P028,PAT-028,GI005,99214,Extended GI Consult,2024-06-03 11:00:00,Gastroenterology,125.00
+P029,PAT-029,GI005,99213,GI Consult,2024-06-03 14:30:00,Gastroenterology,85.00
+P030,PAT-030,GI005,99213,GI Consult,2024-06-03 16:00:00,Gastroenterology,85.00
+P031,PAT-031,GI008,43239,Upper GI Endoscopy,2024-06-01 15:00:00,Gastroenterology,1200.00
+P032,PAT-032,GI008,45378,Diagnostic Colonoscopy,2024-06-01 17:00:00,Gastroenterology,1500.00
+P033,PAT-033,GI008,43235,EGD with Biopsy,2024-06-01 19:00:00,Gastroenterology,1350.00
+P034,PAT-034,GI008,43239,Upper GI Endoscopy,2024-06-02 14:30:00,Gastroenterology,1200.00
+P035,PAT-035,GI008,45385,Colonoscopy with Biopsy,2024-06-02 16:30:00,Gastroenterology,1800.00
+P036,PAT-036,GI008,43239,Upper GI Endoscopy,2024-06-03 14:00:00,Gastroenterology,1200.00
+P037,PAT-037,GI008,45378,Diagnostic Colonoscopy,2024-06-03 16:00:00,Gastroenterology,1500.00
+P038,PAT-038,GI008,43249,ERCP,2024-06-03 18:30:00,Gastroenterology,3500.00

@@ -4,6 +4,7 @@ DuckDB-based data store for the Insights Engine.
 Handles:
 - Loading classified CSVs into DuckDB tables
 - Normalizing column names to schema field names
+- Automatic shift pattern detection for shift data
 - Managing table metadata
 """
 
@@ -16,6 +17,7 @@ import duckdb
 import pandas as pd
 
 from csv_analyzer.insights.models import DataStoreStatus, LoadedTable
+from csv_analyzer.insights.shift_detector import ShiftDetector
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +41,19 @@ class DataStore:
         result = store.execute("SELECT * FROM employee_shifts")
     """
     
-    def __init__(self, database_path: Optional[str] = None):
+    def __init__(self, database_path: Optional[str] = None, enable_shift_detection: bool = True):
         """
         Initialize the data store.
         
         Args:
             database_path: Path to DuckDB file. If None, uses in-memory database.
+            enable_shift_detection: If True, automatically detect shift patterns in shift data.
         """
         self.database_path = database_path
+        self.enable_shift_detection = enable_shift_detection
         self._conn: Optional[duckdb.DuckDBPyConnection] = None
         self._loaded_tables: Dict[str, LoadedTable] = {}
+        self._shift_detector: Optional[ShiftDetector] = None
         
     @property
     def connection(self) -> duckdb.DuckDBPyConnection:
@@ -88,6 +93,10 @@ class DataStore:
         """
         # Normalize column names using mappings
         normalized_df = self._normalize_columns(df, column_mappings)
+        
+        # Auto-detect shift patterns for shift data
+        if self.enable_shift_detection and self._is_shift_data(document_type, normalized_df):
+            normalized_df = self._enrich_with_shift_detection(normalized_df)
         
         # Sanitize table name (replace hyphens, spaces)
         table_name = self._sanitize_table_name(document_type)
@@ -158,6 +167,61 @@ class DataStore:
         # Remove any remaining non-alphanumeric chars except underscore
         sanitized = "".join(c for c in sanitized if c.isalnum() or c == "_")
         return sanitized
+    
+    def _is_shift_data(self, document_type: str, df: pd.DataFrame) -> bool:
+        """Check if this is shift data that should have shift detection applied."""
+        # Check document type
+        shift_types = ["employee_shifts", "shifts", "work_shifts", "staff_shifts"]
+        if any(t in document_type.lower() for t in shift_types):
+            # Check if we have the necessary columns
+            shift_columns = ["shift_start", "start_time", "shift_begin"]
+            return any(col in df.columns for col in shift_columns)
+        return False
+    
+    def _enrich_with_shift_detection(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Add shift detection columns to the DataFrame."""
+        # Initialize detector if needed
+        if self._shift_detector is None:
+            self._shift_detector = ShiftDetector()
+        
+        # Find the start time column
+        start_col = None
+        for col in ["shift_start", "start_time", "shift_begin"]:
+            if col in df.columns:
+                start_col = col
+                break
+        
+        # Find the end time column
+        end_col = None
+        for col in ["shift_end", "end_time", "shift_finish"]:
+            if col in df.columns:
+                end_col = col
+                break
+        
+        if start_col:
+            logger.info(f"Detecting shift patterns using column '{start_col}'...")
+            df = self._shift_detector.enrich_dataframe(
+                df, 
+                start_col=start_col,
+                end_col=end_col or start_col,
+            )
+            
+            # Log detected patterns
+            patterns = self._shift_detector.get_patterns()
+            if patterns:
+                pattern_summary = ", ".join(
+                    f"{p.label}: {p.shift_count} shifts @ {p.typical_start}" 
+                    for p in patterns
+                )
+                logger.info(f"Detected shift patterns: {pattern_summary}")
+        
+        return df
+    
+    def get_shift_patterns(self) -> Optional[pd.DataFrame]:
+        """Get detected shift patterns as a DataFrame."""
+        if self._shift_detector:
+            return self._shift_detector.get_pattern_summary()
+        return None
     
     def execute(self, sql: str, parameters: Optional[Dict[str, Any]] = None) -> pd.DataFrame:
         """

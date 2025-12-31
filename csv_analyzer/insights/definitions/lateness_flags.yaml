@@ -1,15 +1,17 @@
 # Insight: Lateness and Early Arrival Flagging
 # Flags employees who arrived late or more than 30 mins early
+# Now includes auto-detected shift patterns
 
 name: lateness_flags
-version: "1.0"
-description: "Flag employees against standards: arrival timing and lateness detection"
+version: "1.1"
+description: "Flag employees against standards: arrival timing and lateness detection, grouped by detected shift pattern"
 category: compliance
 tags:
   - lateness
   - attendance
   - punctuality
   - compliance
+  - shift_patterns
 
 requires:
   - employee_shifts
@@ -37,6 +39,10 @@ parameters:
     type: string
     required: false
     description: "Filter by department"
+  - name: shift_type
+    type: string
+    required: false
+    description: "Filter by detected shift type (MORNING, AFTERNOON, EVENING, NIGHT)"
 
 sql: |
   WITH attendance_analysis AS (
@@ -45,7 +51,10 @@ sql: |
       employee_name,
       shift_date,
       department_code,
-      shift_type,
+      -- Use detected shift type if available, otherwise use original shift_type
+      COALESCE(detected_shift_type, shift_type, 'UNKNOWN') AS detected_shift_type,
+      shift_cluster_id,
+      shift_detection_confidence,
       shift_start,
       shift_end,
       actual_start,
@@ -68,13 +77,14 @@ sql: |
       {? AND shift_date >= '{{start_date}}' ?}
       {? AND shift_date <= '{{end_date}}' ?}
       {? AND department_code = '{{department}}' ?}
+      {? AND detected_shift_type = '{{shift_type}}' ?}
   )
   SELECT 
     employee_id,
     employee_name,
     shift_date,
     department_code,
-    shift_type,
+    detected_shift_type,
     shift_start AS scheduled_start,
     actual_start,
     shift_end AS scheduled_end,
@@ -111,7 +121,8 @@ sql: |
       WHEN arrival_diff_minutes < -{{early_threshold_minutes}} THEN ABS(arrival_diff_minutes)
       ELSE 0
     END AS minutes_too_early,
-    -- EVIDENCE: Explain how the finding was determined
+    -- EVIDENCE: Explain how the finding was determined (includes shift type)
+    '[' || detected_shift_type || ' SHIFT] ' ||
     CASE 
       WHEN arrival_diff_minutes > {{late_threshold_minutes}} THEN 
         'Arrived at ' || actual_start || ' but shift was scheduled to start at ' || shift_start || 
@@ -137,7 +148,16 @@ sql: |
     END AS evidence
   FROM attendance_analysis
   ORDER BY 
-    -- Show flagged issues first
+    -- Group by shift type first
+    CASE detected_shift_type 
+      WHEN 'MORNING' THEN 1 
+      WHEN 'MID_DAY' THEN 2 
+      WHEN 'AFTERNOON' THEN 3 
+      WHEN 'EVENING' THEN 4 
+      WHEN 'NIGHT' THEN 5 
+      ELSE 6 
+    END,
+    -- Then show flagged issues first within each shift type
     CASE 
       WHEN arrival_diff_minutes > {{late_threshold_minutes}} THEN 0
       WHEN arrival_diff_minutes < -{{early_threshold_minutes}} THEN 1

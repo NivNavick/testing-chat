@@ -1,0 +1,107 @@
+# Insight: Shift Pattern Analysis
+# Analyzes detected shift patterns and their characteristics
+
+name: shift_patterns
+version: "1.0"
+description: "Analyze detected shift patterns: timing, staffing levels, and performance metrics by shift type"
+category: analysis
+tags:
+  - shifts
+  - patterns
+  - scheduling
+  - workforce
+
+requires:
+  - employee_shifts
+
+parameters:
+  - name: start_date
+    type: date
+    required: false
+    description: "Filter from this date"
+  - name: end_date
+    type: date
+    required: false
+    description: "Filter until this date"
+  - name: department
+    type: string
+    required: false
+    description: "Filter by department"
+
+sql: |
+  WITH shift_analysis AS (
+    SELECT 
+      detected_shift_type,
+      shift_cluster_id,
+      shift_date,
+      department_code,
+      employee_id,
+      employee_name,
+      shift_start,
+      shift_end,
+      actual_start,
+      actual_end,
+      shift_start_minutes,
+      shift_detection_confidence,
+      -- Calculate lateness
+      CASE 
+        WHEN actual_start IS NOT NULL AND shift_start IS NOT NULL THEN
+          (CAST(SUBSTR(actual_start, 1, 2) AS INTEGER) * 60 + CAST(SUBSTR(actual_start, 4, 2) AS INTEGER))
+          - (CAST(SUBSTR(shift_start, 1, 2) AS INTEGER) * 60 + CAST(SUBSTR(shift_start, 4, 2) AS INTEGER))
+        ELSE NULL
+      END AS arrival_diff_minutes
+    FROM employee_shifts
+    WHERE detected_shift_type IS NOT NULL
+      AND detected_shift_type != 'UNKNOWN'
+      {? AND shift_date >= '{{start_date}}' ?}
+      {? AND shift_date <= '{{end_date}}' ?}
+      {? AND department_code = '{{department}}' ?}
+  )
+  SELECT 
+    detected_shift_type AS shift_type,
+    shift_cluster_id AS cluster_id,
+    COUNT(*) AS total_shifts,
+    COUNT(DISTINCT employee_id) AS unique_employees,
+    COUNT(DISTINCT shift_date) AS days_with_shifts,
+    -- Timing statistics
+    MIN(shift_start) AS earliest_start,
+    MAX(shift_start) AS latest_start,
+    -- Duration (assuming 8h if can't calculate)
+    8.0 AS avg_duration_hours,
+    -- Punctuality metrics
+    COUNT(CASE WHEN arrival_diff_minutes > 0 THEN 1 END) AS late_arrivals,
+    COUNT(CASE WHEN arrival_diff_minutes <= 0 AND arrival_diff_minutes IS NOT NULL THEN 1 END) AS on_time_arrivals,
+    ROUND(
+      COUNT(CASE WHEN arrival_diff_minutes > 0 THEN 1 END) * 100.0 / 
+      NULLIF(COUNT(CASE WHEN arrival_diff_minutes IS NOT NULL THEN 1 END), 0),
+      1
+    ) AS lateness_rate_pct,
+    ROUND(AVG(CASE WHEN arrival_diff_minutes > 0 THEN arrival_diff_minutes END), 0) AS avg_minutes_late,
+    -- Detection confidence
+    ROUND(AVG(shift_detection_confidence) * 100, 0) AS avg_detection_confidence_pct,
+    -- Evidence
+    'Shift pattern ' || detected_shift_type || ' (cluster ' || shift_cluster_id || '): ' ||
+    COUNT(*) || ' shifts by ' || COUNT(DISTINCT employee_id) || ' employees over ' || 
+    COUNT(DISTINCT shift_date) || ' days. ' ||
+    'Starts range from ' || MIN(shift_start) || ' to ' || MAX(shift_start) || '. ' ||
+    'Punctuality: ' || COUNT(CASE WHEN arrival_diff_minutes <= 0 AND arrival_diff_minutes IS NOT NULL THEN 1 END) || 
+    ' on-time, ' || COUNT(CASE WHEN arrival_diff_minutes > 0 THEN 1 END) || ' late' ||
+    CASE 
+      WHEN COUNT(CASE WHEN arrival_diff_minutes > 0 THEN 1 END) > 0 THEN 
+        ' (avg ' || ROUND(AVG(CASE WHEN arrival_diff_minutes > 0 THEN arrival_diff_minutes END), 0) || ' min late)'
+      ELSE ''
+    END || '. ' ||
+    'Detection confidence: ' || ROUND(AVG(shift_detection_confidence) * 100, 0) || '%.'
+    AS evidence
+  FROM shift_analysis
+  GROUP BY detected_shift_type, shift_cluster_id
+  ORDER BY 
+    CASE detected_shift_type 
+      WHEN 'MORNING' THEN 1 
+      WHEN 'MID_DAY' THEN 2 
+      WHEN 'AFTERNOON' THEN 3 
+      WHEN 'EVENING' THEN 4 
+      WHEN 'NIGHT' THEN 5 
+      ELSE 6 
+    END
+

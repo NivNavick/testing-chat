@@ -1,14 +1,15 @@
 # Insight: Gross profit per shift
-# Revenue from procedures minus physician and staff costs
+# Revenue from procedures minus physician and staff costs, grouped by detected shift pattern
 
 name: gross_profit_per_shift
-version: "1.0"
-description: "Gross profit per shift: procedure revenue minus physician and staff costs"
+version: "1.1"
+description: "Gross profit per shift: procedure revenue minus physician and staff costs, by shift pattern"
 category: profitability
 tags:
   - profit
   - revenue
   - shifts
+  - shift_patterns
 
 requires:
   - employee_shifts
@@ -28,6 +29,10 @@ parameters:
     type: string
     required: false
     description: "Filter by department"
+  - name: shift_type
+    type: string
+    required: false
+    description: "Filter by detected shift type (MORNING, AFTERNOON, EVENING, NIGHT)"
 
 sql: |
   -- Calculate shift costs
@@ -38,6 +43,8 @@ sql: |
       s.department_code,
       s.shift_start,
       s.shift_end,
+      -- Use detected shift type if available
+      COALESCE(s.detected_shift_type, s.shift_type, 'UNKNOWN') AS detected_shift_type,
       c.employee_name,
       c.employment_type,
       c.position,
@@ -50,6 +57,7 @@ sql: |
       {? AND s.shift_date >= '{{start_date}}' ?}
       {? AND s.shift_date <= '{{end_date}}' ?}
       {? AND s.department_code = '{{department}}' ?}
+      {? AND s.detected_shift_type = '{{shift_type}}' ?}
   ),
   -- Calculate revenue from procedures
   procedure_revenue AS (
@@ -72,6 +80,7 @@ sql: |
     SELECT 
       sc.shift_date,
       sc.department_code,
+      sc.detected_shift_type,
       sc.employee_id,
       sc.employee_name,
       sc.employment_type,
@@ -90,6 +99,7 @@ sql: |
   SELECT 
     shift_date,
     department_code,
+    detected_shift_type,
     employee_id,
     employee_name,
     employment_type,
@@ -104,7 +114,8 @@ sql: |
         ROUND((procedure_revenue - shift_cost) / procedure_revenue * 100, 1)
       ELSE 0 
     END AS profit_margin_pct,
-    -- EVIDENCE: Explain the profit calculation
+    -- EVIDENCE: Explain the profit calculation (includes shift type)
+    '[' || detected_shift_type || ' SHIFT] ' ||
     CASE 
       WHEN procedures_performed = 0 THEN
         employee_id || ' (' || COALESCE(employee_name, 'Unknown') || ', ' || COALESCE(position, 'N/A') || ') ' ||
@@ -121,4 +132,16 @@ sql: |
         ' (' || CASE WHEN procedure_revenue > 0 THEN ROUND((procedure_revenue - shift_cost) / procedure_revenue * 100, 1) ELSE 0 END || '% margin).'
     END AS evidence
   FROM shift_analysis
-  ORDER BY shift_date, department_code, employee_id
+  ORDER BY 
+    -- Group by shift type first
+    CASE detected_shift_type 
+      WHEN 'MORNING' THEN 1 
+      WHEN 'MID_DAY' THEN 2 
+      WHEN 'AFTERNOON' THEN 3 
+      WHEN 'EVENING' THEN 4 
+      WHEN 'NIGHT' THEN 5 
+      ELSE 6 
+    END,
+    shift_date, 
+    department_code, 
+    employee_id

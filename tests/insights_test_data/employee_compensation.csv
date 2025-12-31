@@ -1,7 +1,10 @@
-employee_id,employee_name,employment_type,gross_salary,hourly_rate,monthly_hours,effective_hourly_cost,department,position
-GI001,Dr. Rachel Cohen,salaried,48000,,186,322.58,Gastroenterology,GI Physician
-GI002,Dr. David Levi,salaried,52000,,186,349.46,Gastroenterology,Senior GI Physician
-GI003,Nurse Sarah Green,salaried,18000,,186,120.97,Gastroenterology,Endoscopy RN
-GI004,Nurse Michael Kim,contractor,,95,160,95.00,Gastroenterology,Endoscopy RN
-GI005,PA Emma Wilson,contractor,,110,140,110.00,Gastroenterology,GI PA
-GI006,Tech John Smith,contractor,,75,150,75.00,Gastroenterology,Endoscopy Tech
+employee_id,employee_name,department,position,employment_type,gross_salary,hourly_rate,effective_hourly_cost
+GI001,Dr. Rachel Cohen,Gastroenterology,GI Physician,salaried,48000,,322.58
+GI002,Dr. David Levi,Gastroenterology,Senior GI Physician,salaried,52000,,349.46
+GI003,Nurse Sarah Green,Gastroenterology,Endoscopy RN,salaried,18000,,120.97
+GI004,Nurse Michael Kim,Gastroenterology,Endoscopy RN,contractor,,95,95.00
+GI005,PA Emma Wilson,Gastroenterology,GI PA,contractor,,110,110.00
+GI006,Tech John Smith,Gastroenterology,Endoscopy Tech,contractor,,75,75.00
+GI007,Nurse Lisa Park,Gastroenterology,Endoscopy RN,salaried,18500,,124.33
+GI008,Dr. Mark Thompson,Gastroenterology,GI Physician,salaried,50000,,336.02
+GI009,Tech Amy Chen,Gastroenterology,Endoscopy Tech,contractor,,80,80.00

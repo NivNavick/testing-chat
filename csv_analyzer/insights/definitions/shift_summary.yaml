@@ -1,14 +1,15 @@
 # Insight: Shift Summary Statistics
-# Provides overview statistics of shifts and costs
+# Provides overview statistics of shifts and costs, grouped by detected shift pattern
 
 name: shift_summary
-version: "1.0"
-description: "Summary statistics: total shifts, costs, and key metrics by department and period"
+version: "1.1"
+description: "Summary statistics: total shifts, costs, and key metrics by department and detected shift pattern"
 category: summary
 tags:
   - summary
   - statistics
   - overview
+  - shift_patterns
 
 requires:
   - employee_shifts
@@ -23,12 +24,18 @@ parameters:
     type: date
     required: false
     description: "Filter until this date"
+  - name: shift_type
+    type: string
+    required: false
+    description: "Filter by detected shift type (MORNING, AFTERNOON, EVENING, NIGHT)"
 
 sql: |
   WITH shift_data AS (
     SELECT 
       s.shift_date,
       s.department_code,
+      -- Use detected shift type if available
+      COALESCE(s.detected_shift_type, s.shift_type, 'UNKNOWN') AS detected_shift_type,
       s.employee_id,
       c.employee_name,
       c.employment_type,
@@ -40,9 +47,11 @@ sql: |
     WHERE 1=1
       {? AND s.shift_date >= '{{start_date}}' ?}
       {? AND s.shift_date <= '{{end_date}}' ?}
+      {? AND s.detected_shift_type = '{{shift_type}}' ?}
   )
   SELECT 
     department_code,
+    detected_shift_type,
     COUNT(*) AS total_shifts,
     COUNT(DISTINCT employee_id) AS unique_employees,
     ROUND(SUM(hours), 1) AS total_hours,
@@ -54,16 +63,25 @@ sql: |
     MIN(shift_date) AS first_shift,
     MAX(shift_date) AS last_shift,
     -- EVIDENCE: Explain the summary calculation
-    'Summary for ' || department_code || ' department: ' ||
+    'Summary for ' || department_code || ' / ' || detected_shift_type || ' shifts: ' ||
     COUNT(*) || ' shifts by ' || COUNT(DISTINCT employee_id) || ' employees ' ||
     'from ' || MIN(shift_date) || ' to ' || MAX(shift_date) || '. ' ||
     'Total hours: ' || ROUND(SUM(hours), 1) || 'h. ' ||
-    'Staff mix: ' || COUNT(CASE WHEN employment_type = 'salaried' THEN 1 END) || ' salaried shifts ($' ||
-    ROUND(AVG(CASE WHEN employment_type = 'salaried' THEN hours * hourly_cost END), 2) || ' avg) + ' ||
-    COUNT(CASE WHEN employment_type = 'contractor' THEN 1 END) || ' contractor shifts ($' ||
-    ROUND(AVG(CASE WHEN employment_type = 'contractor' THEN hours * hourly_cost END), 2) || ' avg). ' ||
+    'Staff mix: ' || COUNT(CASE WHEN employment_type = 'salaried' THEN 1 END) || ' salaried ($' ||
+    COALESCE(ROUND(AVG(CASE WHEN employment_type = 'salaried' THEN hours * hourly_cost END), 2), 0) || ' avg) + ' ||
+    COUNT(CASE WHEN employment_type = 'contractor' THEN 1 END) || ' contractor ($' ||
+    COALESCE(ROUND(AVG(CASE WHEN employment_type = 'contractor' THEN hours * hourly_cost END), 2), 0) || ' avg). ' ||
     'Total labor cost: $' || ROUND(SUM(hours * hourly_cost), 2) || '.'
     AS evidence
   FROM shift_data
-  GROUP BY department_code
-  ORDER BY total_cost DESC
+  GROUP BY department_code, detected_shift_type
+  ORDER BY 
+    department_code,
+    CASE detected_shift_type 
+      WHEN 'MORNING' THEN 1 
+      WHEN 'MID_DAY' THEN 2 
+      WHEN 'AFTERNOON' THEN 3 
+      WHEN 'EVENING' THEN 4 
+      WHEN 'NIGHT' THEN 5 
+      ELSE 6 
+    END

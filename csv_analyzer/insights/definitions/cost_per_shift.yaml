@@ -1,14 +1,15 @@
 # Insight: Manpower cost per shift
-# Calculates the cost of each shift by joining shift hours with employee compensation
+# Calculates the cost of each shift, now includes detected shift pattern
 
 name: cost_per_shift
-version: "1.0"
-description: "Calculate manpower cost for each shift by joining shifts with compensation data"
+version: "1.1"
+description: "Calculate manpower cost for each shift, grouped by detected shift pattern"
 category: costs
 tags:
   - manpower
   - cost
   - shifts
+  - shift_patterns
 
 requires:
   - employee_shifts
@@ -27,6 +28,10 @@ parameters:
     type: string
     required: false
     description: "Filter by department code"
+  - name: shift_type
+    type: string
+    required: false
+    description: "Filter by detected shift type (MORNING, AFTERNOON, EVENING, NIGHT)"
 
 sql: |
   SELECT 
@@ -36,6 +41,8 @@ sql: |
     s.shift_start,
     s.shift_end,
     s.department_code,
+    -- Use detected shift type if available
+    COALESCE(s.detected_shift_type, s.shift_type, 'UNKNOWN') AS detected_shift_type,
     c.employment_type,
     c.hourly_rate,
     c.effective_hourly_cost,
@@ -47,7 +54,8 @@ sql: |
       * COALESCE(c.effective_hourly_cost, c.hourly_rate, 0), 
       2
     ) AS shift_cost,
-    -- EVIDENCE: Explain the cost calculation
+    -- EVIDENCE: Explain the cost calculation (includes shift type)
+    '[' || COALESCE(s.detected_shift_type, s.shift_type, 'UNKNOWN') || ' SHIFT] ' ||
     'Cost calculated as: ' || 
     ROUND(COALESCE(s.duration_minutes / 60.0, 8.0), 1) || ' hours × $' || 
     ROUND(COALESCE(c.effective_hourly_cost, c.hourly_rate, 0), 2) || '/hour' ||
@@ -69,4 +77,16 @@ sql: |
     {? AND s.shift_date >= '{{start_date}}' ?}
     {? AND s.shift_date <= '{{end_date}}' ?}
     {? AND s.department_code = '{{department}}' ?}
-  ORDER BY s.shift_date, s.shift_start
+    {? AND s.detected_shift_type = '{{shift_type}}' ?}
+  ORDER BY 
+    -- Group by shift type first
+    CASE COALESCE(s.detected_shift_type, s.shift_type, 'UNKNOWN')
+      WHEN 'MORNING' THEN 1 
+      WHEN 'MID_DAY' THEN 2 
+      WHEN 'AFTERNOON' THEN 3 
+      WHEN 'EVENING' THEN 4 
+      WHEN 'NIGHT' THEN 5 
+      ELSE 6 
+    END,
+    s.shift_date, 
+    s.shift_start
