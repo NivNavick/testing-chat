@@ -1,0 +1,195 @@
+# Insight: Staff Performance by Activity Type
+# Compares all clinical staff efficiency within their role (doctors vs doctors, nurses vs nurses, etc.)
+# Works with procedures (billing codes) AND nursing/tech activities
+
+name: staff_performance_by_activity
+version: "2.0"
+description: "Analyzes all clinical staff performance by activity/procedure type, comparing within same position groups"
+category: performance
+tags:
+  - performance
+  - efficiency
+  - clinical_staff
+  - activities
+  - procedures
+  - benchmarking
+
+requires:
+  - staff_clinical_procedures
+  - employee_compensation
+  - employee_shifts
+
+parameters:
+  - name: start_date
+    type: date
+    required: false
+    description: "Filter from this date"
+  - name: end_date
+    type: date
+    required: false
+    description: "Filter until this date"
+  - name: department
+    type: string
+    required: false
+    description: "Filter by department"
+  - name: position
+    type: string
+    required: false
+    description: "Filter by position (e.g., 'GI Physician', 'Endoscopy RN')"
+  - name: min_activity_count
+    type: integer
+    required: false
+    default: 2
+    description: "Minimum activities needed for comparison (default: 2)"
+
+sql: |
+  -- Step 1: Calculate shift workload and activity duration per shift
+  WITH shift_workload AS (
+    SELECT 
+      s.employee_id,
+      s.shift_date,
+      s.department_code,
+      COALESCE(s.duration_minutes / 60.0, 8.0) AS shift_hours,
+      COUNT(p.procedure_id) AS activities_in_shift
+    FROM employee_shifts s
+    LEFT JOIN staff_clinical_procedures p 
+      ON s.employee_id = p.staff_id 
+      AND CAST(p.performed_datetime AS DATE) = s.shift_date
+      AND CAST(p.performed_datetime AS TIME) BETWEEN CAST(s.shift_start AS TIME) AND CAST(s.shift_end AS TIME)
+    WHERE 1=1
+      {? AND s.shift_date >= '{{start_date}}' ?}
+      {? AND s.shift_date <= '{{end_date}}' ?}
+      {? AND s.department_code = '{{department}}' ?}
+    GROUP BY s.employee_id, s.shift_date, s.department_code, s.duration_minutes
+  ),
+  -- Step 2: Calculate estimated hours per activity for each shift
+  shift_durations AS (
+    SELECT 
+      *,
+      CASE 
+        WHEN activities_in_shift > 0 THEN shift_hours / activities_in_shift
+        ELSE NULL
+      END AS estimated_hours_per_activity
+    FROM shift_workload
+  ),
+  -- Step 3: Join activities with durations and compensation
+  activity_durations AS (
+    SELECT 
+      p.procedure_id AS activity_id,
+      p.billing_code AS activity_code,
+      p.procedure_description AS activity_description,
+      p.staff_id AS employee_id,
+      p.performed_datetime,
+      p.location AS department,
+      sd.estimated_hours_per_activity,
+      c.employee_name,
+      c.position,
+      c.employment_type,
+      COALESCE(c.effective_hourly_cost, c.hourly_rate, 0) AS hourly_cost
+    FROM staff_clinical_procedures p
+    LEFT JOIN shift_durations sd 
+      ON p.staff_id = sd.employee_id 
+      AND CAST(p.performed_datetime AS DATE) = sd.shift_date
+    LEFT JOIN employee_compensation c 
+      ON p.staff_id = c.employee_id
+    WHERE sd.estimated_hours_per_activity IS NOT NULL
+      AND c.position IS NOT NULL
+      {? AND CAST(p.performed_datetime AS DATE) >= '{{start_date}}' ?}
+      {? AND CAST(p.performed_datetime AS DATE) <= '{{end_date}}' ?}
+      {? AND p.location = '{{department}}' ?}
+      {? AND c.position = '{{position}}' ?}
+  ),
+  -- Step 4: Calculate per-staff averages for each activity type
+  staff_stats AS (
+    SELECT 
+      employee_id,
+      MAX(employee_name) AS employee_name,
+      MAX(position) AS position,
+      MAX(employment_type) AS employment_type,
+      activity_code,
+      MAX(activity_description) AS activity_description,
+      COUNT(*) AS activities_performed,
+      ROUND(AVG(estimated_hours_per_activity), 2) AS avg_duration_hours,
+      ROUND(AVG(hourly_cost), 2) AS avg_hourly_cost,
+      ROUND(AVG(estimated_hours_per_activity * hourly_cost), 2) AS avg_cost_per_activity,
+      ROUND(SUM(estimated_hours_per_activity * hourly_cost), 2) AS total_cost
+    FROM activity_durations
+    GROUP BY employee_id, activity_code
+    HAVING COUNT(*) >= {{min_activity_count}}
+  ),
+  -- Step 5: Calculate position-based averages for each activity type
+  -- Compare nurses to nurses, doctors to doctors, etc.
+  position_avg AS (
+    SELECT 
+      position,
+      activity_code,
+      ROUND(AVG(estimated_hours_per_activity), 2) AS position_avg_duration_hours,
+      COUNT(DISTINCT employee_id) AS staff_performing
+    FROM activity_durations
+    GROUP BY position, activity_code
+  )
+  -- Step 6: Compare staff performance to their position peers
+  SELECT 
+    ss.employee_id,
+    ss.employee_name,
+    ss.position,
+    ss.employment_type,
+    ss.activity_code,
+    ss.activity_description,
+    ss.activities_performed,
+    ss.avg_duration_hours,
+    pa.position_avg_duration_hours,
+    pa.staff_performing,
+    -- Calculate variance percentage
+    ROUND(((ss.avg_duration_hours - pa.position_avg_duration_hours) / pa.position_avg_duration_hours) * 100, 1) AS duration_variance_pct,
+    -- Performance flag
+    CASE 
+      WHEN ss.avg_duration_hours > pa.position_avg_duration_hours * 1.5 THEN 'VERY_SLOW'
+      WHEN ss.avg_duration_hours > pa.position_avg_duration_hours * 1.2 THEN 'SLOW'
+      WHEN ss.avg_duration_hours < pa.position_avg_duration_hours * 0.9 THEN 'FAST'
+      ELSE 'AVERAGE'
+    END AS performance_flag,
+    ss.avg_hourly_cost,
+    ss.avg_cost_per_activity,
+    ss.total_cost,
+    -- EVIDENCE: Detailed performance comparison
+    ss.employee_name || ' (' || ss.employee_id || ', ' || ss.position || ') ' ||
+    'performed ' || ss.activities_performed || ' × ' || ss.activity_code || ' (' || ss.activity_description || '). ' ||
+    'Avg time: ' || ss.avg_duration_hours || 'h per activity. ' ||
+    'Position avg (' || ss.position || '): ' || pa.position_avg_duration_hours || 'h (' || pa.staff_performing || ' staff). ' ||
+    CASE 
+      WHEN ss.avg_duration_hours > pa.position_avg_duration_hours THEN
+        'Performance: ' || ROUND(((ss.avg_duration_hours - pa.position_avg_duration_hours) / pa.position_avg_duration_hours) * 100, 1) || '% SLOWER than peers. '
+      WHEN ss.avg_duration_hours < pa.position_avg_duration_hours THEN
+        'Performance: ' || ABS(ROUND(((ss.avg_duration_hours - pa.position_avg_duration_hours) / pa.position_avg_duration_hours) * 100, 1)) || '% FASTER than peers. '
+      ELSE 
+        'Performance: ON PAR with position average. '
+    END ||
+    'Avg cost: $' || ss.avg_cost_per_activity || '/activity. ' ||
+    'Total cost for this activity type: $' || ss.total_cost || '. ' ||
+    CASE 
+      WHEN ss.avg_duration_hours > pa.position_avg_duration_hours * 1.5 THEN 
+        '⚠️ VERY SLOW - Consider training or workload review.'
+      WHEN ss.avg_duration_hours > pa.position_avg_duration_hours * 1.2 THEN 
+        '⚠️ SLOW - May need efficiency improvement.'
+      WHEN ss.avg_duration_hours < pa.position_avg_duration_hours * 0.9 THEN 
+        '✓ FAST - High efficiency, potential best practice.'
+      ELSE 
+        '✓ AVERAGE - Within normal range.'
+    END AS evidence
+  FROM staff_stats ss
+  INNER JOIN position_avg pa 
+    ON ss.position = pa.position 
+    AND ss.activity_code = pa.activity_code
+  ORDER BY 
+    -- Group by position first
+    ss.position,
+    -- Show slow performers first within each position
+    CASE 
+      WHEN ss.avg_duration_hours > pa.position_avg_duration_hours * 1.5 THEN 0
+      WHEN ss.avg_duration_hours > pa.position_avg_duration_hours * 1.2 THEN 1
+      WHEN ss.avg_duration_hours < pa.position_avg_duration_hours * 0.9 THEN 2
+      ELSE 3
+    END,
+    ss.activity_code,
+    ss.activities_performed DESC
