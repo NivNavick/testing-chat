@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-01-03T23:02:29.234663",
+  "total_files": 3,
+  "classifications": [
+    {
+      "file": "tests/insights_test_data/employee_shifts.csv",
+      "filename": "employee_shifts.csv",
+      "document_type": "employee_shifts",
+      "confidence": "86.5%",
+      "vertical": "medical",
+      "column_mappings": {
+        "employee_id": "employee_id",
+        "shift_date": "shift_date",
+        "shift_start": "shift_start",
+        "shift_end": "shift_end",
+        "actual_start": "actual_start",
+        "actual_end": "actual_end",
+        "duration_minutes": "duration_minutes",
+        "department_code": "department_code",
+        "shift_type": "shift_type"
+      },
+      "mapped_columns": 9
+    },
+    {
+      "file": "tests/insights_test_data/employee_compensation.csv",
+      "filename": "employee_compensation.csv",
+      "document_type": "employee_compensation",
+      "confidence": "83.1%",
+      "vertical": "medical",
+      "column_mappings": {
+        "employee_id": "employee_id",
+        "department": "department",
+        "position": "position",
+        "employment_type": "employment_type",
+        "hourly_rate": "monthly_hours",
+        "effective_hourly_cost": "effective_hourly_cost"
+      },
+      "mapped_columns": 6
+    },
+    {
+      "file": "tests/insights_test_data/staff_clinical_procedures.csv",
+      "filename": "staff_clinical_procedures.csv",
+      "document_type": "staff_clinical_procedures",
+      "confidence": "87.5%",
+      "vertical": "medical",
+      "column_mappings": {
+        "procedure_id": "procedure_id",
+        "patient_ref": "patient_ref",
+        "staff_id": "staff_id",
+        "procedure_description": "procedure_description",
+        "performed_datetime": "performed_datetime",
+        "location": "location"
+      },
+      "mapped_columns": 6
+    }
+  ]
+}
