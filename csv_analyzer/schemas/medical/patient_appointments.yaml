@@ -1,7 +1,7 @@
 name: patient_appointments
 vertical: medical
-version: "1.0"
-description: "Patient appointment scheduling, clinic visits, medical consultations, and booking records"
+version: "1.1"
+description: "Patient appointment scheduling, clinic visits, medical consultations, procedures, treatments, and booking records with billing information"
 
 fields:
   - name: appointment_id
@@ -53,12 +53,16 @@ fields:
       - medical_record_number
       - patient_code
       - client_id
+      - client_code
       # Hebrew
       - מספר_מטופל
       - מזהה_מטופל
       - ת_ז
+      - ת.ז
       - תעודת_זהות
+      - תז
       - קוד_מטופל
+      - קוד_לקוח
       - מטופל
       # Spanish
       - id_paciente
@@ -107,7 +111,7 @@ fields:
   - name: appointment_date
     type: date
     required: true
-    description: "The date of the scheduled appointment"
+    description: "The date of the scheduled appointment or treatment"
     target_format: "YYYY-MM-DD"
     accepts_formats:
       - "YYYY-MM-DD"
@@ -121,11 +125,14 @@ fields:
       - visit_date
       - scheduled_date
       - booking_date
+      - treatment_date
+      - procedure_date
       # Hebrew
       - תאריך_תור
       - תאריך
       - תאריך_פגישה
       - תאריך_ביקור
+      - תאריך_טיפול
       - יום
       # Spanish
       - fecha_cita
@@ -280,12 +287,16 @@ fields:
       - clinician
       - provider_name
       - treating_physician
+      - treating_staff
+      - staff
       # Hebrew
       - שם_רופא
       - רופא
       - רופא_מטפל
       - מטפל
       - שם_מטפל
+      - צוות_מטפל
+      - צוות
       # Spanish
       - nombre_medico
       - medico
@@ -341,7 +352,7 @@ fields:
   - name: appointment_type
     type: string
     required: false
-    description: "Type of appointment (new patient, follow-up, consultation, procedure)"
+    description: "Type of appointment (new patient, follow-up, consultation, procedure, treatment)"
     aliases:
       # English
       - appt_type
@@ -350,12 +361,14 @@ fields:
       - reason
       - category
       - purpose
+      - service_type
       # Hebrew
       - סוג_תור
       - סוג
       - סוג_ביקור
       - מטרה
       - סיבה
+      - סוג_שירות
       # Spanish
       - tipo_cita
       - tipo
@@ -370,22 +383,25 @@ fields:
       - type_rdv
       - type
       - motif
-    embedding_text: "appointment type visit category new follow-up consultation procedure reason"
+    embedding_text: "appointment type visit category new follow-up consultation procedure treatment reason service"
 
   - name: status
     type: string
     required: false
-    description: "Status of the appointment (scheduled, confirmed, cancelled, completed, no-show)"
+    description: "Status of the appointment or client status (scheduled, confirmed, cancelled, completed, no-show, active, inactive)"
     aliases:
       # English
       - appt_status
       - state
       - booking_status
+      - client_status
       # Hebrew
       - סטטוס
       - מצב
       - מצב_תור
       - סטטוס_תור
+      - סטטוס_לקוח
+      - מצב_לקוח
       # Spanish
       - estado
       - estado_cita
@@ -434,17 +450,19 @@ fields:
   - name: notes
     type: string
     required: false
-    description: "Additional notes or comments about the appointment"
+    description: "Additional notes or comments about the appointment or treatment"
     aliases:
       # English
       - comments
       - remarks
       - description
       - memo
+      - treatment_description
       # Hebrew
       - הערות
       - הערה
       - תיאור
+      - תיאור_טיפול
       # Spanish
       - notas
       - comentarios
@@ -513,4 +531,319 @@ fields:
       # French
       - date_creation
     embedding_text: "created booked registered when booking time"
+
+  - name: procedure_code
+    type: string
+    required: false
+    description: "Medical procedure or treatment code (CPT, ICD, or internal codes)"
+    aliases:
+      # English
+      - treatment_code
+      - cpt_code
+      - procedure_id
+      - service_code
+      - billing_code
+      - code
+      # Hebrew
+      - קוד_טיפול
+      - קוד_פרוצדורה
+      - קוד_שירות
+      - קוד
+      # Spanish
+      - codigo_tratamiento
+      - codigo_procedimiento
+      # Arabic
+      - رمز_العلاج
+      - رمز_الإجراء
+      # Russian
+      - код_процедуры
+      - код_лечения
+      # French
+      - code_traitement
+      - code_procedure
+    embedding_text: "procedure treatment code CPT ICD medical billing service identifier"
+
+  - name: procedure_name
+    type: string
+    required: false
+    description: "Name or description of the medical procedure/treatment"
+    aliases:
+      # English
+      - treatment_name
+      - procedure
+      - treatment
+      - service_name
+      - service_description
+      # Hebrew
+      - שם_טיפול
+      - שם_פרוצדורה
+      - טיפול
+      - שירות
+      - תיאור_שירות
+      # Spanish
+      - nombre_tratamiento
+      - nombre_procedimiento
+      - tratamiento
+      # Arabic
+      - اسم_العلاج
+      - اسم_الإجراء
+      # Russian
+      - название_процедуры
+      - название_лечения
+      # French
+      - nom_traitement
+      - nom_procedure
+    embedding_text: "procedure treatment name service medical description what performed"
+
+  - name: procedure_category
+    type: string
+    required: false
+    description: "Category or type of medical procedure (e.g., gastro, imaging, consultation, lab)"
+    aliases:
+      # English
+      - treatment_category
+      - service_category
+      - procedure_type
+      - specialty
+      - medical_category
+      # Hebrew
+      - קטגורית_טיפול
+      - קטגוריה
+      - סוג_טיפול
+      - קטגורית_שירות
+      # Spanish
+      - categoria_tratamiento
+      - categoria_procedimiento
+      # Arabic
+      - فئة_العلاج
+      - فئة_الإجراء
+      # Russian
+      - категория_процедуры
+      - категория_лечения
+      # French
+      - categorie_traitement
+      - categorie_procedure
+    embedding_text: "procedure category treatment type specialty service classification medical group"
+
+  - name: price
+    type: float
+    required: false
+    description: "Price or cost of the procedure/treatment/service"
+    aliases:
+      # English
+      - cost
+      - amount
+      - charge
+      - fee
+      - service_price
+      - treatment_cost
+      # Hebrew
+      - מחיר
+      - עלות
+      - תשלום
+      - מחיר_טיפול
+      # Spanish
+      - precio
+      - costo
+      - tarifa
+      # Arabic
+      - السعر
+      - التكلفة
+      # Russian
+      - цена
+      - стоимость
+      # French
+      - prix
+      - cout
+      - tarif
+    embedding_text: "price cost amount charge fee payment money value"
+
+  - name: billed_amount
+    type: float
+    required: false
+    description: "Amount billed or charged so far"
+    aliases:
+      # English
+      - charged_amount
+      - invoiced
+      - billed
+      - charged
+      - invoice_amount
+      # Hebrew
+      - חויב
+      - חויב_עד_כה
+      - סכום_חיוב
+      - חשבונית
+      # Spanish
+      - monto_facturado
+      - facturado
+      - cobrado
+      # Arabic
+      - المبلغ_المحصل
+      - الفاتورة
+      # Russian
+      - выставлено
+      - сумма_счета
+      # French
+      - montant_facture
+      - facture
+    embedding_text: "billed charged invoiced amount so far accumulated total"
+
+  - name: balance_due
+    type: float
+    required: false
+    description: "Outstanding balance or amount due for payment"
+    aliases:
+      # English
+      - outstanding
+      - remaining
+      - balance
+      - amount_due
+      - due
+      - unpaid
+      # Hebrew
+      - יתרה
+      - יתרה_לדרישה
+      - יתרה_לתשלום
+      - חוב
+      - יתרת_חוב
+      # Spanish
+      - saldo_pendiente
+      - saldo
+      - por_pagar
+      # Arabic
+      - الرصيد_المستحق
+      - المتبقي
+      # Russian
+      - остаток
+      - задолженность
+      # French
+      - solde_du
+      - reste_a_payer
+    embedding_text: "balance due outstanding remaining owed payment unpaid debt"
+
+  - name: payer
+    type: string
+    required: false
+    description: "Insurance company, payer, or price list name (e.g., health fund, HMO)"
+    aliases:
+      # English
+      - insurance
+      - payer_name
+      - price_list
+      - insurance_company
+      - health_fund
+      - hmo
+      - insurer
+      # Hebrew
+      - מחירון
+      - קופת_חולים
+      - מבטח
+      - חברת_ביטוח
+      - גוף_מממן
+      # Spanish
+      - pagador
+      - seguro
+      - aseguradora
+      # Arabic
+      - الدافع
+      - التأمين
+      # Russian
+      - страховая
+      - плательщик
+      # French
+      - payeur
+      - assurance
+    embedding_text: "payer insurance company price list health fund HMO provider coverage"
+
+  - name: provider_fee
+    type: float
+    required: false
+    description: "Doctor or provider compensation/fee for the service"
+    aliases:
+      # English
+      - doctor_salary
+      - doctor_fee
+      - provider_compensation
+      - physician_fee
+      - practitioner_fee
+      # Hebrew
+      - שכר_רופא
+      - שכר_מטפל
+      - תשלום_רופא
+      - שכר
+      # Spanish
+      - honorario_medico
+      - salario_doctor
+      # Arabic
+      - أتعاب_الطبيب
+      - راتب_الطبيب
+      # Russian
+      - гонорар_врача
+      - зарплата_врача
+      # French
+      - honoraire_medecin
+      - remuneration
+    embedding_text: "doctor fee salary provider compensation payment practitioner earnings"
+
+  - name: clinic_location
+    type: string
+    required: false
+    description: "Specific clinic location, branch, or journal group within the department"
+    aliases:
+      # English
+      - branch
+      - location
+      - clinic_group
+      - site
+      - clinic_branch
+      - journal_group
+      # Hebrew
+      - קבוצת_יומן
+      - מיקום_מרפאה
+      - סניף
+      - מיקום
+      - קבוצה
+      # Spanish
+      - sucursal
+      - ubicacion_clinica
+      - grupo
+      # Arabic
+      - موقع_العيادة
+      - فرع
+      # Russian
+      - филиал
+      - местоположение_клиники
+      # French
+      - emplacement_clinique
+      - succursale
+    embedding_text: "clinic location branch site group journal specific place facility"
+
+  - name: total_invoice
+    type: float
+    required: false
+    description: "Total invoice amount issued"
+    aliases:
+      # English
+      - total_issued
+      - invoice_total
+      - total_demand
+      - demand_issued
+      # Hebrew
+      - סהכ_דרישה
+      - סהכ_דרישה_שהופקה
+      - סך_הכל_חשבונית
+      - סכום_כולל
+      # Spanish
+      - total_factura
+      - factura_total
+      # Arabic
+      - إجمالي_الفاتورة
+      # Russian
+      - общая_сумма
+      - итого_счет
+      # French
+      - total_facture
+      - montant_total
+    embedding_text: "total invoice issued demand amount overall sum"
 
