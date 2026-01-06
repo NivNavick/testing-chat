@@ -1,0 +1,47 @@
+# Insight: Monthly Salary Trends
+# Analyze salary trends over months
+
+name: monthly_trends
+version: "1.0"
+description: "Analyze salary spending trends by month"
+category: payroll
+tags:
+  - salary
+  - trends
+  - monthly
+
+requires:
+  - employee_payroll
+  - medical_staff_salary_records
+  - staff_payroll
+  - salary_records
+  - payroll
+
+parameters:
+  - name: location
+    type: string
+    required: false
+    description: "Filter by location"
+
+sql: |
+  -- Pivot monthly data to show trends
+  SELECT 
+    month_name,
+    total_spent,
+    employee_count,
+    avg_per_employee
+  FROM (
+    SELECT 
+      'January' as month_name, 1 as month_order,
+      SUM(jan_salary) as total_spent,
+      COUNT(*) as employee_count,
+      AVG(jan_salary) as avg_per_employee
+    FROM payroll
+    UNION ALL
+    SELECT 'February', 2, SUM(feb_salary), COUNT(*), AVG(feb_salary) FROM payroll
+    UNION ALL
+    SELECT 'March', 3, SUM(mar_salary), COUNT(*), AVG(mar_salary) FROM payroll
+    -- etc for other months
+  )
+  ORDER BY month_order
+

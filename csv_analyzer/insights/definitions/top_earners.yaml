@@ -1,0 +1,32 @@
+# Insight: Top Earners
+# Works with any payroll/salary data
+
+name: top_earners
+version: "1.0"
+description: "Find the highest paid employees by summing all salary/payment columns"
+category: payroll
+tags:
+  - salary
+  - ranking
+  - employees
+
+requires:
+  - employee_payroll
+  - medical_staff_salary_records
+  - staff_payroll
+  - salary_records
+  - payroll
+
+parameters: []
+
+sql: |
+  -- Find top earners by summing all numeric salary columns
+  SELECT 
+    employee_name,
+    role as job_title,
+    location,
+    (salary_col_1 + salary_col_2 + salary_col_3) as total_salary
+  FROM employees
+  ORDER BY total_salary DESC
+  LIMIT 10
+

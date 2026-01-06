@@ -160,10 +160,18 @@ Your job is to:
 5. Suggest useful insights/questions that could be answered with this data
 
 IMPORTANT:
-- Column names may be in Hebrew, Arabic, or other languages - translate/normalize them
+- Column names may be in Hebrew, Arabic, or other languages - translate/normalize them to English
 - Infer semantic meaning from both column names AND sample values
 - Be specific about data types (string, integer, float, date, datetime, boolean, currency)
 - Identify semantic types (employee_id, date, amount, name, phone, email, etc.)
+
+COLUMN NAMING RULES:
+- If a column name is a number like "12.25", "1.25", etc., it's likely a MONTH.YEAR format (Dec 2025, Jan 2025)
+  → Name it descriptively like "salary_dec_25", "payment_jan_25", or "hours_dec_25" based on context
+- If column looks like a rate/multiplier (e.g., "1.25", "2.25" in context of payroll), it might be shift rate multipliers
+  → Name it like "rate_125_percent" or "overtime_rate"
+- Always make column names descriptive - avoid "unknown_column" or generic names
+- Use snake_case for all inferred names
 
 Respond in JSON format with this exact structure:
 {
@@ -203,6 +211,19 @@ Column: "{col['name']}"
                 col_text += f"\n  - Range: {col['min']} to {col['max']} (mean: {col['mean']:.2f})"
             columns_text.append(col_text)
         
+        # Detect if columns look like month.year patterns
+        date_like_cols = [col['name'] for col in profile["columns"] 
+                         if isinstance(col['name'], (int, float)) or 
+                         (isinstance(col['name'], str) and 
+                          any(c.isdigit() for c in col['name']) and 
+                          '.' in str(col['name']))]
+        
+        date_hint = ""
+        if date_like_cols:
+            date_hint = f"""
+NOTE: Columns {date_like_cols[:5]}{'...' if len(date_like_cols) > 5 else ''} look like month.year patterns (e.g., 12.25 = December 2025, 1.25 = January 2025).
+Name these columns descriptively based on what the numeric values represent (salary, hours, payments, etc.)."""
+
         user_prompt = f"""Analyze this dataset:
 
 Total rows: {profile['row_count']}
@@ -210,6 +231,7 @@ Total columns: {profile['column_count']}
 
 {"Business domain: " + vertical if vertical else ""}
 {"Additional context: " + context if context else ""}
+{date_hint}
 
 COLUMNS:
 {''.join(columns_text)}

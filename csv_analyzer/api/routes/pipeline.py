@@ -960,15 +960,19 @@ CRITICAL RULES:
 Return ONLY valid DuckDB SQL, no explanations or markdown."""},
             {"role": "user", "content": f"""Insight: {definition.get('description')}
 
-Original SQL:
+Original SQL template:
 {definition.get('sql')}
 
 Actual tables in DuckDB:
 {chr(10).join(schemas)}
 
-Parameters: {json.dumps(parameters)}
+Parameters provided: {json.dumps(parameters)}
+Default parameter values: {json.dumps({p['name']: p.get('default') for p in definition.get('parameters', []) if p.get('default')})}
 
-Adapt the SQL to work with the actual schema."""}
+IMPORTANT: 
+1. Replace all {{{{param}}}} placeholders with actual values (use defaults if not provided)
+2. Use EXACTLY the table and column names from the actual schema above
+3. Output ONLY executable SQL, no placeholders remaining"""}
         ],
         temperature=0.1
     )

@@ -1,0 +1,44 @@
+# Insight: Salary by Location
+# Compare salary costs across locations/branches
+
+name: salary_by_location
+version: "1.0"
+description: "Compare total salary costs across locations"
+category: payroll
+tags:
+  - salary
+  - location
+  - comparison
+
+requires:
+  - employee_payroll
+  - medical_staff_salary_records
+  - staff_payroll
+  - salary_records
+  - payroll
+
+parameters:
+  - name: job_title
+    type: string
+    required: false
+    description: "Filter by specific job title"
+
+sql: |
+  SELECT 
+    location,
+    COUNT(DISTINCT employee_name) as employee_count,
+    SUM(total_salary) as total_cost,
+    AVG(total_salary) as avg_salary,
+    MIN(total_salary) as min_salary,
+    MAX(total_salary) as max_salary
+  FROM (
+    SELECT 
+      employee_name,
+      location,
+      -- Sum all monthly salary columns
+      total_annual_salary as total_salary
+    FROM payroll
+  )
+  GROUP BY location
+  ORDER BY total_cost DESC
+
