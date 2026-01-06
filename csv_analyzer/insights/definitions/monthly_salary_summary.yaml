@@ -1,0 +1,57 @@
+# Insight: Monthly Salary Summary
+# Works with payroll data that has monthly salary columns
+
+name: monthly_salary_summary
+version: "1.0"
+description: "Summarize monthly salary costs by job title and location"
+category: payroll
+tags:
+  - salary
+  - monthly
+  - payroll
+  - costs
+
+requires:
+  # Accept multiple document type names that might be inferred for payroll data
+  - employee_payroll
+  - medical_staff_salary_records
+  - staff_payroll
+  - salary_records
+
+parameters:
+  - name: job_title
+    type: string
+    required: false
+    description: "Filter by job title"
+  - name: location
+    type: string
+    required: false
+    description: "Filter by location/branch"
+
+sql: |
+  SELECT 
+    job_title,
+    location,
+    COUNT(*) AS employee_count,
+    ROUND(AVG(total_salary), 2) AS avg_total_salary,
+    ROUND(SUM(total_salary), 2) AS sum_total_salary,
+    ROUND(MIN(total_salary), 2) AS min_salary,
+    ROUND(MAX(total_salary), 2) AS max_salary
+  FROM (
+    SELECT 
+      job_title,
+      location,
+      -- Sum all monthly salary columns
+      COALESCE(salary_jan, 0) + COALESCE(salary_feb, 0) + COALESCE(salary_mar, 0) +
+      COALESCE(salary_apr, 0) + COALESCE(salary_may, 0) + COALESCE(salary_jun, 0) +
+      COALESCE(salary_jul, 0) + COALESCE(salary_aug, 0) + COALESCE(salary_sep, 0) +
+      COALESCE(salary_oct, 0) + COALESCE(salary_nov, 0) + COALESCE(salary_dec, 0)
+      AS total_salary
+    FROM employee_payroll
+    WHERE 1=1
+      {? AND job_title = '{{job_title}}' ?}
+      {? AND location = '{{location}}' ?}
+  ) t
+  GROUP BY job_title, location
+  ORDER BY sum_total_salary DESC
+

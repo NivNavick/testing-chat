@@ -855,6 +855,154 @@ async def get_session_schema(session_id: str):
     return {"schemas": schemas}
 
 
+@router.get("/pipeline/sessions/{session_id}/predefined-insights")
+async def list_predefined_insights(session_id: str):
+    """
+    List all predefined insights and whether they can run on current data.
+    
+    Predefined insights are YAML files in csv_analyzer/insights/definitions/
+    """
+    from pathlib import Path
+    import yaml
+    
+    session = get_session(session_id)
+    
+    # Load all insight definitions
+    definitions_dir = Path(__file__).parent.parent.parent / "insights" / "definitions"
+    
+    insights = []
+    for yaml_file in definitions_dir.glob("*.yaml"):
+        try:
+            with open(yaml_file, 'r', encoding='utf-8') as f:
+                definition = yaml.safe_load(f)
+            
+            required_types = definition.get("requires", [])
+            loaded_types = [t.document_type for t in session.tables.values()]
+            
+            # Check if at least ONE required type is loaded (any match = can run)
+            # This allows insights to define multiple acceptable document types
+            matching = [r for r in required_types if r in loaded_types]
+            missing = [r for r in required_types if r not in loaded_types]
+            can_run = len(matching) > 0
+            
+            insights.append({
+                "name": definition.get("name"),
+                "description": definition.get("description"),
+                "category": definition.get("category"),
+                "requires": required_types,
+                "parameters": definition.get("parameters", []),
+                "can_run": can_run,
+                "missing_types": missing,
+                "file": yaml_file.name
+            })
+        except Exception as e:
+            logger.warning(f"Failed to load insight {yaml_file}: {e}")
+    
+    return {
+        "loaded_document_types": list(set(t.document_type for t in session.tables.values())),
+        "insights": insights
+    }
+
+
+@router.post("/pipeline/sessions/{session_id}/predefined-insights/{insight_name}/run")
+async def run_predefined_insight(
+    session_id: str,
+    insight_name: str,
+    parameters: Dict[str, Any] = {}
+):
+    """
+    Run a predefined insight on the session data.
+    
+    The insight SQL will be adapted to match the actual column names in DuckDB.
+    """
+    from pathlib import Path
+    import yaml
+    import time
+    
+    session = get_session(session_id)
+    
+    # Find the insight definition
+    definitions_dir = Path(__file__).parent.parent.parent / "insights" / "definitions"
+    insight_file = definitions_dir / f"{insight_name}.yaml"
+    
+    if not insight_file.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Insight '{insight_name}' not found"
+        )
+    
+    with open(insight_file, 'r', encoding='utf-8') as f:
+        definition = yaml.safe_load(f)
+    
+    # Get current table schemas (include ALL columns, not just first 10)
+    schemas = []
+    for table_name, table_info in session.tables.items():
+        col_info = ", ".join([f"{c['inferred_name']} ({c['data_type']})" for c in table_info.columns])
+        schemas.append(f"Table '{table_name}': {col_info}")
+    
+    # Use LLM to adapt the SQL to actual schema
+    from openai import OpenAI
+    settings = get_settings()
+    client = OpenAI(api_key=settings.openai_api_key)
+    
+    response = client.chat.completions.create(
+        model=settings.llm_model,
+        messages=[
+            {"role": "system", "content": """You are a SQL expert. Adapt the given insight SQL to work with the actual table schema.
+
+CRITICAL RULES:
+1. Use EXACTLY the table names provided (e.g., if table is 'employees', use FROM employees)
+2. Use EXACTLY the column names provided in the schema
+3. Keep the same logic and structure
+4. Use COALESCE for null safety
+5. If a column doesn't exist, skip it or use 0
+
+Return ONLY valid DuckDB SQL, no explanations or markdown."""},
+            {"role": "user", "content": f"""Insight: {definition.get('description')}
+
+Original SQL:
+{definition.get('sql')}
+
+Actual tables in DuckDB:
+{chr(10).join(schemas)}
+
+Parameters: {json.dumps(parameters)}
+
+Adapt the SQL to work with the actual schema."""}
+        ],
+        temperature=0.1
+    )
+    
+    adapted_sql = response.choices[0].message.content.strip()
+    
+    # Clean up SQL (remove markdown code blocks if present)
+    if adapted_sql.startswith("```"):
+        adapted_sql = adapted_sql.split("\n", 1)[1]
+        if adapted_sql.endswith("```"):
+            adapted_sql = adapted_sql.rsplit("```", 1)[0]
+    
+    # Execute
+    start_time = time.time()
+    try:
+        result_df = session.duckdb_conn.execute(adapted_sql).fetchdf()
+        execution_time = (time.time() - start_time) * 1000
+        
+        return {
+            "insight_name": insight_name,
+            "description": definition.get("description"),
+            "adapted_sql": adapted_sql,
+            "columns": result_df.columns.tolist(),
+            "data": result_df.to_dict(orient="records"),
+            "row_count": len(result_df),
+            "execution_time_ms": round(execution_time, 2)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"SQL execution failed: {str(e)}\n\nSQL:\n{adapted_sql}"
+        )
+
+
 @router.delete("/pipeline/sessions/{session_id}")
 async def delete_session(session_id: str):
     """Delete a session and clean up resources."""
