@@ -24,7 +24,14 @@ from pydantic import BaseModel
 from csv_analyzer.core.config import get_settings
 from csv_analyzer.storage.s3.client import get_s3_client
 
+# Use PostgreSQL for persistence
+from csv_analyzer.storage.postgres_db import (
+    SessionRepository, FileRepository, TableRepository, InsightRepository
+)
+
 logger = logging.getLogger(__name__)
+
+# Repositories are now async (PostgreSQL-based)
 router = APIRouter()
 
 
@@ -498,10 +505,13 @@ async def create_pipeline_session(
     Create a new analysis session.
     
     The session will hold all uploaded files and their relationships.
+    Session is persisted to SQLite database.
     """
-    session_id = str(uuid.uuid4())
+    # Save to database first (PostgreSQL)
+    db_session = await SessionRepository.create(vertical=vertical)
+    session_id = db_session['id']
     
-    # Create DuckDB connection for this session
+    # Create DuckDB connection for this session (in-memory for queries)
     conn = duckdb.connect(":memory:")
     
     session = Session(
@@ -512,7 +522,7 @@ async def create_pipeline_session(
     
     _sessions[session_id] = session
     
-    logger.info(f"Created session {session_id} for vertical '{vertical}'")
+    logger.info(f"Created session {session_id} for vertical '{vertical}' (saved to DB)")
     return session.to_state()
 
 
@@ -647,6 +657,48 @@ async def upload_and_analyze(
     
     session.tables[table_name] = analyzed_table
     
+    # Persist to PostgreSQL
+    try:
+        # Save file metadata
+        db_file = await FileRepository.create(
+            session_id=session_id,
+            filename=filename,
+            file_type=filename.split('.')[-1],
+            s3_key=None,  # Can add S3 upload later
+            row_count=len(cleaned_df)
+        )
+        
+        # Convert columns to JSON-safe format
+        columns_data = []
+        for c in schema.columns:
+            col_dict = {
+                "original_name": c.original_name,
+                "inferred_name": c.inferred_name,
+                "data_type": c.data_type,
+                "semantic_type": c.semantic_type,
+                "description": c.description,
+                "sample_values": [str(v) for v in (c.sample_values or [])[:5]],
+                "nullable": bool(c.nullable) if hasattr(c, 'nullable') else True,
+                "is_key": bool(c.is_key) if hasattr(c, 'is_key') else False
+            }
+            columns_data.append(col_dict)
+        
+        # Save table metadata
+        await TableRepository.create(
+            session_id=session_id,
+            table_name=table_name,
+            document_type=schema.document_type,
+            description=schema.document_description,
+            confidence=schema.confidence,
+            row_count=len(cleaned_df),
+            columns=columns_data,
+            suggested_insights=schema.suggested_insights or [],
+            file_id=db_file['id']
+        )
+        logger.info(f"Saved table {table_name} to PostgreSQL")
+    except Exception as e:
+        logger.warning(f"Failed to persist table to PostgreSQL: {e}")
+    
     # Re-detect relationships if we have multiple tables
     if len(session.tables) > 1:
         logger.info("Detecting relationships between tables...")
@@ -706,12 +758,29 @@ async def query_session(
         result_df = session.duckdb_conn.execute(sql_result["sql"]).fetchdf()
         execution_time = (time.time() - start_time) * 1000
         
+        result_data = result_df.to_dict(orient="records")
+        
+        # Save query result as an insight to PostgreSQL
+        saved_insight = await InsightRepository.create(
+            session_id=session_id,
+            insight_name=f"query_{request.question[:30]}...",
+            insight_type="natural_language",
+            executed_sql=sql_result["sql"],
+            parameters={"question": request.question},
+            row_count=len(result_df),
+            columns=list(result_df.columns),
+            data=result_data,
+            execution_time_ms=round(execution_time, 2),
+            success=True
+        )
+        logger.info(f"Saved query result to PostgreSQL (id: {saved_insight['id']})")
+        
         # Convert to response
         return QueryResponse(
             sql=sql_result["sql"],
             explanation=sql_result.get("explanation", ""),
             columns=list(result_df.columns),
-            data=result_df.to_dict(orient="records"),
+            data=result_data,
             row_count=len(result_df),
             execution_time_ms=execution_time
         )
@@ -991,32 +1060,164 @@ IMPORTANT:
         result_df = session.duckdb_conn.execute(adapted_sql).fetchdf()
         execution_time = (time.time() - start_time) * 1000
         
+        # Convert data to JSON-safe format
+        result_data = result_df.to_dict(orient="records")
+        
+        # Save insight result to PostgreSQL
+        saved_insight = await InsightRepository.create(
+            session_id=session_id,
+            insight_name=insight_name,
+            insight_type="predefined",
+            executed_sql=adapted_sql,
+            parameters=parameters,
+            row_count=len(result_df),
+            columns=result_df.columns.tolist(),
+            data=result_data,
+            execution_time_ms=round(execution_time, 2),
+            success=True
+        )
+        logger.info(f"Saved insight '{insight_name}' to PostgreSQL (id: {saved_insight['id']})")
+        
         return {
+            "insight_id": saved_insight['id'],  # Now we have a persistent ID!
             "insight_name": insight_name,
             "description": definition.get("description"),
             "adapted_sql": adapted_sql,
             "columns": result_df.columns.tolist(),
-            "data": result_df.to_dict(orient="records"),
+            "data": result_data,
             "row_count": len(result_df),
             "execution_time_ms": round(execution_time, 2)
         }
     except Exception as e:
+        # Save failed insight attempt too
+        try:
+            await InsightRepository.create(
+                session_id=session_id,
+                insight_name=insight_name,
+                insight_type="predefined",
+                executed_sql=adapted_sql,
+                parameters=parameters,
+                row_count=0,
+                columns=[],
+                data=[],
+                execution_time_ms=0,
+                success=False,
+                error_message=str(e)
+            )
+        except:
+            pass  # Don't fail on logging failure
+        
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"SQL execution failed: {str(e)}\n\nSQL:\n{adapted_sql}"
         )
 
 
+# ============================================================================
+# Database Retrieval Endpoints
+# ============================================================================
+
+@router.get("/db/sessions")
+async def list_all_sessions():
+    """List all sessions saved in PostgreSQL."""
+    sessions = await SessionRepository.list_all()
+    return {"sessions": sessions, "count": len(sessions)}
+
+
+@router.get("/db/sessions/{session_id}")
+async def get_session_from_db(session_id: str):
+    """Get a session and all its data from PostgreSQL."""
+    session = await SessionRepository.get(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found in database"
+        )
+    
+    # Get related data
+    files = await FileRepository.list_by_session(session_id)
+    tables = await TableRepository.list_by_session(session_id)
+    insights = await InsightRepository.list_by_session(session_id)
+    
+    return {
+        "session": session,
+        "files": files,
+        "tables": tables,
+        "insights": insights
+    }
+
+
+@router.get("/db/sessions/{session_id}/insights")
+async def list_session_insights(session_id: str):
+    """List all insight results for a session."""
+    insights = await InsightRepository.list_by_session(session_id)
+    return {
+        "session_id": session_id,
+        "insights": [
+            {
+                "id": i['id'],
+                "name": i['insight_name'],
+                "type": i['insight_type'],
+                "row_count": i['row_count'],
+                "success": i['success'],
+                "execution_time_ms": i['execution_time_ms'],
+                "created_at": str(i['created_at']) if i.get('created_at') else None
+            }
+            for i in insights
+        ],
+        "count": len(insights)
+    }
+
+
+@router.get("/db/insights/{insight_id}")
+async def get_insight_result(insight_id: str):
+    """Get a specific insight result with all its data."""
+    insight = await InsightRepository.get(insight_id)
+    if not insight:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Insight {insight_id} not found"
+        )
+    # Convert datetime to string for JSON serialization
+    if insight.get('created_at'):
+        insight['created_at'] = str(insight['created_at'])
+    return insight
+
+
+@router.get("/db/insights/{insight_id}/data")
+async def get_insight_data(insight_id: str):
+    """Get just the data rows from an insight result."""
+    data = await InsightRepository.get_insight_data(insight_id)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Insight {insight_id} not found or has no data"
+        )
+    return {"data": data, "row_count": len(data)}
+
+
+@router.get("/db/sessions/{session_id}/tables")
+async def list_session_tables(session_id: str):
+    """List all analyzed tables for a session."""
+    tables = await TableRepository.list_by_session(session_id)
+    return {
+        "session_id": session_id,
+        "tables": tables,
+        "count": len(tables)
+    }
+
+
 @router.delete("/pipeline/sessions/{session_id}")
 async def delete_session(session_id: str):
     """Delete a session and clean up resources."""
-    session = get_session(session_id)
+    # Clean up in-memory session if exists
+    if session_id in _sessions:
+        session = _sessions[session_id]
+        session.duckdb_conn.close()
+        del _sessions[session_id]
     
-    # Close DuckDB connection
-    session.duckdb_conn.close()
-    
-    # Remove from storage
-    del _sessions[session_id]
+    # Delete from PostgreSQL (cascades to files, tables, insights)
+    await SessionRepository.delete(session_id)
     
     return {"status": "deleted", "session_id": session_id}
 
