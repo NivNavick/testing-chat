@@ -50,6 +50,10 @@ class AnalyzedTable(BaseModel):
     row_count: int
     columns: List[Dict[str, Any]]
     suggested_insights: List[str]
+    # Classification metadata
+    classification_source: Optional[str] = None  # "classification_engine" or "smart_analyzer"
+    column_mappings: Optional[Dict[str, str]] = None  # original -> schema column
+    predefined_insights_available: bool = False
 
 
 class DetectedRelationship(BaseModel):
@@ -102,6 +106,17 @@ class InsightSuggestion(BaseModel):
 # ============================================================================
 
 @dataclass
+class TableClassification:
+    """Classification result for a table."""
+    source: str  # "classification_engine" or "smart_analyzer"
+    document_type: str
+    confidence: float
+    column_mappings: Optional[Dict[str, str]] = None  # original_col -> schema_col
+    llm_schema: Optional[Any] = None  # InferredSchema from SmartAnalyzer
+    predefined_insights_available: bool = False
+
+
+@dataclass
 class Session:
     """An analysis session with loaded data."""
     session_id: str
@@ -110,6 +125,7 @@ class Session:
     tables: Dict[str, AnalyzedTable] = field(default_factory=dict)
     relationships: List[DetectedRelationship] = field(default_factory=list)
     schemas: Dict[str, Any] = field(default_factory=dict)  # Inferred schemas
+    classifications: Dict[str, TableClassification] = field(default_factory=dict)  # table_name -> classification
     created_at: float = field(default_factory=time.time)
     
     def to_state(self) -> SessionState:
@@ -222,7 +238,7 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 async def analyze_dataframe(df: pd.DataFrame, vertical: str = None) -> Dict[str, Any]:
-    """Analyze a DataFrame using the smart analyzer."""
+    """Analyze a DataFrame using the smart analyzer only (fallback mode)."""
     from csv_analyzer.intelligence.smart_analyzer import SmartAnalyzer
     
     # Clean the DataFrame first
@@ -238,25 +254,150 @@ async def analyze_dataframe(df: pd.DataFrame, vertical: str = None) -> Dict[str,
     }
 
 
+CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.7
+
+
+async def dual_classify(
+    df: pd.DataFrame, 
+    vertical: str,
+    confidence_threshold: float = CLASSIFICATION_CONFIDENCE_THRESHOLD
+) -> Dict[str, Any]:
+    """
+    Dual classification: try ClassificationEngine first, fallback to SmartAnalyzer.
+    
+    Returns dict with:
+        - classification: TableClassification with source, mappings, etc.
+        - schema: The inferred schema (from either system)
+        - cleaned_df: Cleaned DataFrame
+    """
+    from csv_analyzer.intelligence.smart_analyzer import SmartAnalyzer
+    
+    # Clean the DataFrame first
+    cleaned_df = clean_dataframe(df)
+    
+    # Step 1: Try ClassificationEngine first (embedding-based)
+    try:
+        from csv_analyzer.engines.classification_engine import ClassificationEngine
+        from csv_analyzer.multilingual_embeddings_client import MultilingualEmbeddingsClient
+        from csv_analyzer.db.connection import Database
+        
+        # Initialize database connection if not already done
+        if not Database.is_initialized():
+            Database.init(
+                host="localhost",
+                port=5432,
+                database="csv_mapping",
+                user="postgres",
+                password="postgres"
+            )
+            logger.info("Initialized Database connection for ClassificationEngine")
+        
+        # Initialize embeddings client and classification engine
+        embeddings_client = MultilingualEmbeddingsClient()
+        engine = ClassificationEngine(embeddings_client=embeddings_client)
+        result = engine.classify_hybrid(cleaned_df, vertical=vertical)
+        
+        logger.info(
+            f"ClassificationEngine result: {result.document_type} "
+            f"(score={result.final_score:.2f})"
+        )
+        
+        if result.final_score >= confidence_threshold and result.document_type:
+            # Known document type - extract column mappings
+            column_mappings = {}
+            for col_name, mapping in result.suggested_mappings.items():
+                if mapping.get("target"):
+                    column_mappings[col_name] = mapping["target"]
+            
+            # Build a compatible schema from the classification result
+            # We still need SmartAnalyzer for consistent schema format
+            analyzer = SmartAnalyzer()
+            smart_result = await analyzer.analyze(cleaned_df, vertical=vertical)
+            
+            classification = TableClassification(
+                source="classification_engine",
+                document_type=result.document_type,
+                confidence=result.final_score,
+                column_mappings=column_mappings,
+                llm_schema=None,
+                predefined_insights_available=True
+            )
+            
+            logger.info(
+                f"Using ClassificationEngine: {result.document_type} "
+                f"({len(column_mappings)} column mappings)"
+            )
+            
+            return {
+                "classification": classification,
+                "schema": smart_result.inferred_schema,  # Use SmartAnalyzer schema for consistency
+                "cleaned_df": cleaned_df,
+                "classification_result": result  # Keep full result for debugging
+            }
+    
+    except Exception as e:
+        logger.warning(f"ClassificationEngine failed: {e}, falling back to SmartAnalyzer")
+    
+    # Step 2: Fallback to SmartAnalyzer (LLM-based)
+    logger.info("Using SmartAnalyzer for classification (unknown document type)")
+    
+    analyzer = SmartAnalyzer()
+    smart_result = await analyzer.analyze(cleaned_df, vertical=vertical)
+    
+    classification = TableClassification(
+        source="smart_analyzer",
+        document_type=smart_result.inferred_schema.document_type,
+        confidence=smart_result.inferred_schema.confidence,
+        column_mappings=None,  # No schema mapping available
+        llm_schema=smart_result.inferred_schema,
+        predefined_insights_available=False
+    )
+    
+    logger.info(
+        f"Using SmartAnalyzer: {smart_result.inferred_schema.document_type} "
+        f"(confidence={smart_result.inferred_schema.confidence:.2f})"
+    )
+    
+    return {
+        "classification": classification,
+        "schema": smart_result.inferred_schema,
+        "cleaned_df": cleaned_df
+    }
+
+
 def create_table_in_duckdb(
     conn: duckdb.DuckDBPyConnection,
     df: pd.DataFrame,
     table_name: str,
-    schema: Any
+    schema: Any,
+    column_mappings: Optional[Dict[str, str]] = None
 ) -> None:
-    """Create a table in DuckDB with normalized column names and proper types."""
+    """
+    Create a table in DuckDB with normalized column names and proper types.
+    
+    If column_mappings is provided (from ClassificationEngine), also creates
+    columns with schema names for predefined insights.
+    """
     # Create a view with normalized names
     conn.register(f"_raw_{table_name}", df)
     
+    # Build reverse mapping: original_name -> schema_column_name
+    schema_names = {}
+    if column_mappings:
+        for orig, schema_col in column_mappings.items():
+            if schema_col:
+                schema_names[orig] = schema_col
+    
     # Build column renames with type casting
     rename_cols = []
+    added_cols = set()  # Track added column names to avoid duplicates
+    
     for col in schema.columns:
         safe_orig = f'"{col.original_name}"'
         safe_new = col.inferred_name.replace(" ", "_").lower()
         
         # Cast based on inferred data type
         if col.data_type in ("float", "currency", "number"):
-            # Try to cast to DOUBLE, handling mixed types
             cast_expr = f'TRY_CAST({safe_orig} AS DOUBLE)'
         elif col.data_type == "integer":
             cast_expr = f'TRY_CAST({safe_orig} AS BIGINT)'
@@ -267,7 +408,17 @@ def create_table_in_duckdb(
         else:
             cast_expr = f'CAST({safe_orig} AS VARCHAR)'
         
-        rename_cols.append(f'{cast_expr} AS "{safe_new}"')
+        # Add the inferred name column
+        if safe_new not in added_cols:
+            rename_cols.append(f'{cast_expr} AS "{safe_new}"')
+            added_cols.add(safe_new)
+        
+        # If we have a schema mapping, also add the canonical schema column name
+        if col.original_name in schema_names:
+            schema_col = schema_names[col.original_name].replace(" ", "_").lower()
+            if schema_col not in added_cols and schema_col != safe_new:
+                rename_cols.append(f'{cast_expr} AS "{schema_col}"')
+                added_cols.add(schema_col)
     
     # Create the table with normalized names and types
     create_sql = f"""
@@ -278,7 +429,10 @@ def create_table_in_duckdb(
     conn.execute(create_sql)
     conn.execute(f"DROP VIEW IF EXISTS _raw_{table_name}")
     
-    logger.info(f"Created table {table_name} with {len(df)} rows")
+    logger.info(
+        f"Created table {table_name} with {len(df)} rows, "
+        f"{len(added_cols)} columns (including {len(schema_names)} schema-mapped)"
+    )
 
 
 async def detect_relationships(
@@ -409,15 +563,33 @@ async def generate_cross_table_sql(
         # Get actual DuckDB types
         duckdb_types = get_duckdb_column_types(session.duckdb_conn, table_name)
         
+        # Get column mappings if available (from ClassificationEngine)
+        classification = session.classifications.get(table_name)
+        column_mappings = classification.column_mappings if classification else None
+        
         cols = []
         for c in schema.columns:
             col_name = c.inferred_name.replace(" ", "_").lower()
             actual_type = duckdb_types.get(col_name, c.data_type)
-            cols.append(f"  - {col_name} (DuckDB type: {actual_type}): {c.description}")
+            
+            # Add semantic meaning if we have column mappings
+            semantic_info = ""
+            if column_mappings and c.original_name in column_mappings:
+                schema_col = column_mappings[c.original_name]
+                semantic_info = f" [semantic: {schema_col}]"
+            
+            cols.append(f"  - {col_name} (DuckDB type: {actual_type}){semantic_info}: {c.description}")
+        
+        # Add classification source info
+        source_info = ""
+        if classification:
+            source_info = f"\nClassification: {classification.source} (confidence: {classification.confidence:.2f})"
         
         schema_descriptions.append(
             f"Table: {table_name}\n"
-            f"Description: {schema.document_description}\n"
+            f"Document Type: {session.tables[table_name].document_type}\n"
+            f"Description: {schema.document_description}"
+            f"{source_info}\n"
             f"Columns:\n" + "\n".join(cols)
         )
     
@@ -533,6 +705,87 @@ async def get_pipeline_session(session_id: str):
     return session.to_state()
 
 
+@router.get("/pipeline/sessions/{session_id}/capabilities")
+async def get_session_capabilities(session_id: str):
+    """
+    Get the capabilities of a session based on classification results.
+    
+    Shows what features are available based on how tables were classified:
+    - ClassificationEngine: Predefined insights + Natural language
+    - SmartAnalyzer: Natural language only
+    """
+    from pathlib import Path
+    import yaml
+    
+    session = get_session(session_id)
+    
+    # Build table capabilities
+    tables_info = []
+    tables_with_schema_mappings = []
+    
+    for table_name, table_info in session.tables.items():
+        classification = session.classifications.get(table_name)
+        
+        table_cap = {
+            "table_name": table_name,
+            "document_type": table_info.document_type,
+            "row_count": table_info.row_count,
+            "classification_source": classification.source if classification else "unknown",
+            "confidence": classification.confidence if classification else 0.0,
+            "has_column_mappings": bool(classification and classification.column_mappings),
+            "column_mappings": classification.column_mappings if classification else None,
+            "features": {
+                "natural_language_queries": True,  # Always available
+                "predefined_insights": classification.predefined_insights_available if classification else False
+            }
+        }
+        tables_info.append(table_cap)
+        
+        if classification and classification.predefined_insights_available:
+            tables_with_schema_mappings.append(table_name)
+    
+    # Get available predefined insights
+    available_insights = []
+    if tables_with_schema_mappings:
+        definitions_dir = Path(__file__).parent.parent.parent / "insights" / "definitions"
+        known_doc_types = [
+            session.tables[name].document_type 
+            for name in tables_with_schema_mappings
+        ]
+        
+        for yaml_file in definitions_dir.glob("*.yaml"):
+            try:
+                with open(yaml_file, 'r', encoding='utf-8') as f:
+                    definition = yaml.safe_load(f)
+                required_types = definition.get("requires", [])
+                if any(r in known_doc_types for r in required_types):
+                    available_insights.append({
+                        "name": definition.get("name"),
+                        "description": definition.get("description"),
+                        "category": definition.get("category")
+                    })
+            except Exception:
+                pass
+    
+    return {
+        "session_id": session_id,
+        "vertical": session.vertical,
+        "summary": {
+            "total_tables": len(session.tables),
+            "tables_with_schema_mappings": len(tables_with_schema_mappings),
+            "natural_language_available": len(session.tables) > 0,
+            "predefined_insights_available": len(tables_with_schema_mappings) > 0
+        },
+        "tables": tables_info,
+        "available_predefined_insights": available_insights,
+        "recommendation": (
+            "Use predefined insights for reliable results" 
+            if tables_with_schema_mappings 
+            else "Use natural language queries - predefined insights not available for current document types"
+        )
+    }
+
+
 @router.post("/pipeline/sessions/{session_id}/upload", response_model=AnalyzedTable)
 async def upload_and_analyze(
     session_id: str,
@@ -621,27 +874,49 @@ async def upload_and_analyze(
             table_name = f"{original_name}_{counter}"
             counter += 1
     
-    # Analyze with LLM (includes data cleaning)
-    logger.info(f"Analyzing {filename}...")
-    analysis = await analyze_dataframe(df, vertical=session.vertical)
+    # Dual classification: try ClassificationEngine first, then SmartAnalyzer
+    logger.info(f"Analyzing {filename} with dual classification...")
+    analysis = await dual_classify(df, vertical=session.vertical)
     schema = analysis["schema"]
-    cleaned_df = analysis.get("cleaned_df", df)  # Use cleaned DataFrame
+    cleaned_df = analysis["cleaned_df"]
+    classification = analysis["classification"]
     
-    # Create table in DuckDB with cleaned data
-    create_table_in_duckdb(session.duckdb_conn, cleaned_df, table_name, schema)
+    # Create table in DuckDB with cleaned data (include schema column names if available)
+    create_table_in_duckdb(
+        session.duckdb_conn, 
+        cleaned_df, 
+        table_name, 
+        schema,
+        column_mappings=classification.column_mappings
+    )
     
-    # Store schema
+    # Store schema and classification
     session.schemas[table_name] = schema
+    session.classifications[table_name] = classification
     
-    # Create analyzed table record
+    # Determine available predefined insights
+    available_insights = []
+    if classification.predefined_insights_available:
+        # Get insights that match this document type
+        try:
+            from csv_analyzer.insights.registry import InsightsRegistry
+            registry = InsightsRegistry()
+            all_insights = registry.list_all()
+            for insight in all_insights:
+                if classification.document_type in insight.requires:
+                    available_insights.append(insight.name)
+        except Exception as e:
+            logger.warning(f"Could not load insights registry: {e}")
+    
+    # Create analyzed table record with classification metadata
     analyzed_table = AnalyzedTable(
         table_id=str(uuid.uuid4()),
         original_filename=filename,
         table_name=table_name,
-        document_type=schema.document_type,
+        document_type=classification.document_type,
         description=schema.document_description,
-        confidence=schema.confidence,
-        row_count=len(cleaned_df),  # Use cleaned row count
+        confidence=classification.confidence,
+        row_count=len(cleaned_df),
         columns=[
             {
                 "original_name": c.original_name,
@@ -652,10 +927,22 @@ async def upload_and_analyze(
             }
             for c in schema.columns
         ],
-        suggested_insights=schema.suggested_insights
+        suggested_insights=available_insights if available_insights else schema.suggested_insights,
+        # Classification metadata
+        classification_source=classification.source,
+        column_mappings=classification.column_mappings,
+        predefined_insights_available=classification.predefined_insights_available
     )
     
     session.tables[table_name] = analyzed_table
+    
+    # Log classification source for debugging
+    logger.info(
+        f"Classification: source={classification.source}, "
+        f"type={classification.document_type}, "
+        f"predefined_available={classification.predefined_insights_available}, "
+        f"available_insights={available_insights}"
+    )
     
     # Persist to PostgreSQL
     try:
@@ -929,15 +1216,44 @@ async def list_predefined_insights(session_id: str):
     """
     List all predefined insights and whether they can run on current data.
     
-    Predefined insights are YAML files in csv_analyzer/insights/definitions/
+    Predefined insights require ClassificationEngine to succeed (column mappings needed).
+    If tables were classified with SmartAnalyzer only, predefined insights won't work
+    reliably - use natural language queries instead.
     """
     from pathlib import Path
     import yaml
     
     session = get_session(session_id)
     
+    # Check which tables have column mappings (from ClassificationEngine)
+    tables_with_mappings = {
+        name: classification
+        for name, classification in session.classifications.items()
+        if classification.predefined_insights_available
+    }
+    
+    if not tables_with_mappings:
+        # No tables with column mappings - predefined insights not available
+        return {
+            "status": "limited",
+            "message": "Predefined insights require known document types. Use natural language queries instead.",
+            "loaded_document_types": list(set(t.document_type for t in session.tables.values())),
+            "classification_sources": {
+                name: classification.source 
+                for name, classification in session.classifications.items()
+            },
+            "insights": []
+        }
+    
     # Load all insight definitions
     definitions_dir = Path(__file__).parent.parent.parent / "insights" / "definitions"
+    
+    # Get document types from tables with mappings
+    known_doc_types = [
+        session.tables[name].document_type 
+        for name in tables_with_mappings.keys()
+        if name in session.tables
+    ]
     
     insights = []
     for yaml_file in definitions_dir.glob("*.yaml"):
@@ -946,12 +1262,10 @@ async def list_predefined_insights(session_id: str):
                 definition = yaml.safe_load(f)
             
             required_types = definition.get("requires", [])
-            loaded_types = [t.document_type for t in session.tables.values()]
             
-            # Check if at least ONE required type is loaded (any match = can run)
-            # This allows insights to define multiple acceptable document types
-            matching = [r for r in required_types if r in loaded_types]
-            missing = [r for r in required_types if r not in loaded_types]
+            # Check if at least ONE required type matches a KNOWN document type
+            matching = [r for r in required_types if r in known_doc_types]
+            missing = [r for r in required_types if r not in known_doc_types]
             can_run = len(matching) > 0
             
             insights.append({
@@ -962,13 +1276,16 @@ async def list_predefined_insights(session_id: str):
                 "parameters": definition.get("parameters", []),
                 "can_run": can_run,
                 "missing_types": missing,
-                "file": yaml_file.name
+                "file": yaml_file.name,
+                "uses_column_mappings": can_run  # Will use deterministic column mappings
             })
         except Exception as e:
             logger.warning(f"Failed to load insight {yaml_file}: {e}")
     
     return {
-        "loaded_document_types": list(set(t.document_type for t in session.tables.values())),
+        "status": "available",
+        "loaded_document_types": known_doc_types,
+        "tables_with_column_mappings": list(tables_with_mappings.keys()),
         "insights": insights
     }
 
@@ -982,11 +1299,13 @@ async def run_predefined_insight(
     """
     Run a predefined insight on the session data.
     
-    The insight SQL will be adapted to match the actual column names in DuckDB.
+    If tables have column mappings (from ClassificationEngine), uses direct SQL.
+    Otherwise falls back to LLM adaptation.
     """
     from pathlib import Path
     import yaml
     import time
+    import re
     
     session = get_session(session_id)
     
@@ -1003,21 +1322,65 @@ async def run_predefined_insight(
     with open(insight_file, 'r', encoding='utf-8') as f:
         definition = yaml.safe_load(f)
     
-    # Get current table schemas (include ALL columns, not just first 10)
-    schemas = []
-    for table_name, table_info in session.tables.items():
-        col_info = ", ".join([f"{c['inferred_name']} ({c['data_type']})" for c in table_info.columns])
-        schemas.append(f"Table '{table_name}': {col_info}")
+    # Get required document types
+    required_types = definition.get("requires", [])
     
-    # Use LLM to adapt the SQL to actual schema
-    from openai import OpenAI
-    settings = get_settings()
-    client = OpenAI(api_key=settings.openai_api_key)
+    # Check if we have tables with column mappings for this insight
+    tables_with_mappings = {}
+    for table_name, classification in session.classifications.items():
+        if classification.predefined_insights_available:
+            table_doc_type = session.tables[table_name].document_type
+            if table_doc_type in required_types:
+                tables_with_mappings[table_name] = {
+                    "doc_type": table_doc_type,
+                    "mappings": classification.column_mappings
+                }
     
-    response = client.chat.completions.create(
-        model=settings.llm_model,
-        messages=[
-            {"role": "system", "content": """You are a SQL expert. Adapt the given insight SQL to work with the actual table schema.
+    # Get SQL template
+    sql_template = definition.get('sql', '')
+    
+    # Apply parameter defaults
+    param_defaults = {p['name']: p.get('default') for p in definition.get('parameters', []) if p.get('default')}
+    final_params = {**param_defaults, **parameters}
+    
+    if tables_with_mappings:
+        # Mode 1: Use column mappings - direct SQL rewriting (deterministic)
+        logger.info(f"Running insight {insight_name} with column mappings (fast mode)")
+        
+        adapted_sql = sql_template
+        
+        # Replace table names (e.g., employee_shifts -> actual table name)
+        for table_name, info in tables_with_mappings.items():
+            doc_type = info["doc_type"]
+            # Replace both the exact doc type name and common variations
+            adapted_sql = adapted_sql.replace(doc_type, table_name)
+        
+        # Replace parameters
+        for param_name, param_value in final_params.items():
+            adapted_sql = adapted_sql.replace(f"{{{{{param_name}}}}}", str(param_value))
+        
+        # Remove optional parameter blocks {? ... ?} if parameter not provided
+        adapted_sql = re.sub(r'\{\?[^?]*\?\}', '', adapted_sql)
+        
+        method = "column_mappings"
+    else:
+        # Mode 2: Fallback to LLM adaptation (for SmartAnalyzer-only tables)
+        logger.info(f"Running insight {insight_name} with LLM adaptation (no column mappings)")
+        
+        # Get current table schemas
+        schemas = []
+        for table_name, table_info in session.tables.items():
+            col_info = ", ".join([f"{c['inferred_name']} ({c['data_type']})" for c in table_info.columns])
+            schemas.append(f"Table '{table_name}': {col_info}")
+        
+        from openai import OpenAI
+        settings = get_settings()
+        client = OpenAI(api_key=settings.openai_api_key)
+        
+        response = client.chat.completions.create(
+            model=settings.llm_model,
+            messages=[
+                {"role": "system", "content": """You are a SQL expert. Adapt the given insight SQL to work with the actual table schema.
 
 CRITICAL RULES:
 1. Use EXACTLY the table names provided (e.g., if table is 'employees', use FROM employees)
@@ -1027,32 +1390,33 @@ CRITICAL RULES:
 5. If a column doesn't exist, skip it or use 0
 
 Return ONLY valid DuckDB SQL, no explanations or markdown."""},
-            {"role": "user", "content": f"""Insight: {definition.get('description')}
+                {"role": "user", "content": f"""Insight: {definition.get('description')}
 
 Original SQL template:
-{definition.get('sql')}
+{sql_template}
 
 Actual tables in DuckDB:
 {chr(10).join(schemas)}
 
-Parameters provided: {json.dumps(parameters)}
-Default parameter values: {json.dumps({p['name']: p.get('default') for p in definition.get('parameters', []) if p.get('default')})}
+Parameters provided: {json.dumps(final_params)}
 
 IMPORTANT: 
-1. Replace all {{{{param}}}} placeholders with actual values (use defaults if not provided)
+1. Replace all {{{{param}}}} placeholders with actual values
 2. Use EXACTLY the table and column names from the actual schema above
 3. Output ONLY executable SQL, no placeholders remaining"""}
-        ],
-        temperature=0.1
-    )
-    
-    adapted_sql = response.choices[0].message.content.strip()
-    
-    # Clean up SQL (remove markdown code blocks if present)
-    if adapted_sql.startswith("```"):
-        adapted_sql = adapted_sql.split("\n", 1)[1]
-        if adapted_sql.endswith("```"):
-            adapted_sql = adapted_sql.rsplit("```", 1)[0]
+            ],
+            temperature=0.1
+        )
+        
+        adapted_sql = response.choices[0].message.content.strip()
+        
+        # Clean up SQL (remove markdown code blocks if present)
+        if adapted_sql.startswith("```"):
+            adapted_sql = adapted_sql.split("\n", 1)[1]
+            if adapted_sql.endswith("```"):
+                adapted_sql = adapted_sql.rsplit("```", 1)[0]
+        
+        method = "llm_adaptation"
     
     # Execute
     start_time = time.time()
@@ -1079,9 +1443,10 @@ IMPORTANT:
         logger.info(f"Saved insight '{insight_name}' to PostgreSQL (id: {saved_insight['id']})")
         
         return {
-            "insight_id": saved_insight['id'],  # Now we have a persistent ID!
+            "insight_id": saved_insight['id'],
             "insight_name": insight_name,
             "description": definition.get("description"),
+            "method": method,  # "column_mappings" or "llm_adaptation"
             "adapted_sql": adapted_sql,
             "columns": result_df.columns.tolist(),
             "data": result_data,
