@@ -1,0 +1,357 @@
+name: medical_actions
+vertical: medical
+version: "1.0"
+description: "Medical procedures, treatments, clinical actions, and healthcare services"
+
+# =============================================================================
+# PREPROCESSING CONFIGURATION
+# =============================================================================
+preprocessing:
+  # Structure detection - standard CSV with single header row
+  structure_hints:
+    max_header_rows: 1
+    
+  # Row filtering
+  row_filters:
+    - name: exclude_settlements
+      description: "Exclude settlement/accounting rows (התחשבנות)"
+      condition: "\"שם טיפול\" NOT LIKE '%התחשבנות%'"
+      enabled: true
+      
+    - name: only_medical_categories
+      description: "Include only medical procedure categories"
+      condition: "\"קטגורית טיפול\" IN ('גסטרו', 'עיניים', 'אורתופדיה', 'פנימית')"
+      enabled: false  # Disabled by default, enable as needed
+      
+  # Column value transformations
+  column_transforms:
+    # Split treatment time range into start and end columns
+    - source_column: "שעות טיפול בפועל"
+      transform_type: split_range
+      pattern: "^(\\d{1,2}:\\d{2})\\s*-\\s*(\\d{1,2}:\\d{2})$"
+      output_columns:
+        - name: treatment_start_time
+          group: 1
+        - name: treatment_end_time
+          group: 2
+
+# =============================================================================
+# FIELD DEFINITIONS
+# =============================================================================
+fields:
+  - name: treatment_name
+    type: string
+    required: true
+    description: "Name of the medical treatment or procedure"
+    aliases:
+      - שם טיפול
+      - procedure_name
+      - action_name
+      - service_name
+      # Hebrew
+      - שם_הטיפול
+      - פעולה
+      - טיפול
+      # Spanish
+      - nombre_tratamiento
+      - procedimiento
+      # Arabic
+      - اسم_العلاج
+      # Russian
+      - название_процедуры
+    embedding_text: "treatment procedure medical action service name clinical"
+
+  - name: treatment_code
+    type: string
+    required: false
+    description: "Code identifying the treatment type"
+    aliases:
+      - קוד טיפול
+      - procedure_code
+      - action_code
+      - service_code
+      - cpt_code
+      # Hebrew
+      - קוד_טיפול
+      - קוד_פעולה
+      # Spanish
+      - codigo_tratamiento
+      # Arabic
+      - رمز_العلاج
+      # Russian
+      - код_процедуры
+    embedding_text: "treatment procedure code identifier CPT billing"
+
+  - name: treatment_description
+    type: string
+    required: false
+    description: "Detailed description of the treatment"
+    aliases:
+      - תיאור טיפול
+      - description
+      - procedure_description
+      # Hebrew
+      - תיאור
+      - פירוט_טיפול
+      # Spanish
+      - descripcion_tratamiento
+    embedding_text: "treatment procedure description details explanation"
+
+  - name: treatment_category
+    type: string
+    required: false
+    description: "Category of the treatment (e.g., gastro, surgery, imaging)"
+    aliases:
+      - קטגורית טיפול
+      - category
+      - procedure_category
+      - department
+      - specialty
+      # Hebrew
+      - קטגוריה
+      - מחלקה
+      - תחום
+      # Spanish
+      - categoria_tratamiento
+      # Arabic
+      - فئة_العلاج
+    embedding_text: "treatment category department specialty type gastro surgery imaging"
+
+  - name: treatment_date
+    type: date
+    required: true
+    description: "Date when the treatment was performed"
+    target_format: "YYYY-MM-DD"
+    accepts_formats:
+      - "YYYY-MM-DD"
+      - "DD/MM/YYYY"
+      - "MM/DD/YYYY"
+    aliases:
+      - תאריך טיפול
+      - date
+      - procedure_date
+      - service_date
+      # Hebrew
+      - תאריך
+      - תאריך_ביצוע
+      # Spanish
+      - fecha_tratamiento
+      # Arabic
+      - تاريخ_العلاج
+    embedding_text: "treatment procedure date when performed service"
+
+  - name: treatment_time_range
+    type: string
+    required: false
+    description: "Time range when treatment was performed (e.g., 19:00 - 19:15)"
+    aliases:
+      - שעות טיפול בפועל
+      - treatment_hours
+      - procedure_time
+      - service_time
+      # Hebrew
+      - שעות_טיפול
+      - זמן_טיפול
+    embedding_text: "treatment time hours range when procedure performed"
+
+  - name: treatment_start_time
+    type: time
+    required: false
+    description: "Start time of the treatment (extracted from range)"
+    aliases:
+      - start_time
+      - begin_time
+      # Hebrew
+      - שעת_התחלה
+      - התחלת_טיפול
+    embedding_text: "treatment start time begin procedure"
+
+  - name: treatment_end_time
+    type: time
+    required: false
+    description: "End time of the treatment (extracted from range)"
+    aliases:
+      - end_time
+      - finish_time
+      # Hebrew
+      - שעת_סיום
+      - סיום_טיפול
+    embedding_text: "treatment end time finish procedure"
+
+  - name: treating_staff
+    type: string
+    required: false
+    description: "Name of the staff member who performed the treatment"
+    aliases:
+      - צוות מטפל
+      - staff_name
+      - provider
+      - doctor
+      - physician
+      - nurse
+      # Hebrew
+      - רופא
+      - מטפל
+      - אחות
+      - צוות
+      # Spanish
+      - medico
+      - profesional
+      # Arabic
+      - الطبيب
+      - المعالج
+    embedding_text: "treating staff doctor physician nurse provider healthcare professional"
+
+  - name: treatment_price
+    type: float
+    required: false
+    description: "Price/cost of the treatment"
+    aliases:
+      - מחיר
+      - price
+      - cost
+      - fee
+      - amount
+      # Hebrew
+      - עלות
+      - תעריף
+      - מחיר_טיפול
+      # Spanish
+      - precio
+      - costo
+    embedding_text: "treatment price cost fee amount charge"
+
+  - name: amount_charged
+    type: float
+    required: false
+    description: "Amount charged/billed so far"
+    aliases:
+      - חויב עד כה
+      - charged_amount
+      - billed_amount
+      - total_charged
+      # Hebrew
+      - סכום_חיוב
+      - חויב
+    embedding_text: "amount charged billed invoice payment"
+
+  - name: price_list
+    type: string
+    required: false
+    description: "Price list or insurance plan used for billing"
+    aliases:
+      - מחירון
+      - price_list_name
+      - tariff
+      - insurance
+      - plan
+      # Hebrew
+      - תעריפון
+      - קופת_חולים
+      - ביטוח
+    embedding_text: "price list tariff insurance plan HMO billing"
+
+  - name: department
+    type: string
+    required: false
+    description: "Department or clinic where treatment was performed"
+    aliases:
+      - מחלקה
+      - clinic
+      - unit
+      - facility
+      - location
+      # Hebrew
+      - סניף
+      - מרפאה
+      - יחידה
+      # Spanish
+      - departamento
+      - clinica
+    embedding_text: "department clinic unit facility location branch"
+
+  - name: doctor_fee
+    type: float
+    required: false
+    description: "Fee paid to the doctor for this treatment"
+    aliases:
+      - שכר רופא
+      - physician_fee
+      - provider_fee
+      - professional_fee
+      # Hebrew
+      - שכר_רופא
+      - תשלום_רופא
+    embedding_text: "doctor physician fee payment professional compensation"
+
+  - name: total_invoice_amount
+    type: float
+    required: false
+    description: "Total invoice amount generated"
+    aliases:
+      - סהכ דרישה שהופקה
+      - invoice_total
+      - claim_amount
+      - total_demand
+      # Hebrew
+      - סכום_חשבונית
+      - דרישה
+    embedding_text: "total invoice claim amount demand billing"
+
+  - name: balance_due
+    type: float
+    required: false
+    description: "Remaining balance to be collected"
+    aliases:
+      - יתרה לדרישה
+      - balance
+      - remaining_amount
+      - outstanding
+      # Hebrew
+      - יתרה
+      - חוב
+    embedding_text: "balance due remaining outstanding amount owed"
+
+  - name: commitment_number
+    type: string
+    required: false
+    description: "Insurance commitment/authorization number"
+    aliases:
+      - מספר התחייבות
+      - authorization_number
+      - commitment_id
+      - approval_number
+      # Hebrew
+      - התחייבות
+      - אישור
+      - מספר_אישור
+    embedding_text: "commitment authorization approval number insurance"
+
+  - name: program_name
+    type: string
+    required: false
+    description: "Insurance program or plan name"
+    aliases:
+      - שם התוכנית
+      - plan_name
+      - program
+      - insurance_plan
+      # Hebrew
+      - תוכנית
+      - שם_תוכנית
+    embedding_text: "program plan insurance coverage name"
+
+  - name: equipment
+    type: string
+    required: false
+    description: "Medical equipment used for the treatment"
+    aliases:
+      - מכשיר
+      - device
+      - machine
+      - instrument
+      # Hebrew
+      - ציוד
+      - מכשור
+    embedding_text: "equipment device machine instrument medical"
+

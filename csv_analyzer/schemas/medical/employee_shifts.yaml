@@ -1,8 +1,48 @@
 name: employee_shifts
 vertical: medical
-version: "1.0"
+version: "1.1"
 description: "Employee work schedules, shift assignments, staff rosters, nursing schedules"
 
+# =============================================================================
+# PREPROCESSING CONFIGURATION
+# Applied before classification and column mapping
+# =============================================================================
+preprocessing:
+  # Structure detection hints for multi-row headers
+  structure_hints:
+    max_header_rows: 3
+    metadata_row_patterns:
+      - "^\\d{2}\\.\\d{2}\\.\\d{4}\\s*-"  # Date range pattern (01.12.2025 - 31.12.2025)
+    
+  # Row filtering via SQL conditions
+  row_filters:
+    - name: exclude_empty_dates
+      description: "Remove rows with no date value"
+      condition: "תאריך IS NOT NULL AND TRIM(תאריך) != ''"
+      enabled: true
+      
+  # Column value transformations
+  column_transforms:
+    # Clean asterisk prefix from time columns (e.g., "* 14:30" → "14:30")
+    - source_column: "כניסה"
+      transform_type: clean_prefix
+      pattern: "^\\*\\s*"
+      replacement: ""
+      
+    - source_column: "יציאה"
+      transform_type: clean_prefix
+      pattern: "^\\*\\s*"
+      replacement: ""
+      
+    # Normalize Hebrew date format (e.g., "ב - 01" → ISO date)
+    - source_column: "תאריך"
+      transform_type: hebrew_date_normalize
+      pattern: "^([אבגדהוש])\\s*-\\s*(\\d{1,2})$"
+      context_date_column: null  # Uses session date range from metadata
+
+# =============================================================================
+# FIELD DEFINITIONS
+# =============================================================================
 fields:
   - name: shift_id
     type: string

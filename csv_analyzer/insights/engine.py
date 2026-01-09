@@ -1,5 +1,11 @@
 """
 Main Insights Engine - Orchestrates CSV loading, classification, and insight execution.
+
+Now includes preprocessing pipeline support for:
+- Multi-row header detection
+- Value transformations (split ranges, Hebrew dates, clean prefixes)
+- Row filtering via SQL conditions
+- Session management for multi-document processing
 """
 
 import logging
@@ -53,6 +59,8 @@ class InsightsEngine:
         vertical: str = "medical",
         database_path: Optional[str] = None,
         definitions_path: Optional[Path] = None,
+        enable_preprocessing: bool = True,
+        openai_client=None,
     ):
         """
         Initialize the Insights Engine.
@@ -61,21 +69,32 @@ class InsightsEngine:
             vertical: The vertical context (e.g., "medical")
             database_path: Path to DuckDB file. None = in-memory.
             definitions_path: Path to insight YAML definitions. None = default.
+            enable_preprocessing: Whether to enable the preprocessing pipeline.
+            openai_client: Optional OpenAI client for AI-based structure detection.
         """
         self.vertical = vertical
         self.data_store = DataStore(database_path)
         self.registry = InsightsRegistry(definitions_path)
+        self.enable_preprocessing = enable_preprocessing
         
         # Lazy-load classification engine
         self._classification_engine = None
         self._embeddings_client = None
+        
+        # Lazy-load preprocessing pipeline
+        self._preprocessing_pipeline = None
+        self._openai_client = openai_client
+        
+        # Session management
+        self._current_session = None
         
         # Load insight definitions
         self.registry.load_definitions()
         
         logger.info(
             f"InsightsEngine initialized: vertical={vertical}, "
-            f"{len(self.registry.list_names())} insights available"
+            f"{len(self.registry.list_names())} insights available, "
+            f"preprocessing={'enabled' if enable_preprocessing else 'disabled'}"
         )
     
     @property
@@ -91,12 +110,91 @@ class InsightsEngine:
             self._classification_engine = ClassificationEngine(self._embeddings_client)
         return self._classification_engine
     
+    @property
+    def preprocessing_pipeline(self):
+        """Lazy-load the preprocessing pipeline."""
+        if self._preprocessing_pipeline is None:
+            from csv_analyzer.preprocessing.pipeline import PreprocessingPipeline
+            self._preprocessing_pipeline = PreprocessingPipeline(
+                openai_client=self._openai_client
+            )
+        return self._preprocessing_pipeline
+    
+    @property
+    def current_session(self):
+        """Get the current processing session."""
+        return self._current_session
+    
+    def create_session(self, name: Optional[str] = None) -> "ProcessingSession":
+        """
+        Create a new processing session for multi-document operations.
+        
+        Args:
+            name: Optional human-readable name for the session
+            
+        Returns:
+            ProcessingSession instance
+        """
+        from csv_analyzer.sessions import ProcessingSession
+        
+        self._current_session = ProcessingSession(
+            vertical=self.vertical,
+            name=name,
+        )
+        logger.info(f"Created session: {self._current_session.name}")
+        return self._current_session
+    
+    def load_session(self, session_id: str, sessions_path: Optional[str] = None) -> Optional["ProcessingSession"]:
+        """
+        Load an existing session from disk.
+        
+        Args:
+            session_id: ID of the session to load
+            sessions_path: Path to sessions directory (default: ./sessions)
+            
+        Returns:
+            ProcessingSession or None if not found
+        """
+        from csv_analyzer.sessions import FileBasedSessionStore
+        
+        store = FileBasedSessionStore(sessions_path)
+        session = store.load(session_id)
+        
+        if session:
+            self._current_session = session
+            logger.info(f"Loaded session: {session.name}")
+        
+        return session
+    
+    def save_session(self, sessions_path: Optional[str] = None) -> Optional[str]:
+        """
+        Save the current session to disk.
+        
+        Args:
+            sessions_path: Path to sessions directory (default: ./sessions)
+            
+        Returns:
+            Path to saved session or None if no session
+        """
+        if not self._current_session:
+            logger.warning("No current session to save")
+            return None
+        
+        from csv_analyzer.sessions import FileBasedSessionStore
+        
+        store = FileBasedSessionStore(sessions_path)
+        path = store.save(self._current_session)
+        logger.info(f"Saved session to: {path}")
+        return path
+    
     def load_csv(
         self,
         csv_file: Union[str, Path, BinaryIO, pd.DataFrame],
         document_type: Optional[str] = None,
         column_mappings: Optional[Dict[str, str]] = None,
         replace: bool = True,
+        preprocess: bool = True,
+        schema_path: Optional[Union[str, Path]] = None,
     ) -> LoadedTable:
         """
         Load a CSV file into the data store.
@@ -109,20 +207,48 @@ class InsightsEngine:
             document_type: Override classification (e.g., "employee_shifts")
             column_mappings: Override column mappings (original -> schema field)
             replace: If True, replace existing table. If False, append.
+            preprocess: If True, run preprocessing pipeline (structure detection, transforms)
+            schema_path: Path to schema YAML with preprocessing rules
             
         Returns:
             LoadedTable with metadata about the loaded data
         """
-        # Load the CSV
-        if isinstance(csv_file, pd.DataFrame):
-            df = csv_file
-            source_file = "DataFrame"
-        elif isinstance(csv_file, (str, Path)):
-            df = pd.read_csv(csv_file)
-            source_file = str(csv_file)
+        source_file = str(csv_file) if isinstance(csv_file, (str, Path)) else "DataFrame"
+        extracted_metadata = None
+        
+        # Run preprocessing if enabled
+        if preprocess and self.enable_preprocessing and isinstance(csv_file, (str, Path)):
+            logger.info(f"Running preprocessing pipeline on: {source_file}")
+            
+            processed = self.preprocessing_pipeline.process_with_auto_transforms(
+                csv_file,
+                detect_time_ranges=True,
+                detect_hebrew_dates=True,
+                clean_time_prefixes=True,
+            )
+            
+            df = processed.df
+            extracted_metadata = processed.extracted_metadata
+            
+            # Update session context if we have a session
+            if self._current_session and extracted_metadata:
+                if extracted_metadata.date_range_start:
+                    self._current_session.set_context("date_range_start", extracted_metadata.date_range_start)
+                if extracted_metadata.date_range_end:
+                    self._current_session.set_context("date_range_end", extracted_metadata.date_range_end)
+            
+            logger.info(
+                f"Preprocessing complete: {processed.original_rows} → {processed.final_rows} rows, "
+                f"columns added: {processed.columns_added}"
+            )
         else:
-            df = pd.read_csv(csv_file)
-            source_file = "file_object"
+            # Load the CSV directly
+            if isinstance(csv_file, pd.DataFrame):
+                df = csv_file
+            elif isinstance(csv_file, (str, Path)):
+                df = pd.read_csv(csv_file)
+            else:
+                df = pd.read_csv(csv_file)
         
         logger.info(f"Loaded CSV: {source_file} ({len(df)} rows, {len(df.columns)} columns)")
         
@@ -163,11 +289,116 @@ class InsightsEngine:
                 "Please provide document_type manually."
             )
         
+        # Add to session if active
+        if self._current_session:
+            from csv_analyzer.sessions.session import ExtractedMetadata
+            self._current_session.add_document(
+                source_path=source_file,
+                df=df,
+                document_type=document_type,
+                classification_confidence=confidence,
+                column_mappings=column_mappings or {},
+                extracted_metadata=extracted_metadata,
+                preprocessed=preprocess and self.enable_preprocessing,
+            )
+        
         # Load into data store
         return self.data_store.load_dataframe(
             df=df,
             document_type=document_type,
             column_mappings=column_mappings or {},
+            source_file=source_file,
+            classification_confidence=confidence,
+            replace=replace,
+        )
+    
+    def load_csv_with_preprocessing(
+        self,
+        csv_file: Union[str, Path],
+        schema_path: Optional[Union[str, Path]] = None,
+        document_type: Optional[str] = None,
+        replace: bool = True,
+    ) -> LoadedTable:
+        """
+        Load a CSV with full preprocessing from schema YAML.
+        
+        This method applies all preprocessing rules defined in the schema's
+        'preprocessing' section before classification.
+        
+        Args:
+            csv_file: Path to CSV file
+            schema_path: Path to schema YAML with preprocessing rules
+            document_type: Override document type (skip classification)
+            replace: If True, replace existing table
+            
+        Returns:
+            LoadedTable with metadata
+        """
+        from csv_analyzer.preprocessing.pipeline import PreprocessingConfig
+        
+        source_file = str(csv_file)
+        logger.info(f"Loading CSV with full preprocessing: {source_file}")
+        
+        # Load preprocessing config from schema if provided
+        config = None
+        if schema_path:
+            config = PreprocessingConfig.from_yaml_file(schema_path)
+        
+        # Run preprocessing pipeline
+        processed = self.preprocessing_pipeline.process(
+            csv_file,
+            schema_path=schema_path,
+            config=config,
+            detect_structure=True,
+        )
+        
+        df = processed.df
+        extracted_metadata = processed.extracted_metadata
+        
+        logger.info(
+            f"Preprocessing complete: {processed.original_rows} → {processed.final_rows} rows"
+        )
+        
+        # Classify if document_type not provided
+        if document_type is None:
+            classification = self.classification_engine.classify_hybrid(
+                df,
+                vertical=self.vertical,
+            )
+            document_type = classification.document_type
+            column_mappings = {}
+            for col_name, mapping_info in classification.suggested_mappings.items():
+                if isinstance(mapping_info, dict):
+                    target = mapping_info.get("target") or mapping_info.get("field_name")
+                    if target:
+                        column_mappings[col_name] = target
+                elif mapping_info:
+                    column_mappings[col_name] = str(mapping_info)
+            confidence = classification.final_score
+        else:
+            column_mappings = {}
+            confidence = 1.0
+        
+        if not document_type:
+            raise ValueError(f"Could not classify CSV: {source_file}")
+        
+        # Add to session if active
+        if self._current_session:
+            self._current_session.add_document(
+                source_path=source_file,
+                df=df,
+                document_type=document_type,
+                classification_confidence=confidence,
+                column_mappings=column_mappings,
+                extracted_metadata=extracted_metadata,
+                preprocessed=True,
+            )
+        
+        # Load into data store
+        return self.data_store.load_dataframe(
+            df=df,
+            document_type=document_type,
+            column_mappings=column_mappings,
             source_file=source_file,
             classification_confidence=confidence,
             replace=replace,
@@ -454,10 +685,36 @@ class InsightsEngine:
     def close(self) -> None:
         """Close the engine and release resources."""
         self.data_store.close()
+        if self._preprocessing_pipeline:
+            self._preprocessing_pipeline.close()
     
     def __enter__(self) -> "InsightsEngine":
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
+
+
+# Convenience function for creating engine with preprocessing
+def create_insights_engine(
+    vertical: str = "medical",
+    enable_preprocessing: bool = True,
+    openai_client=None,
+) -> InsightsEngine:
+    """
+    Create an InsightsEngine with preprocessing support.
+    
+    Args:
+        vertical: The vertical context
+        enable_preprocessing: Enable preprocessing pipeline
+        openai_client: Optional OpenAI client for AI structure detection
+        
+    Returns:
+        InsightsEngine instance
+    """
+    return InsightsEngine(
+        vertical=vertical,
+        enable_preprocessing=enable_preprocessing,
+        openai_client=openai_client,
+    )
 
