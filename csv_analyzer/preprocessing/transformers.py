@@ -5,6 +5,7 @@ Provides transformations for:
 - Splitting range values (e.g., "19:00 - 19:15" → two columns)
 - Normalizing Hebrew dates (e.g., "ב - 01" → ISO date)
 - Cleaning prefixes/suffixes (e.g., "* 14:30" → "14:30")
+- Location normalization (e.g., "בת ים - גיאפה" → "bat_yam_gastro")
 - Custom regex extractions
 """
 
@@ -53,6 +54,186 @@ class TransformConfig:
             context_date_column=data.get("context_date_column"),
             options=data.get("options", {}),
         )
+
+
+@dataclass
+class LocationRule:
+    """A rule for normalizing locations to canonical form."""
+    patterns: List[str]  # Regex patterns to match
+    canonical: str  # The canonical location ID
+    display_name: Optional[str] = None  # Human-readable name
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LocationRule":
+        """Create from dictionary (from YAML)."""
+        patterns = data.get("patterns", [])
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        return cls(
+            patterns=patterns,
+            canonical=data["canonical"],
+            display_name=data.get("display_name"),
+        )
+
+
+class LocationNormalizer:
+    """
+    Normalizes location names to canonical identifiers.
+    
+    This enables cross-document joins where locations are written differently:
+    - Shifts: "בת ים - עצמאיים - גיאפה"
+    - Actions: "בסט מדיקל -בת ים/מכון גסטרו בת ים"
+    
+    Both can be normalized to: "bat_yam_gastro"
+    
+    YAML Configuration:
+    ```yaml
+    preprocessing:
+      location_normalization:
+        source_columns:
+          - department
+          - _meta_location
+        output_column: _normalized_location
+        rules:
+          - patterns:
+              - "בת ים.*גסטרו"
+              - "גיאפה"
+            canonical: "bat_yam_gastro"
+            display_name: "בת ים - גסטרו"
+          - patterns:
+              - "חדרה"
+            canonical: "hadera"
+            display_name: "חדרה"
+    ```
+    """
+    
+    def __init__(self, rules: Optional[List[LocationRule]] = None):
+        """
+        Initialize with location rules.
+        
+        Args:
+            rules: List of LocationRule objects
+        """
+        self.rules = rules or []
+        self._compiled_rules: List[Tuple[List[re.Pattern], str, Optional[str]]] = []
+        self._compile_rules()
+    
+    def _compile_rules(self) -> None:
+        """Compile regex patterns for efficiency."""
+        self._compiled_rules = []
+        for rule in self.rules:
+            compiled_patterns = []
+            for pattern in rule.patterns:
+                try:
+                    compiled_patterns.append(re.compile(pattern, re.IGNORECASE))
+                except re.error as e:
+                    logger.warning(f"Invalid location pattern '{pattern}': {e}")
+            if compiled_patterns:
+                self._compiled_rules.append((compiled_patterns, rule.canonical, rule.display_name))
+    
+    def add_rule(self, rule: LocationRule) -> None:
+        """Add a new rule."""
+        self.rules.append(rule)
+        compiled_patterns = []
+        for pattern in rule.patterns:
+            try:
+                compiled_patterns.append(re.compile(pattern, re.IGNORECASE))
+            except re.error as e:
+                logger.warning(f"Invalid location pattern '{pattern}': {e}")
+        if compiled_patterns:
+            self._compiled_rules.append((compiled_patterns, rule.canonical, rule.display_name))
+    
+    def normalize(self, location: str) -> Optional[str]:
+        """
+        Normalize a location string to its canonical form.
+        
+        Args:
+            location: The location string to normalize
+            
+        Returns:
+            Canonical location ID if matched, None otherwise
+        """
+        if not location or pd.isna(location):
+            return None
+        
+        location_str = str(location)
+        
+        for compiled_patterns, canonical, _ in self._compiled_rules:
+            for pattern in compiled_patterns:
+                if pattern.search(location_str):
+                    return canonical
+        
+        return None
+    
+    def normalize_with_display(self, location: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Normalize a location and return both canonical ID and display name.
+        
+        Returns:
+            Tuple of (canonical_id, display_name) or (None, None)
+        """
+        if not location or pd.isna(location):
+            return None, None
+        
+        location_str = str(location)
+        
+        for compiled_patterns, canonical, display_name in self._compiled_rules:
+            for pattern in compiled_patterns:
+                if pattern.search(location_str):
+                    return canonical, display_name
+        
+        return None, None
+    
+    def apply_to_dataframe(
+        self,
+        df: pd.DataFrame,
+        source_columns: List[str],
+        output_column: str = "_normalized_location",
+        include_display: bool = False,
+    ) -> Tuple[pd.DataFrame, int]:
+        """
+        Apply location normalization to a DataFrame.
+        
+        Checks multiple source columns and uses the first match.
+        
+        Args:
+            df: Input DataFrame
+            source_columns: Columns to check for location (in order of priority)
+            output_column: Name of the new normalized column
+            include_display: If True, also add a display name column
+            
+        Returns:
+            Tuple of (modified DataFrame, rows affected)
+        """
+        rows_affected = 0
+        normalized_values = []
+        display_values = [] if include_display else None
+        
+        for _, row in df.iterrows():
+            normalized = None
+            display = None
+            
+            # Try each source column until we get a match
+            for col in source_columns:
+                if col in df.columns:
+                    value = row.get(col)
+                    if value and not pd.isna(value):
+                        normalized, display = self.normalize_with_display(value)
+                        if normalized:
+                            break
+            
+            normalized_values.append(normalized)
+            if include_display:
+                display_values.append(display)
+            
+            if normalized:
+                rows_affected += 1
+        
+        df[output_column] = normalized_values
+        if include_display:
+            df[f"{output_column}_display"] = display_values
+        
+        return df, rows_affected
 
 
 class ValueTransformer:
@@ -117,7 +298,15 @@ class ValueTransformer:
             "extract_pattern": self._transform_extract_pattern,
             "replace_pattern": self._transform_replace_pattern,
             "time_normalize": self._transform_time_normalize,
+            "normalize_location": self._transform_normalize_location,
         }
+        
+        # Location normalizer (set via set_location_normalizer)
+        self._location_normalizer: Optional[LocationNormalizer] = None
+    
+    def set_location_normalizer(self, normalizer: LocationNormalizer) -> None:
+        """Set the location normalizer for location transforms."""
+        self._location_normalizer = normalizer
     
     def set_context(self, key: str, value: Any) -> None:
         """Set a context value."""
@@ -450,6 +639,77 @@ class ValueTransformer:
         
         df[col] = df[col].apply(normalize_time)
         return df, rows_affected, [], [col]
+    
+    def _transform_normalize_location(
+        self,
+        df: pd.DataFrame,
+        config: TransformConfig,
+    ) -> Tuple[pd.DataFrame, int, List[str], List[str]]:
+        """
+        Normalize location values using configured rules.
+        
+        Options in config:
+        - output_column: Name for the normalized column (default: _normalized_location)
+        - include_display: Also add a display name column
+        - rules: Inline rules (alternative to using set_location_normalizer)
+        
+        Example YAML:
+        ```yaml
+        - source_column: department
+          transform_type: normalize_location
+          options:
+            output_column: _normalized_location
+            include_display: true
+            rules:
+              - patterns: ["בת ים.*גסטרו", "גיאפה"]
+                canonical: bat_yam_gastro
+                display_name: "בת ים - גסטרו"
+        ```
+        """
+        col = config.source_column
+        options = config.options or {}
+        output_column = options.get("output_column", "_normalized_location")
+        include_display = options.get("include_display", False)
+        inline_rules = options.get("rules", [])
+        
+        # Use inline rules if provided, otherwise use the pre-configured normalizer
+        if inline_rules:
+            normalizer = LocationNormalizer([
+                LocationRule.from_dict(r) for r in inline_rules
+            ])
+        elif self._location_normalizer:
+            normalizer = self._location_normalizer
+        else:
+            logger.warning("No location rules configured for normalize_location transform")
+            return df, 0, [], []
+        
+        rows_affected = 0
+        normalized_values = []
+        display_values = [] if include_display else None
+        
+        for value in df[col]:
+            if pd.isna(value):
+                normalized_values.append(None)
+                if include_display:
+                    display_values.append(None)
+                continue
+            
+            canonical, display = normalizer.normalize_with_display(str(value))
+            normalized_values.append(canonical)
+            if include_display:
+                display_values.append(display)
+            
+            if canonical:
+                rows_affected += 1
+        
+        df[output_column] = normalized_values
+        columns_added = [output_column]
+        
+        if include_display:
+            df[f"{output_column}_display"] = display_values
+            columns_added.append(f"{output_column}_display")
+        
+        return df, rows_affected, columns_added, []
 
 
 # Convenience function for common transformations

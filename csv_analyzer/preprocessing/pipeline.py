@@ -21,6 +21,8 @@ from csv_analyzer.preprocessing.transformers import (
     TransformConfig,
     TransformResult,
     ValueTransformer,
+    LocationNormalizer,
+    LocationRule,
 )
 from csv_analyzer.preprocessing.row_filter import (
     FilterConfig,
@@ -56,6 +58,12 @@ class PreprocessingConfig:
     inject_metadata_columns: bool = True  # Add extracted metadata as columns
     metadata_column_prefix: str = "_meta_"  # Prefix for metadata columns
     
+    # Location normalization options
+    normalize_locations: bool = True  # Apply location normalization
+    location_output_column: str = "_normalized_location"
+    location_include_display: bool = True
+    location_source_columns: Optional[List[str]] = None  # None = use defaults
+    
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "PreprocessingConfig":
         """Create from dictionary (from YAML preprocessing section)."""
@@ -77,6 +85,10 @@ class PreprocessingConfig:
             skip_empty_rows=data.get("skip_empty_rows", True),
             inject_metadata_columns=data.get("inject_metadata_columns", True),
             metadata_column_prefix=data.get("metadata_column_prefix", "_meta_"),
+            normalize_locations=data.get("normalize_locations", True),
+            location_output_column=data.get("location_output_column", "_normalized_location"),
+            location_include_display=data.get("location_include_display", True),
+            location_source_columns=data.get("location_source_columns"),
         )
     
     @classmethod
@@ -118,6 +130,7 @@ class ProcessedCSV:
     columns_added: List[str] = field(default_factory=list)
     columns_modified: List[str] = field(default_factory=list)
     metadata_columns_added: List[str] = field(default_factory=list)
+    location_columns_added: List[str] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization (without DataFrame)."""
@@ -130,6 +143,7 @@ class ProcessedCSV:
             "columns_added": self.columns_added,
             "columns_modified": self.columns_modified,
             "metadata_columns_added": self.metadata_columns_added,
+            "location_columns_added": self.location_columns_added,
             "transform_stats": {
                 "applied": self.transform_result.transformations_applied if self.transform_result else 0,
                 "rows_affected": self.transform_result.rows_affected if self.transform_result else 0,
@@ -180,6 +194,7 @@ class PreprocessingPipeline:
         self,
         openai_client=None,
         context: Optional[Dict[str, Any]] = None,
+        context_path: Optional[Union[str, Path]] = None,
     ):
         """
         Initialize the preprocessing pipeline.
@@ -187,13 +202,20 @@ class PreprocessingPipeline:
         Args:
             openai_client: Optional OpenAI client for AI-based structure detection
             context: Optional context dict (date_range, etc.)
+            context_path: Optional path to context YAML (for location normalization rules)
         """
         self.openai_client = openai_client
         self.context = context or {}
+        self.context_path = context_path
         
         self.structure_detector = StructureDetector(openai_client)
         self.value_transformer = ValueTransformer(context)
         self.row_filter = RowFilter()
+        
+        # Load location normalizer from context if provided
+        self.location_normalizer: Optional[LocationNormalizer] = None
+        if context_path:
+            self.location_normalizer = self.load_location_normalizer_from_context(context_path)
     
     def set_context(self, key: str, value: Any) -> None:
         """Set a context value for transformations."""
@@ -248,6 +270,114 @@ class PreprocessingPipeline:
         
         if columns_added:
             logger.info(f"Injected {len(columns_added)} metadata columns: {columns_added}")
+        
+        return df, columns_added
+    
+    def load_location_normalizer_from_context(
+        self,
+        context_path: Union[str, Path],
+    ) -> Optional[LocationNormalizer]:
+        """
+        Load location normalization rules from a context YAML file.
+        
+        Args:
+            context_path: Path to context YAML file (e.g., contexts/medical.yaml)
+            
+        Returns:
+            LocationNormalizer if rules found, None otherwise
+        """
+        path = Path(context_path)
+        
+        if not path.exists():
+            logger.warning(f"Context file not found: {context_path}")
+            return None
+        
+        with open(path, 'r', encoding='utf-8') as f:
+            context_data = yaml.safe_load(f)
+        
+        loc_config = context_data.get("location_normalization")
+        if not loc_config:
+            return None
+        
+        rules = [
+            LocationRule.from_dict(r)
+            for r in loc_config.get("rules", [])
+        ]
+        
+        if not rules:
+            return None
+        
+        normalizer = LocationNormalizer(rules)
+        logger.info(f"Loaded {len(rules)} location normalization rules from {context_path}")
+        
+        return normalizer
+    
+    def apply_location_normalization(
+        self,
+        df: pd.DataFrame,
+        context_path: Optional[Union[str, Path]] = None,
+        normalizer: Optional[LocationNormalizer] = None,
+        source_columns: Optional[List[str]] = None,
+        output_column: str = "_normalized_location",
+        include_display: bool = True,
+    ) -> tuple:
+        """
+        Apply location normalization to a DataFrame.
+        
+        Normalizes various location representations to canonical identifiers,
+        enabling cross-document joins.
+        
+        Args:
+            df: Input DataFrame
+            context_path: Path to context YAML with location rules
+            normalizer: Pre-configured LocationNormalizer (overrides context_path)
+            source_columns: Columns to check for location (in priority order)
+            output_column: Name for the normalized location column
+            include_display: Also add a display name column
+            
+        Returns:
+            Tuple of (modified DataFrame, list of columns added)
+        """
+        # Get or create normalizer
+        if normalizer is None and context_path:
+            normalizer = self.load_location_normalizer_from_context(context_path)
+        
+        if normalizer is None:
+            logger.debug("No location normalizer available, skipping")
+            return df, []
+        
+        # Default source columns
+        if source_columns is None:
+            source_columns = [
+                "_meta_location",
+                "department",
+                "מחלקה",
+                "location",
+                "branch",
+                "סניף",
+            ]
+        
+        # Filter to columns that exist
+        existing_cols = [c for c in source_columns if c in df.columns]
+        
+        if not existing_cols:
+            logger.debug(f"No source columns found for location normalization: {source_columns}")
+            return df, []
+        
+        logger.info(f"Applying location normalization using columns: {existing_cols}")
+        
+        df, rows_affected = normalizer.apply_to_dataframe(
+            df,
+            existing_cols,
+            output_column=output_column,
+            include_display=include_display,
+        )
+        
+        columns_added = [output_column]
+        if include_display:
+            columns_added.append(f"{output_column}_display")
+        
+        logger.info(f"Location normalization: {rows_affected}/{len(df)} rows matched")
         
         return df, columns_added
     
@@ -341,6 +471,18 @@ class PreprocessingPipeline:
                 prefix=config.metadata_column_prefix,
             )
         
+        # Stage 2.6: Location normalization
+        location_columns_added = []
+        if config.normalize_locations and self.location_normalizer:
+            logger.info("Stage 2.6: Applying location normalization...")
+            df, location_columns_added = self.apply_location_normalization(
+                df,
+                normalizer=self.location_normalizer,
+                source_columns=config.location_source_columns,
+                output_column=config.location_output_column,
+                include_display=config.location_include_display,
+            )
+        
         # Stage 3: Value transformations
         transform_result = None
         columns_added = []
@@ -392,6 +534,7 @@ class PreprocessingPipeline:
             columns_added=columns_added,
             columns_modified=columns_modified,
             metadata_columns_added=metadata_columns_added,
+            location_columns_added=location_columns_added,
         )
     
     def process_with_auto_transforms(
@@ -500,11 +643,20 @@ class PreprocessingPipeline:
         if extracted_metadata:
             df, metadata_columns_added = self.inject_metadata_columns(df, extracted_metadata)
         
+        # Apply location normalization if normalizer available
+        location_columns_added = []
+        if self.location_normalizer:
+            df, location_columns_added = self.apply_location_normalization(
+                df,
+                normalizer=self.location_normalizer,
+            )
+        
         # Apply transforms
         config = PreprocessingConfig(
             column_transforms=transforms,
             auto_detect_structure=False,  # Already done
             inject_metadata_columns=False,  # Already done above
+            normalize_locations=False,  # Already done above
         )
         
         # Process with existing DataFrame
@@ -513,6 +665,7 @@ class PreprocessingPipeline:
         result.structure = structure
         result.extracted_metadata = extracted_metadata
         result.metadata_columns_added = metadata_columns_added
+        result.location_columns_added = location_columns_added
         
         return result
     
@@ -525,6 +678,7 @@ class PreprocessingPipeline:
 def create_pipeline(
     openai_client=None,
     context: Optional[Dict[str, Any]] = None,
+    context_path: Optional[Union[str, Path]] = None,
 ) -> PreprocessingPipeline:
     """
     Create a preprocessing pipeline.
@@ -532,9 +686,10 @@ def create_pipeline(
     Args:
         openai_client: Optional OpenAI client for AI structure detection
         context: Optional context dict
+        context_path: Optional path to context YAML (for location rules)
         
     Returns:
         PreprocessingPipeline instance
     """
-    return PreprocessingPipeline(openai_client, context)
+    return PreprocessingPipeline(openai_client, context, context_path)
 

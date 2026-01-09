@@ -161,6 +161,80 @@ field_contexts:
       The room, clinic, department, or facility location.
     examples: [location, room, clinic, facility, site, place, venue]
 
+# Location normalization rules for cross-document joins
+# Maps various location representations to canonical identifiers
+location_normalization:
+  # Columns to check for location (in priority order)
+  source_columns:
+    - _meta_location
+    - department
+    - מחלקה
+    - location
+    - branch
+    - סניף
+  
+  # Output column name
+  output_column: _normalized_location
+  
+  # Include human-readable display name
+  include_display: true
+  
+  # Location mapping rules
+  rules:
+    # Bat Yam - Gastro
+    - patterns:
+        - "בת ים.*גסטרו"
+        - "גסטרו.*בת ים"
+        - "גיאפה"
+        - "עצמאיים.*גיאפה"
+      canonical: bat_yam_gastro
+      display_name: "בת ים - גסטרו"
+    
+    # Bat Yam - Eye Clinic
+    - patterns:
+        - "בת ים.*עיניים"
+        - "עיניים.*בת ים"
+        - "מכון עיניים.*בת ים"
+      canonical: bat_yam_eye
+      display_name: "בת ים - עיניים"
+    
+    # Hadera
+    - patterns:
+        - "חדרה"
+        - "hadera"
+      canonical: hadera
+      display_name: "חדרה"
+    
+    # Tel Aviv
+    - patterns:
+        - "תל אביב"
+        - "tel aviv"
+        - "ת\"א"
+      canonical: tel_aviv
+      display_name: "תל אביב"
+    
+    # Jerusalem
+    - patterns:
+        - "ירושלים"
+        - "jerusalem"
+      canonical: jerusalem
+      display_name: "ירושלים"
+    
+    # Haifa
+    - patterns:
+        - "חיפה"
+        - "haifa"
+      canonical: haifa
+      display_name: "חיפה"
+    
+    # Beer Sheva
+    - patterns:
+        - "באר שבע"
+        - "beer ?sheva"
+        - "ב\"ש"
+      canonical: beer_sheva
+      display_name: "באר שבע"
+
 # Domain-specific terminology for OpenAI prompts
 # Helps OpenAI understand medical jargon and abbreviations
 terminology:

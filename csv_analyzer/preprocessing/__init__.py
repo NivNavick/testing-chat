@@ -16,6 +16,8 @@ from csv_analyzer.preprocessing.structure_detector import (
 from csv_analyzer.preprocessing.transformers import (
     ValueTransformer,
     TransformResult,
+    LocationNormalizer,
+    LocationRule,
 )
 from csv_analyzer.preprocessing.row_filter import RowFilter
 from csv_analyzer.preprocessing.pipeline import (
@@ -29,6 +31,8 @@ __all__ = [
     "MetadataRow",
     "ValueTransformer",
     "TransformResult",
+    "LocationNormalizer",
+    "LocationRule",
     "RowFilter",
     "PreprocessingPipeline",
     "ProcessedCSV",
