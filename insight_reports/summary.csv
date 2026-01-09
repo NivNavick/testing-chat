@@ -1,0 +1,9 @@
+insight,name,description,rows,alerts
+early_arrival,Early Arrival Alert,Employees who arrived more than 30 minutes before first procedure,11,1
+coverage_gaps,Coverage Gaps,Days with procedures but no employee shift at that location,153,153
+late_procedures,Late Procedures,Procedures that occurred after employee shift ended,86,86
+procedures_by_location,Procedures by Location,Count of procedures per location,3,0
+busiest_hours,Busiest Hours,Procedure count by hour and location,45,0
+employee_utilization,Employee Utilization,Shift statistics per employee,1,0
+procedure_categories,Procedure Categories,Distribution of procedure types,16,0
+daily_summary,Daily Summary,Daily procedure and shift summary,167,0

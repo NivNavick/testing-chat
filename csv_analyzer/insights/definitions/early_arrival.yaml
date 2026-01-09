@@ -1,0 +1,79 @@
+name: early_arrival
+display_name: "Early Arrival Alert"
+description: "Detects when employees arrived more than 30 minutes before the first procedure at their location"
+version: "1.0"
+category: compliance
+
+# Required document types (auto-detected from input files)
+requires:
+  - employee_shifts
+  - medical_actions
+
+# Output columns for the CSV
+output_columns:
+  - employee
+  - emp_id
+  - shift_date
+  - shift_start
+  - first_procedure_time
+  - location
+  - minutes_early
+  - status
+
+# Alert threshold (minutes early that triggers alert)
+parameters:
+  - name: alert_threshold
+    type: integer
+    default: 30
+    description: "Minutes early threshold to trigger alert"
+
+sql: |
+  WITH shift_data AS (
+      SELECT 
+          _meta_employee_name as employee,
+          _meta_employee_id as emp_id,
+          "תאריך" as shift_date,
+          "כניסה" as shift_start,
+          "יציאה" as shift_end,
+          "הערה" as notes,
+          _normalized_location as location_id,
+          _normalized_location_display as location_name
+      FROM employee_shifts
+      WHERE "כניסה" IS NOT NULL AND "כניסה" != ''
+  ),
+  shift_with_formatted_date AS (
+      SELECT *,
+          SUBSTR(shift_date, 9, 2) || '/' || SUBSTR(shift_date, 6, 2) || '/' || SUBSTR(shift_date, 1, 4) as shift_date_formatted
+      FROM shift_data
+  ),
+  first_procedure AS (
+      SELECT 
+          "תאריך טיפול" as treatment_date,
+          _normalized_location as location_id,
+          MIN("שעות טיפול בפועל_start") as first_procedure_time
+      FROM medical_actions
+      WHERE "קטגורית טיפול" = 'גסטרו'
+      GROUP BY "תאריך טיפול", _normalized_location
+  )
+  SELECT 
+      s.employee,
+      s.emp_id,
+      s.shift_date,
+      s.shift_start,
+      p.first_procedure_time,
+      s.location_name as location,
+      (CAST(SUBSTR(p.first_procedure_time, 1, 2) AS INT) * 60 + CAST(SUBSTR(p.first_procedure_time, 4, 2) AS INT)) -
+      (CAST(SUBSTR(s.shift_start, 1, 2) AS INT) * 60 + CAST(SUBSTR(s.shift_start, 4, 2) AS INT)) as minutes_early,
+      CASE 
+          WHEN (CAST(SUBSTR(p.first_procedure_time, 1, 2) AS INT) * 60 + CAST(SUBSTR(p.first_procedure_time, 4, 2) AS INT)) -
+               (CAST(SUBSTR(s.shift_start, 1, 2) AS INT) * 60 + CAST(SUBSTR(s.shift_start, 4, 2) AS INT)) > 30
+          THEN 'ALERT'
+          ELSE 'OK'
+      END as status
+  FROM shift_with_formatted_date s
+  JOIN first_procedure p 
+      ON s.shift_date_formatted = p.treatment_date
+      AND s.location_id = p.location_id
+  WHERE s.notes = 'גסטרו'
+  ORDER BY s.shift_date
+
