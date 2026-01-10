@@ -348,6 +348,37 @@ def early_arrival_matcher(
             "minutes_early", "status", "evidence"
         ])
     
+    # Infer missing locations from employee's other shifts
+    # Build map: employee_id -> most common location
+    from collections import Counter
+    employee_locations = {}
+    for shift in shifts_data:
+        emp_id = shift.get("employee_id", "")
+        loc = shift.get("location")
+        if emp_id and loc and loc != "UNKNOWN" and str(loc).lower() not in ['nan', 'none', '']:
+            if emp_id not in employee_locations:
+                employee_locations[emp_id] = []
+            employee_locations[emp_id].append(loc)
+    
+    # Get most common location for each employee
+    employee_primary_location = {}
+    for emp_id, locs in employee_locations.items():
+        if locs:
+            most_common = Counter(locs).most_common(1)[0][0]
+            employee_primary_location[emp_id] = most_common
+            logger.info(f"Employee {emp_id} primary location: {most_common}")
+    
+    # Fill missing locations with inferred location
+    for shift in shifts_data:
+        loc = shift.get("location")
+        if not loc or loc == "UNKNOWN" or str(loc).lower() in ['nan', 'none', '']:
+            emp_id = shift.get("employee_id", "")
+            if emp_id in employee_primary_location:
+                inferred_loc = employee_primary_location[emp_id]
+                shift["location"] = inferred_loc
+                shift["location_inferred"] = True
+                logger.debug(f"Inferred location for employee {emp_id}: {inferred_loc}")
+    
     # Group shifts by date and location
     from collections import defaultdict
     shift_groups = defaultdict(list)
@@ -384,11 +415,16 @@ def early_arrival_matcher(
         )
         
         for arr in matched + unmatched:
+            # Mark location as inferred if it was
+            location_display = arr.get("location", "")
+            if arr.get("location_inferred"):
+                location_display = f"{location_display} (inferred)"
+            
             results.append({
                 "employee_name": arr.get("employee_name"),
                 "employee_id": arr.get("employee_id"),
                 "shift_date": arr.get("shift_date"),
-                "location": arr.get("location"),
+                "location": location_display,
                 "arrival_time": arr["arrival_time"].strftime("%H:%M"),
                 "matched_procedure_time": arr.get("matched_procedure_time"),
                 "matched_treatment": arr.get("matched_treatment"),
