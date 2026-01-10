@@ -103,6 +103,8 @@ def match_arrivals_to_procedures(
     
     for proc in procedures_sorted:
         proc_time = proc["procedure_time"]
+        proc_name = proc.get("treatment_name", "")
+        proc_category = proc.get("category", "")
         
         for i, arr in enumerate(arrivals_sorted):
             if i in matched_indices:
@@ -115,12 +117,20 @@ def match_arrivals_to_procedures(
                 matched_indices.add(i)
                 arr_copy = arr.copy()
                 arr_copy["matched_procedure_time"] = proc_time.strftime("%H:%M")
+                arr_copy["matched_treatment"] = proc_name
                 arr_copy["minutes_before_procedure"] = diff
                 arr_copy["status"] = "OK"
+                
+                # Build evidence with location and treatment
+                loc = arr.get('location')
+                location_str = f" at {loc}" if loc and loc != 'UNKNOWN' and loc != 'None' and str(loc).lower() != 'nan' else ""
+                treatment_str = f" Treatment: {proc_name}." if proc_name else ""
+                category_str = f" Category: {proc_category}." if proc_category else ""
+                
                 arr_copy["evidence"] = (
-                    f"Arrived at {arr_time.strftime('%H:%M')}, "
+                    f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
                     f"covered procedure at {proc_time.strftime('%H:%M')} "
-                    f"({diff} min before)"
+                    f"({diff} min before).{treatment_str}{category_str}"
                 )
                 matched_arrivals.append(arr_copy)
                 break
@@ -130,6 +140,8 @@ def match_arrivals_to_procedures(
         if i not in matched_indices:
             arr_copy = arr.copy()
             arr_time = arr["arrival_time"]
+            loc = arr.get('location')
+            location_str = f" at {loc}" if loc and loc != 'UNKNOWN' and loc != 'None' and str(loc).lower() != 'nan' else ""
             
             if procedures_sorted:
                 nearest_proc = min(
@@ -137,37 +149,45 @@ def match_arrivals_to_procedures(
                     key=lambda p: abs(time_diff_minutes(arr_time, p["procedure_time"]))
                 )
                 nearest_time = nearest_proc["procedure_time"]
+                nearest_name = nearest_proc.get("treatment_name", "")
+                nearest_category = nearest_proc.get("category", "")
                 gap = time_diff_minutes(arr_time, nearest_time)
+                
+                treatment_str = f" Nearest treatment: {nearest_name}." if nearest_name else ""
+                category_str = f" Category: {nearest_category}." if nearest_category else ""
                 
                 if gap > max_early_minutes:
                     minutes_early = gap - max_early_minutes
                     arr_copy["matched_procedure_time"] = nearest_time.strftime("%H:%M")
+                    arr_copy["matched_treatment"] = nearest_name
                     arr_copy["minutes_before_procedure"] = gap
                     arr_copy["minutes_early"] = minutes_early
                     arr_copy["status"] = "EARLY"
                     arr_copy["evidence"] = (
-                        f"Arrived at {arr_time.strftime('%H:%M')}, "
+                        f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
                         f"nearest procedure at {nearest_time.strftime('%H:%M')} "
                         f"({gap} min gap > {max_early_minutes} allowed). "
-                        f"Arrived {minutes_early} min early."
+                        f"Arrived {minutes_early} min early.{treatment_str}{category_str}"
                     )
                 else:
                     arr_copy["matched_procedure_time"] = nearest_time.strftime("%H:%M")
+                    arr_copy["matched_treatment"] = nearest_name
                     arr_copy["minutes_before_procedure"] = gap
                     arr_copy["minutes_early"] = 0
                     arr_copy["status"] = "EXCESS"
                     arr_copy["evidence"] = (
-                        f"Arrived at {arr_time.strftime('%H:%M')}, "
+                        f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
                         f"but all procedures already have assigned staff. "
-                        f"Nearest procedure at {nearest_time.strftime('%H:%M')}."
+                        f"Nearest procedure at {nearest_time.strftime('%H:%M')}.{treatment_str}{category_str}"
                     )
             else:
                 arr_copy["matched_procedure_time"] = None
+                arr_copy["matched_treatment"] = None
                 arr_copy["minutes_before_procedure"] = None
                 arr_copy["minutes_early"] = None
                 arr_copy["status"] = "NO_PROCEDURES"
                 arr_copy["evidence"] = (
-                    f"Arrived at {arr_time.strftime('%H:%M')}, "
+                    f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
                     f"but no procedures found for this date/location."
                 )
             
@@ -240,6 +260,7 @@ def early_arrival_matcher(
     proc_time_candidates = ['treatment_start_time', 'שעות טיפול בפועל_start', 'performed_datetime', 'start_time']
     proc_date_candidates = ['treatment_date', 'תאריך טיפול', 'תאריך', 'date']
     proc_cat_candidates = ['treatment_category', 'קטגורית טיפול', 'category', 'department']
+    proc_name_candidates = ['treatment_name', 'שם טיפול', 'procedure_name', 'name', 'description']
     
     def find_column(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
         """Find first matching column from candidates."""
@@ -265,8 +286,9 @@ def early_arrival_matcher(
     proc_time_col = find_column(procedures_df, proc_time_candidates)
     proc_date_col = find_column(procedures_df, proc_date_candidates)
     proc_cat_col = find_column(procedures_df, proc_cat_candidates)
+    proc_name_col = find_column(procedures_df, proc_name_candidates)
     
-    logger.info(f"Procedure columns found: time={proc_time_col}, date={proc_date_col}, cat={proc_cat_col}")
+    logger.info(f"Procedure columns found: time={proc_time_col}, date={proc_date_col}, cat={proc_cat_col}, name={proc_name_col}")
     
     if not proc_time_col:
         raise ValueError(f"Could not find time column in procedures. Available: {list(procedures_df.columns)}")
@@ -308,11 +330,13 @@ def early_arrival_matcher(
         normalized_date = normalize_date(date_val) if date_val else "unknown"
         
         category = str(row.get(proc_cat_col, "")) if proc_cat_col else ""
+        treatment_name = str(row.get(proc_name_col, "")) if proc_name_col else ""
         
         procedures_data.append({
             "procedure_date": normalized_date,
             "procedure_time": parsed_time,
             "category": category,
+            "treatment_name": treatment_name,
         })
     
     logger.info(f"Extracted {len(shifts_data)} shifts and {len(procedures_data)} procedures")
@@ -320,8 +344,8 @@ def early_arrival_matcher(
     if not shifts_data:
         return pd.DataFrame(columns=[
             "employee_name", "employee_id", "shift_date", "location",
-            "arrival_time", "matched_procedure_time", "minutes_early",
-            "status", "evidence"
+            "arrival_time", "matched_procedure_time", "matched_treatment",
+            "minutes_early", "status", "evidence"
         ])
     
     # Group shifts by date and location
@@ -352,10 +376,10 @@ def early_arrival_matcher(
         if not matching_procs and day_procs:
             matching_procs = day_procs
         
-        # Run matching
+        # Run matching - pass full procedure data including treatment name
         matched, unmatched = match_arrivals_to_procedures(
             arrivals,
-            [{"procedure_time": p["procedure_time"]} for p in matching_procs],
+            matching_procs,  # Pass full procedure data
             max_early_minutes
         )
         
@@ -367,6 +391,7 @@ def early_arrival_matcher(
                 "location": arr.get("location"),
                 "arrival_time": arr["arrival_time"].strftime("%H:%M"),
                 "matched_procedure_time": arr.get("matched_procedure_time"),
+                "matched_treatment": arr.get("matched_treatment"),
                 "minutes_early": arr.get("minutes_early", 0),
                 "status": arr.get("status"),
                 "evidence": arr.get("evidence"),
