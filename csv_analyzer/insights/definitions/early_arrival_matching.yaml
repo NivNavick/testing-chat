@@ -56,6 +56,10 @@ output_columns:
     description: "Time the employee arrived (shift start)"
   - name: matched_procedure_time
     description: "Time of the procedure this arrival was matched to (if any)"
+  - name: matched_treatment
+    description: "Name of the matched treatment/procedure"
+  - name: treating_staff
+    description: "Name of the staff member who performed the treatment"
   - name: minutes_early
     description: "Minutes arrived before allowed window (0 if OK)"
   - name: status
