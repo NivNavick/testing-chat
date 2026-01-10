@@ -27,19 +27,23 @@ parameters:
     default: 30
     description: "Minutes early threshold to trigger alert"
 
+# SQL uses canonical field names (after column mapping)
+# Column mappings: 
+#   employee_shifts: כניסה→shift_start, יציאה→shift_end, תאריך→(unmapped, kept as תאריך)
+#   medical_actions: שעות טיפול בפועל_start→treatment_start_time
 sql: |
   WITH shift_data AS (
       SELECT 
-          _meta_employee_name as employee,
-          _meta_employee_id as emp_id,
+          employee_name as employee,
+          employee_id as emp_id,
           "תאריך" as shift_date,
-          "כניסה" as shift_start,
-          "יציאה" as shift_end,
+          shift_start,
+          shift_end,
           "הערה" as notes,
           _normalized_location as location_id,
           _normalized_location_display as location_name
       FROM employee_shifts
-      WHERE "כניסה" IS NOT NULL AND "כניסה" != ''
+      WHERE shift_start IS NOT NULL AND shift_start != ''
   ),
   shift_with_formatted_date AS (
       SELECT *,
@@ -48,12 +52,12 @@ sql: |
   ),
   first_procedure AS (
       SELECT 
-          "תאריך טיפול" as treatment_date,
+          treatment_date,
           _normalized_location as location_id,
-          MIN("שעות טיפול בפועל_start") as first_procedure_time
+          MIN(treatment_start_time) as first_procedure_time
       FROM medical_actions
-      WHERE "קטגורית טיפול" = 'גסטרו'
-      GROUP BY "תאריך טיפול", _normalized_location
+      WHERE treatment_category = 'גסטרו'
+      GROUP BY treatment_date, _normalized_location
   )
   SELECT 
       s.employee,
@@ -76,4 +80,3 @@ sql: |
       AND s.location_id = p.location_id
   WHERE s.notes = 'גסטרו'
   ORDER BY s.shift_date
-
