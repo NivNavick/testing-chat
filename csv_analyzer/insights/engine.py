@@ -22,9 +22,11 @@ from csv_analyzer.insights.models import (
     DataStoreStatus,
     InsightDefinition,
     InsightResult,
+    InsightType,
     LoadedTable,
 )
 from csv_analyzer.insights.registry import InsightsRegistry
+from csv_analyzer.insights.code_insights import CodeInsightsRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -438,7 +440,7 @@ class InsightsEngine:
         parameters: Optional[Dict[str, Any]] = None,
     ) -> InsightResult:
         """
-        Execute an insight query.
+        Execute an insight query (SQL or Python code-based).
         
         Args:
             insight_name: Name of the insight to run
@@ -482,6 +484,19 @@ class InsightsEngine:
                 error=str(e),
             )
         
+        # Dispatch based on insight type
+        if insight.type == InsightType.CODE:
+            return self._run_code_insight(insight, validated_params, start_time)
+        else:
+            return self._run_sql_insight(insight, validated_params, start_time)
+    
+    def _run_sql_insight(
+        self,
+        insight: InsightDefinition,
+        validated_params: Dict[str, Any],
+        start_time: float,
+    ) -> InsightResult:
+        """Execute a SQL-based insight."""
         # Prepare SQL with parameter substitution
         sql = self._prepare_sql(insight.sql, validated_params)
         
@@ -491,7 +506,7 @@ class InsightsEngine:
             execution_time = (time.time() - start_time) * 1000
             
             return InsightResult(
-                insight_name=insight_name,
+                insight_name=insight.name,
                 success=True,
                 data=result_df,
                 row_count=len(result_df),
@@ -502,12 +517,50 @@ class InsightsEngine:
             
         except Exception as e:
             execution_time = (time.time() - start_time) * 1000
-            logger.error(f"Insight '{insight_name}' failed: {e}")
+            logger.error(f"SQL insight '{insight.name}' failed: {e}")
             return InsightResult(
-                insight_name=insight_name,
+                insight_name=insight.name,
                 success=False,
                 error=str(e),
                 executed_sql=sql,
+                parameters_used=validated_params,
+                execution_time_ms=execution_time,
+            )
+    
+    def _run_code_insight(
+        self,
+        insight: InsightDefinition,
+        validated_params: Dict[str, Any],
+        start_time: float,
+    ) -> InsightResult:
+        """Execute a Python code-based insight."""
+        try:
+            # Run the registered handler
+            result_df = CodeInsightsRegistry.run(
+                insight.handler,
+                self,
+                validated_params,
+            )
+            execution_time = (time.time() - start_time) * 1000
+            
+            return InsightResult(
+                insight_name=insight.name,
+                success=True,
+                data=result_df,
+                row_count=len(result_df),
+                executed_sql=None,  # Code insights don't have SQL
+                parameters_used=validated_params,
+                execution_time_ms=execution_time,
+            )
+            
+        except Exception as e:
+            execution_time = (time.time() - start_time) * 1000
+            logger.error(f"Code insight '{insight.name}' failed: {e}")
+            return InsightResult(
+                insight_name=insight.name,
+                success=False,
+                error=str(e),
+                executed_sql=None,
                 parameters_used=validated_params,
                 execution_time_ms=execution_time,
             )

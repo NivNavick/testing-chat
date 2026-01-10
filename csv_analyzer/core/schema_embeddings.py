@@ -247,6 +247,52 @@ class SchemaEmbeddingsService:
         
         return matches
     
+    def _build_alias_index(self, vertical: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Build an index of aliases to schema fields for exact matching.
+        
+        Returns:
+            Dict mapping lowercase alias -> list of {field_name, document_type, vertical, field_type, ...}
+        """
+        alias_index = {}
+        schemas = self.schema_registry.get_schemas_by_vertical(vertical) if vertical else []
+        
+        # If no vertical specified, get all schemas
+        if not schemas:
+            for v in ["medical"]:  # Add more verticals as needed
+                schemas.extend(self.schema_registry.get_schemas_by_vertical(v))
+        
+        for schema in schemas:
+            for field in schema.fields:
+                # Index by field name
+                field_name_lower = field.name.lower()
+                if field_name_lower not in alias_index:
+                    alias_index[field_name_lower] = []
+                alias_index[field_name_lower].append({
+                    "field_name": field.name,
+                    "document_type": schema.name,
+                    "vertical": schema.vertical,
+                    "field_type": field.type,
+                    "required": field.required,
+                    "description": field.description or "",
+                })
+                
+                # Index by aliases
+                for alias in (field.aliases or []):
+                    alias_lower = alias.lower().strip()
+                    if alias_lower not in alias_index:
+                        alias_index[alias_lower] = []
+                    alias_index[alias_lower].append({
+                        "field_name": field.name,
+                        "document_type": schema.name,
+                        "vertical": schema.vertical,
+                        "field_type": field.type,
+                        "required": field.required,
+                        "description": field.description or "",
+                    })
+        
+        return alias_index
+    
     def score_columns_against_schemas(
         self,
         columns: List[Dict[str, Any]],
@@ -254,6 +300,9 @@ class SchemaEmbeddingsService:
     ) -> Dict[str, Any]:
         """
         Score a list of columns against all schemas.
+        
+        IMPORTANT: First checks for EXACT alias matches (similarity=1.0),
+        then falls back to embeddings for non-matched columns.
         
         Args:
             columns: List of column profiles (from column_profiler)
@@ -276,6 +325,9 @@ class SchemaEmbeddingsService:
         from csv_analyzer.core.text_representation import column_to_embedding_text
         from csv_analyzer.core.type_compatibility import get_type_compatibility
         
+        # Build alias index for exact matching
+        alias_index = self._build_alias_index(vertical)
+        
         column_matches = {}
         column_embeddings = {}  # Cache embeddings for potential reuse
         doc_type_votes = {}  # doc_type -> list of adjusted similarities
@@ -285,7 +337,34 @@ class SchemaEmbeddingsService:
             col_type = col.get("detected_type", "unknown")
             col_text = column_to_embedding_text(col)
             
-            # Generate and cache embedding
+            enriched_matches = []
+            
+            # STEP 1: Check for exact alias match FIRST
+            col_name_lower = col_name.lower().strip()
+            if col_name_lower in alias_index:
+                alias_matches = alias_index[col_name_lower]
+                logger.debug(f"Exact alias match for '{col_name}': {[m['field_name'] for m in alias_matches]}")
+                
+                for match in alias_matches:
+                    target_type = match.get("field_type", "string")
+                    type_compat = get_type_compatibility(col_type, target_type)
+                    
+                    enriched_matches.append({
+                        "field_id": f"{match['vertical']}_{match['document_type']}_{match['field_name']}",
+                        "field_name": match["field_name"],
+                        "document_type": match["document_type"],
+                        "vertical": match["vertical"],
+                        "field_type": target_type,
+                        "required": match["required"],
+                        "description": match["description"],
+                        "source_type": col_type,
+                        "raw_similarity": 1.0,  # Exact match!
+                        "type_compatibility": round(type_compat, 3),
+                        "similarity": round(1.0 * type_compat, 4),  # Full similarity for exact match
+                        "match_source": "alias",  # Indicate this was an alias match
+                    })
+            
+            # STEP 2: Generate embedding and find additional matches
             prefixed = f"query: {col_text}"
             query_embedding = self.embeddings_client._model.encode(
                 prefixed,
@@ -294,64 +373,83 @@ class SchemaEmbeddingsService:
             )
             column_embeddings[col_name] = query_embedding
             
-            # Find matching fields using cached embedding
-            matches = self.find_matching_fields(
+            # Find matching fields using embedding
+            embedding_matches = self.find_matching_fields(
                 column_text=col_text,
                 vertical=vertical,
                 n_results=5,
                 query_embedding=query_embedding,
             )
             
-            # Enrich matches with source type and type-adjusted similarity
-            enriched_matches = []
-            for match in matches:
+            # Add embedding matches (but don't duplicate alias matches)
+            existing_field_ids = {m["field_id"] for m in enriched_matches}
+            
+            for match in embedding_matches:
+                if match["field_id"] in existing_field_ids:
+                    continue  # Skip - already have an alias match
+                    
                 target_type = match.get("field_type", "string")
-                
-                # Calculate type compatibility
                 type_compat = get_type_compatibility(col_type, target_type)
                 raw_similarity = match["similarity"]
-                
-                # Adjust similarity by type compatibility
                 adjusted_similarity = raw_similarity * type_compat
                 
-                enriched_match = {
+                enriched_matches.append({
                     **match,
                     "source_type": col_type,
                     "raw_similarity": raw_similarity,
                     "type_compatibility": round(type_compat, 3),
-                    "similarity": round(adjusted_similarity, 4),  # Replace with adjusted
-                }
-                enriched_matches.append(enriched_match)
+                    "similarity": round(adjusted_similarity, 4),
+                    "match_source": "embedding",
+                })
             
-            # Re-sort by adjusted similarity
+            # Sort by similarity (alias matches will be at top with 1.0)
             enriched_matches.sort(key=lambda x: x["similarity"], reverse=True)
             column_matches[col_name] = enriched_matches
             
             # Vote for document types based on adjusted similarities
+            # Track alias matches separately for better scoring
             for match in enriched_matches:
                 doc_type = match["document_type"]
                 similarity = match["similarity"]
+                match_source = match.get("match_source", "embedding")
                 
                 if doc_type not in doc_type_votes:
-                    doc_type_votes[doc_type] = []
-                doc_type_votes[doc_type].append(similarity)
+                    doc_type_votes[doc_type] = {"alias_cols": set(), "embedding_sims": []}
+                
+                if match_source == "alias":
+                    # Track unique columns with alias matches
+                    doc_type_votes[doc_type]["alias_cols"].add(col_name)
+                else:
+                    doc_type_votes[doc_type]["embedding_sims"].append(similarity)
         
         # Calculate document type scores
+        # Formula: alias_ratio * 0.7 + embedding_avg * 0.3
+        # Prioritizes document types with more alias-matched columns
         document_type_scores = {}
-        for doc_type, similarities in doc_type_votes.items():
+        total_cols = len(columns)
+        
+        for doc_type, votes in doc_type_votes.items():
             # Get schema to check required fields
             schema = self.schema_registry.get_schema(vertical or "medical", doc_type)
             required_count = len(schema.get_required_fields()) if schema else 0
             
-            # Score = average of top similarities (one per unique match)
-            # We take unique matches to avoid counting same doc_type multiple times
-            unique_sims = similarities[:len(columns)]  # Limit to column count
-            avg_score = sum(unique_sims) / len(unique_sims) if unique_sims else 0
+            alias_col_count = len(votes["alias_cols"])
+            embedding_sims = votes["embedding_sims"]
+            
+            # Alias match ratio (how many columns matched by alias / total columns)
+            alias_ratio = alias_col_count / total_cols if total_cols > 0 else 0
+            
+            # Average embedding similarity for non-alias matches
+            embedding_avg = sum(embedding_sims) / len(embedding_sims) if embedding_sims else 0.5
+            
+            # Combined score: heavily weight alias matches
+            # If many columns match aliases, that's a strong signal
+            score = (alias_ratio * 0.7) + (embedding_avg * 0.3)
             
             document_type_scores[doc_type] = {
-                "score": round(avg_score, 4),
-                "matched_columns": len(unique_sims),
-                "total_columns": len(columns),
+                "score": round(score, 4),
+                "alias_matched_columns": alias_col_count,
+                "total_columns": total_cols,
                 "required_fields": required_count,
             }
         

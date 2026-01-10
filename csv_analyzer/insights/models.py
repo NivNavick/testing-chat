@@ -21,6 +21,12 @@ class ParameterType(str, Enum):
     BOOLEAN = "boolean"
 
 
+class InsightType(str, Enum):
+    """Type of insight - SQL-based or Python code-based."""
+    SQL = "sql"
+    CODE = "code"
+
+
 @dataclass
 class InsightParameter:
     """Definition of a parameter for an insight query."""
@@ -70,15 +76,19 @@ class InsightDefinition:
         description: Human-readable description
         version: Version of this insight definition
         requires: List of document types (tables) required
-        sql: The SQL query to execute
+        type: Type of insight - SQL or CODE (Python handler)
+        sql: The SQL query to execute (required for SQL type)
+        handler: Python handler name (required for CODE type)
         parameters: Optional parameters for filtering
         category: Optional category for grouping insights
         tags: Optional tags for discovery
     """
     name: str
     description: str
-    sql: str
     requires: List[str]
+    type: InsightType = InsightType.SQL
+    sql: Optional[str] = None
+    handler: Optional[str] = None
     version: str = "1.0"
     parameters: List[InsightParameter] = field(default_factory=list)
     category: Optional[str] = None
@@ -98,12 +108,24 @@ class InsightDefinition:
                 description=param.get("description"),
             ))
         
+        # Parse insight type (default to SQL for backwards compatibility)
+        insight_type_str = data.get("type", "sql").lower()
+        insight_type = InsightType(insight_type_str)
+        
+        # Validate: SQL insights need sql field, CODE insights need handler field
+        if insight_type == InsightType.SQL and not data.get("sql"):
+            raise ValueError(f"SQL insight '{data.get('name')}' requires 'sql' field")
+        if insight_type == InsightType.CODE and not data.get("handler"):
+            raise ValueError(f"Code insight '{data.get('name')}' requires 'handler' field")
+        
         return cls(
             name=data["name"],
             description=data.get("description", ""),
             version=data.get("version", "1.0"),
             requires=data.get("requires", []),
-            sql=data["sql"],
+            type=insight_type,
+            sql=data.get("sql"),
+            handler=data.get("handler"),
             parameters=parameters,
             category=data.get("category"),
             tags=data.get("tags", []),

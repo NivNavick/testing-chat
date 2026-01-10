@@ -42,6 +42,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+class InsightParameter:
+    """Represents a parameter for an insight."""
+    def __init__(self, data: Dict[str, Any]):
+        self.name = data.get("name", "")
+        self.type = data.get("type", "string")
+        self.required = data.get("required", False)
+        self.default = data.get("default")
+        self.description = data.get("description", "")
+
+
 class InsightDefinition:
     """Represents an insight loaded from YAML."""
     
@@ -50,9 +60,15 @@ class InsightDefinition:
         self.display_name = data.get("display_name", self.name)
         self.description = data.get("description", "")
         self.requires = data.get("requires", [])
-        self.sql = data.get("sql", "")
+        self.type = data.get("type", "sql")  # 'sql' or 'code'
+        self.sql = data.get("sql")
+        self.handler = data.get("handler")  # For code insights
         self.output_columns = data.get("output_columns", [])
-        self.parameters = data.get("parameters", [])
+        # Parse parameters as InsightParameter objects
+        self.parameters = [
+            InsightParameter(p) if isinstance(p, dict) else p
+            for p in data.get("parameters", [])
+        ]
     
     @classmethod
     def load(cls, insight_name: str, definitions_dir: Optional[Path] = None) -> "InsightDefinition":
@@ -309,6 +325,8 @@ class InsightRunner:
         """
         Load CSV, preprocess, classify, and canonize to schema field names.
         
+        If multiple files have the same document type, they are MERGED (concatenated).
+        
         Returns:
             Detected document type name
         """
@@ -329,6 +347,15 @@ class InsightRunner:
         logger.info(f"Detected: {doc_type}")
         logger.info(f"Canonized {len(mappings)} columns to schema field names")
         
+        # Check if this document type already exists - MERGE if so
+        if doc_type in self.loaded_tables:
+            existing_df = self.loaded_tables[doc_type]
+            logger.info(f"  Merging with existing '{doc_type}' table ({len(existing_df)} rows)")
+            
+            # Concatenate, aligning columns (fill missing with NaN)
+            df_canonized = pd.concat([existing_df, df_canonized], ignore_index=True, sort=False)
+            logger.info(f"  After merge: {len(df_canonized)} rows")
+        
         # Register in DuckDB with canonical column names
         self.connection.register(doc_type, df_canonized)
         self.loaded_tables[doc_type] = df_canonized
@@ -348,7 +375,7 @@ class InsightRunner:
         return results
     
     def run_insight(self, insight: InsightDefinition) -> pd.DataFrame:
-        """Run an insight SQL query on canonized tables."""
+        """Run an insight (SQL or code-based) on canonized tables."""
         # Check required tables
         missing = [t for t in insight.requires if t not in self.loaded_tables]
         if missing:
@@ -358,7 +385,37 @@ class InsightRunner:
             )
         
         logger.info(f"Running insight: {insight.display_name}")
-        result = self.connection.execute(insight.sql).fetchdf()
+        
+        # Check if this is a code insight
+        if hasattr(insight, 'type') and insight.type == 'code':
+            # Run code insight handler
+            from csv_analyzer.insights.code_insights import CodeInsightsRegistry
+            
+            # Create a minimal engine-like interface for the handler
+            loaded_tables_copy = self.loaded_tables
+            
+            class DataStoreAdapter:
+                def list_tables(self):
+                    return list(loaded_tables_copy.keys())
+            
+            class EngineAdapter:
+                def __init__(self, connection):
+                    self.connection = connection
+                    self.data_store = DataStoreAdapter()
+                
+                def execute_sql(self, sql):
+                    return self.connection.execute(sql).fetchdf()
+            
+            adapter = EngineAdapter(self.connection)
+            params = {}
+            for param in insight.parameters:
+                params[param.name] = param.default
+            
+            result = CodeInsightsRegistry.run(insight.handler, adapter, params)
+        else:
+            # Run SQL insight
+            result = self.connection.execute(insight.sql).fetchdf()
+        
         logger.info(f"  Result: {len(result)} rows")
         
         return result
