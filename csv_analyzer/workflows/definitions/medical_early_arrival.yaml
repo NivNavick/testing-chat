@@ -1,0 +1,84 @@
+# Medical Early Arrival Workflow
+# 
+# Detects early arrivals by matching employee shifts to medical procedures.
+# 
+# Pipeline:
+#   upload → preprocess → classify → router → early_arrival → export_csv
+#
+# Usage:
+#   python -m csv_analyzer.run_workflow medical_early_arrival \
+#       --files shifts.csv actions.csv \
+#       --param max_early_minutes=30
+
+name: medical_early_arrival
+description: "Detect early arrivals by matching shifts to procedures"
+version: "1.0"
+
+# Global parameters (accessible by all blocks)
+parameters:
+  vertical: medical
+  output_dir: ./results
+  max_early_minutes: 30
+
+# S3 storage configuration
+storage:
+  type: s3
+  bucket: ""  # Set via S3_BUCKET env var or --bucket CLI arg
+
+blocks:
+  # Entry point block - upload files to S3
+  - id: upload
+    handler: upload_to_s3
+    parameters:
+      # 'files' passed at runtime via CLI: --files shifts.csv actions.csv
+      skip_upload: true  # Set to false for production (requires S3 bucket)
+
+  # Preprocessing block - transforms raw CSVs, adds _meta columns
+  - id: preprocess
+    handler: preprocess_csvs
+    inputs:
+      - name: files
+        source: upload.uploaded_files
+    parameters:
+      detect_time_ranges: true
+      detect_hebrew_dates: true
+      clean_time_prefixes: true
+
+  # Classification block - canonizes column names to schema fields
+  - id: classify
+    handler: classify_csvs
+    inputs:
+      - name: files
+        source: preprocess.processed_files
+    parameters:
+      vertical: "{{vertical}}"
+      threshold: 0.5
+
+  # Router block - routes data by document type
+  - id: router
+    handler: route_by_doc_type
+    inputs:
+      - name: classified_data
+        source: classify.classified_data
+
+  # Early arrival insight block
+  - id: early_arrival
+    handler: early_arrival_matcher
+    inputs:
+      - name: data
+        source: classify.classified_data  # Takes full classified data
+    parameters:
+      max_early_minutes: "{{max_early_minutes}}"
+
+  # CSV Export block - exports only EARLY arrivals to CSV
+  - id: export
+    handler: export_csv
+    inputs:
+      - name: result
+        source: early_arrival.result
+    parameters:
+      filename: "early_arrival_report.csv"
+      include_source_column: false
+      filter_column: "status"
+      filter_value: "EARLY"
+

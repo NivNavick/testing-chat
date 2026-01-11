@@ -1,0 +1,18 @@
+{
+  "upload": {
+    "uploaded_files": "/Users/nivnavick/Documents/git/testing-chat/test_results/f883abac/upload/uploaded_files.json"
+  },
+  "preprocess": {
+    "processed_files": "/Users/nivnavick/Documents/git/testing-chat/test_results/f883abac/preprocess/processed_files.json"
+  },
+  "classify": {
+    "classified_data": "/Users/nivnavick/Documents/git/testing-chat/test_results/f883abac/classify/classified_data_manifest.json"
+  },
+  "router": {
+    "employee_shifts": "/Users/nivnavick/Documents/git/testing-chat/test_results/f883abac/router/employee_shifts.json",
+    "medical_actions": "/Users/nivnavick/Documents/git/testing-chat/test_results/f883abac/router/medical_actions.json"
+  },
+  "early_arrival": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/test_results/f883abac/early_arrival/result.json"
+  }
+}
