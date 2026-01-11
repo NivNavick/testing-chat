@@ -545,17 +545,10 @@ Examples:
         # Run insight
         result = runner.run_insight(insight)
         
-        # Save output with timestamp
-        import datetime
+        # Save output
         output_path = Path(args.output)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Add timestamp to filename
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"{output_path.stem}_{timestamp}{output_path.suffix}"
-        final_output_path = output_path.parent / output_filename
-        
-        result.to_csv(final_output_path, index=False, encoding="utf-8-sig")
+        result.to_csv(output_path, index=False, encoding="utf-8-sig")
         
         print()
         print("=" * 60)
@@ -563,7 +556,7 @@ Examples:
         print("=" * 60)
         print(result.to_string())
         print()
-        print(f"Saved to: {final_output_path}")
+        print(f"Saved to: {output_path}")
         print(f"Rows: {len(result)}")
         
         if "status" in result.columns:
