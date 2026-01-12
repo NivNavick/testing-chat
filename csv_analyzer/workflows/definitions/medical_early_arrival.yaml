@@ -71,11 +71,16 @@ blocks:
       max_early_minutes: "{{max_early_minutes}}"
 
   # CSV Export block - exports only EARLY arrivals to CSV
+  # Uses 'sources' list to accept multiple inputs into a single field
   - id: export
     handler: export_csv
     inputs:
-      - name: result
-        source: early_arrival.result
+      - name: data
+        sources:  # List of sources - all combined into CSV
+          - early_arrival.result
+          # Uncomment to include more data:
+          # - router.employee_shifts
+          # - router.medical_actions
     parameters:
       filename: "early_arrival_report.csv"
       include_source_column: false

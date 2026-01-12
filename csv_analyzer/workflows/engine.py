@@ -132,16 +132,21 @@ class WorkflowEngine:
             deps = set()
             
             for input_spec in block.inputs:
-                source = input_spec.get("source", "")
-                if source:
-                    # Parse source: "block_id.output_name" or "block_id.output_name.field"
-                    parts = source.split(".")
-                    if len(parts) >= 2:
-                        source_block_id = parts[0]
-                        deps.add(source_block_id)
-                        
-                        # Validate ontology
-                        self._validate_connection(source_block_id, parts[1], block.id, input_spec["name"])
+                # Support both single "source" and multiple "sources"
+                sources = input_spec.get("sources", [])
+                if input_spec.get("source"):
+                    sources.append(input_spec["source"])
+                
+                for source in sources:
+                    if source:
+                        # Parse source: "block_id.output_name" or "block_id.output_name.field"
+                        parts = source.split(".")
+                        if len(parts) >= 2:
+                            source_block_id = parts[0]
+                            deps.add(source_block_id)
+                            
+                            # Validate ontology
+                            self._validate_connection(source_block_id, parts[1], block.id, input_spec["name"])
             
             self._dag[block.id] = deps
         
@@ -360,34 +365,53 @@ class WorkflowEngine:
         self,
         block: WorkflowBlock,
         results: Dict[str, Dict[str, str]],
-    ) -> Dict[str, str]:
-        """Gather inputs for a block from previous results."""
+    ) -> Dict[str, Any]:
+        """
+        Gather inputs for a block from previous results.
+        
+        Supports:
+        - Single source: inputs[name] = uri
+        - Multiple sources: inputs[name] = [uri1, uri2, ...] (list)
+        """
         inputs = {}
         
         for input_spec in block.inputs:
             input_name = input_spec["name"]
-            source = input_spec.get("source", "")
             
-            if not source:
+            # Support both single "source" and multiple "sources"
+            sources = list(input_spec.get("sources", []))
+            if input_spec.get("source"):
+                sources.append(input_spec["source"])
+            
+            if not sources:
                 continue
             
-            # Parse source: "block_id.output_name" or "block_id.output_name.field"
-            parts = source.split(".")
-            if len(parts) >= 2:
-                source_block_id = parts[0]
-                source_output = parts[1]
-                
-                if source_block_id not in results:
-                    raise ValueError(f"Source block not executed: {source_block_id}")
-                
-                block_results = results[source_block_id]
-                if source_output not in block_results:
-                    raise ValueError(
-                        f"Output '{source_output}' not found in block '{source_block_id}'. "
-                        f"Available: {list(block_results.keys())}"
-                    )
-                
-                inputs[input_name] = block_results[source_output]
+            # Collect URIs from all sources
+            uris = []
+            for source in sources:
+                # Parse source: "block_id.output_name"
+                parts = source.split(".")
+                if len(parts) >= 2:
+                    source_block_id = parts[0]
+                    source_output = parts[1]
+                    
+                    if source_block_id not in results:
+                        raise ValueError(f"Source block not executed: {source_block_id}")
+                    
+                    block_results = results[source_block_id]
+                    if source_output not in block_results:
+                        raise ValueError(
+                            f"Output '{source_output}' not found in block '{source_block_id}'. "
+                            f"Available: {list(block_results.keys())}"
+                        )
+                    
+                    uris.append(block_results[source_output])
+            
+            # Single source → single URI; multiple sources → list of URIs
+            if len(uris) == 1:
+                inputs[input_name] = uris[0]
+            else:
+                inputs[input_name] = uris
         
         return inputs
     

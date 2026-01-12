@@ -52,50 +52,57 @@ class CSVExportBlock(BaseBlock):
         dataframes = []
         metadata = {}
         
-        for input_name, input_uri in self.ctx.inputs.items():
-            self.logger.info(f"  Loading input: {input_name}")
+        for input_name, input_value in self.ctx.inputs.items():
+            # Handle both single URI and list of URIs
+            if isinstance(input_value, list):
+                uris = input_value
+                self.logger.info(f"  Loading input: {input_name} ({len(uris)} sources)")
+            else:
+                uris = [input_value]
+                self.logger.info(f"  Loading input: {input_name}")
             
-            try:
-                data = self._load_input_data(input_uri)
-                
-                if isinstance(data, pd.DataFrame):
-                    # Add source column to identify origin
-                    df = data.copy()
-                    df["_source"] = input_name
-                    dataframes.append(df)
-                    self.logger.info(f"    → DataFrame with {len(df)} rows, {len(df.columns)} columns")
+            for uri in uris:
+                try:
+                    data = self._load_input_data(uri)
                     
-                elif isinstance(data, list):
-                    if data and isinstance(data[0], dict):
-                        # List of dicts → DataFrame
-                        df = pd.DataFrame(data)
+                    if isinstance(data, pd.DataFrame):
+                        # Add source column to identify origin
+                        df = data.copy()
                         df["_source"] = input_name
                         dataframes.append(df)
-                        self.logger.info(f"    → List of {len(data)} records → DataFrame")
-                    else:
-                        # List of values → single column
-                        df = pd.DataFrame({input_name: data})
-                        dataframes.append(df)
-                        self.logger.info(f"    → List of {len(data)} values → column '{input_name}'")
+                        self.logger.info(f"    → DataFrame with {len(df)} rows, {len(df.columns)} columns")
                         
-                elif isinstance(data, dict):
-                    # Dict → metadata or single row
-                    if all(isinstance(v, (str, int, float, bool, type(None))) for v in data.values()):
-                        # Simple dict → metadata row
-                        metadata.update(data)
-                        self.logger.info(f"    → Dict with {len(data)} fields → metadata")
+                    elif isinstance(data, list):
+                        if data and isinstance(data[0], dict):
+                            # List of dicts → DataFrame
+                            df = pd.DataFrame(data)
+                            df["_source"] = input_name
+                            dataframes.append(df)
+                            self.logger.info(f"    → List of {len(data)} records → DataFrame")
+                        else:
+                            # List of values → single column
+                            df = pd.DataFrame({input_name: data})
+                            dataframes.append(df)
+                            self.logger.info(f"    → List of {len(data)} values → column '{input_name}'")
+                            
+                    elif isinstance(data, dict):
+                        # Dict → metadata or single row
+                        if all(isinstance(v, (str, int, float, bool, type(None))) for v in data.values()):
+                            # Simple dict → metadata row
+                            metadata.update(data)
+                            self.logger.info(f"    → Dict with {len(data)} fields → metadata")
+                        else:
+                            # Complex dict (might have lists/nested) → try DataFrame
+                            df = pd.DataFrame([data])
+                            df["_source"] = input_name
+                            dataframes.append(df)
+                            self.logger.info(f"    → Dict → single row DataFrame")
                     else:
-                        # Complex dict (might have lists/nested) → try DataFrame
-                        df = pd.DataFrame([data])
-                        df["_source"] = input_name
-                        dataframes.append(df)
-                        self.logger.info(f"    → Dict → single row DataFrame")
-                else:
-                    self.logger.warning(f"    → Unknown type {type(data)}, skipping")
-                    
-            except Exception as e:
-                self.logger.error(f"    → Error loading {input_name}: {e}")
-                continue
+                        self.logger.warning(f"    → Unknown type {type(data)}, skipping")
+                        
+                except Exception as e:
+                    self.logger.error(f"    → Error loading {uri}: {e}")
+                    continue
         
         # Combine all DataFrames
         if not dataframes:
