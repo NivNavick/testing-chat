@@ -194,6 +194,40 @@ class BaseBlock(ABC):
         self.logger.info(f"Loading input '{name}' from {s3_uri}")
         return self.load_from_s3(s3_uri)
     
+    def get_correlated_data(self) -> pd.DataFrame:
+        """
+        Get correlated data from field-level inputs.
+        
+        When using field-level input syntax:
+            inputs:
+              - field: status
+                source: early_arrival.status
+              - field: name
+                source: early_arrival.name
+        
+        The engine automatically correlates rows and provides
+        them as a DataFrame via this method.
+        
+        Returns:
+            DataFrame with correlated rows, or empty DataFrame if no field inputs
+        """
+        correlated = self.ctx.inputs.get("_correlated_data")
+        
+        if correlated is None:
+            return pd.DataFrame()
+        
+        if isinstance(correlated, pd.DataFrame):
+            return correlated
+        
+        if isinstance(correlated, list):
+            return pd.DataFrame(correlated)
+        
+        return pd.DataFrame()
+    
+    def has_correlated_data(self) -> bool:
+        """Check if correlated field data is available."""
+        return "_correlated_data" in self.ctx.inputs
+    
     def load_classified_data(self, input_name: str = "data") -> Dict[str, pd.DataFrame]:
         """
         Load CLASSIFIED_DATA input (manifest + individual DataFrames).

@@ -38,6 +38,12 @@ class CSVExportBlock(BaseBlock):
         """
         Combine all inputs into a CSV file.
         
+        Supports two input modes:
+        1. Field-level correlation: inputs use 'field' + 'source' syntax
+           → get_correlated_data() returns pre-correlated DataFrame
+        2. Legacy mode: inputs use 'name' + 'source' syntax
+           → Load URIs and combine DataFrames
+        
         Returns:
             Dict with 'csv_path' pointing to the generated file
         """
@@ -46,63 +52,73 @@ class CSVExportBlock(BaseBlock):
         output_dir = self.get_param("output_dir", None)
         include_index = self.get_param("include_index", False)
         
-        # Collect all input data
-        self.logger.info(f"Collecting {len(self.ctx.inputs)} inputs for CSV export...")
-        
         dataframes = []
         metadata = {}
         
-        for input_name, input_value in self.ctx.inputs.items():
-            # Handle both single URI and list of URIs
-            if isinstance(input_value, list):
-                uris = input_value
-                self.logger.info(f"  Loading input: {input_name} ({len(uris)} sources)")
-            else:
-                uris = [input_value]
-                self.logger.info(f"  Loading input: {input_name}")
+        # Mode 1: Check for correlated field data (new correlation engine)
+        if self.has_correlated_data():
+            correlated_df = self.get_correlated_data()
+            if not correlated_df.empty:
+                self.logger.info(f"Using correlated field data: {len(correlated_df)} rows, {list(correlated_df.columns)}")
+                dataframes.append(correlated_df)
+        
+        # Mode 2: Legacy mode - load from URIs
+        legacy_inputs = {k: v for k, v in self.ctx.inputs.items() if not k.startswith("_")}
+        
+        if legacy_inputs:
+            self.logger.info(f"Collecting {len(legacy_inputs)} inputs for CSV export...")
             
-            for uri in uris:
-                try:
-                    data = self._load_input_data(uri)
-                    
-                    if isinstance(data, pd.DataFrame):
-                        # Add source column to identify origin
-                        df = data.copy()
-                        df["_source"] = input_name
-                        dataframes.append(df)
-                        self.logger.info(f"    → DataFrame with {len(df)} rows, {len(df.columns)} columns")
+            for input_name, input_value in legacy_inputs.items():
+                # Handle both single URI and list of URIs
+                if isinstance(input_value, list):
+                    uris = input_value
+                    self.logger.info(f"  Loading input: {input_name} ({len(uris)} sources)")
+                else:
+                    uris = [input_value]
+                    self.logger.info(f"  Loading input: {input_name}")
+                
+                for uri in uris:
+                    try:
+                        data = self._load_input_data(uri)
                         
-                    elif isinstance(data, list):
-                        if data and isinstance(data[0], dict):
-                            # List of dicts → DataFrame
-                            df = pd.DataFrame(data)
+                        if isinstance(data, pd.DataFrame):
+                            # Add source column to identify origin
+                            df = data.copy()
                             df["_source"] = input_name
                             dataframes.append(df)
-                            self.logger.info(f"    → List of {len(data)} records → DataFrame")
-                        else:
-                            # List of values → single column
-                            df = pd.DataFrame({input_name: data})
-                            dataframes.append(df)
-                            self.logger.info(f"    → List of {len(data)} values → column '{input_name}'")
+                            self.logger.info(f"    → DataFrame with {len(df)} rows, {len(df.columns)} columns")
                             
-                    elif isinstance(data, dict):
-                        # Dict → metadata or single row
-                        if all(isinstance(v, (str, int, float, bool, type(None))) for v in data.values()):
-                            # Simple dict → metadata row
-                            metadata.update(data)
-                            self.logger.info(f"    → Dict with {len(data)} fields → metadata")
+                        elif isinstance(data, list):
+                            if data and isinstance(data[0], dict):
+                                # List of dicts → DataFrame
+                                df = pd.DataFrame(data)
+                                df["_source"] = input_name
+                                dataframes.append(df)
+                                self.logger.info(f"    → List of {len(data)} records → DataFrame")
+                            else:
+                                # List of values → single column
+                                df = pd.DataFrame({input_name: data})
+                                dataframes.append(df)
+                                self.logger.info(f"    → List of {len(data)} values → column '{input_name}'")
+                                
+                        elif isinstance(data, dict):
+                            # Dict → metadata or single row
+                            if all(isinstance(v, (str, int, float, bool, type(None))) for v in data.values()):
+                                # Simple dict → metadata row
+                                metadata.update(data)
+                                self.logger.info(f"    → Dict with {len(data)} fields → metadata")
+                            else:
+                                # Complex dict (might have lists/nested) → try DataFrame
+                                df = pd.DataFrame([data])
+                                df["_source"] = input_name
+                                dataframes.append(df)
+                                self.logger.info(f"    → Dict → single row DataFrame")
                         else:
-                            # Complex dict (might have lists/nested) → try DataFrame
-                            df = pd.DataFrame([data])
-                            df["_source"] = input_name
-                            dataframes.append(df)
-                            self.logger.info(f"    → Dict → single row DataFrame")
-                    else:
-                        self.logger.warning(f"    → Unknown type {type(data)}, skipping")
-                        
-                except Exception as e:
-                    self.logger.error(f"    → Error loading {uri}: {e}")
-                    continue
+                            self.logger.warning(f"    → Unknown type {type(data)}, skipping")
+                            
+                    except Exception as e:
+                        self.logger.error(f"    → Error loading {uri}: {e}")
+                        continue
         
         # Combine all DataFrames
         if not dataframes:
@@ -122,6 +138,8 @@ class CSVExportBlock(BaseBlock):
         if not self.get_param("include_source_column", True):
             if "_source" in combined_df.columns:
                 combined_df = combined_df.drop(columns=["_source"])
+            if "_source_block" in combined_df.columns:
+                combined_df = combined_df.drop(columns=["_source_block"])
         
         # Apply filter if specified
         filter_column = self.get_param("filter_column", None)
@@ -136,8 +154,8 @@ class CSVExportBlock(BaseBlock):
         # Determine output path
         if output_dir:
             output_path = Path(output_dir) / output_filename
-        elif self.ctx.local_output_dir:
-            output_path = self.ctx.local_output_dir / self.ctx.workflow_run_id / self.ctx.block_id / output_filename
+        elif self.ctx.local_storage_path:
+            output_path = Path(self.ctx.local_storage_path) / self.ctx.workflow_run_id / self.ctx.block_id / output_filename
         else:
             output_path = Path(".") / output_filename
         
