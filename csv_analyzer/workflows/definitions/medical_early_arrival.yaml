@@ -101,6 +101,4 @@ blocks:
     parameters:
       filename: "early_arrival_report.csv"
       output_dir: ./results
-      filter_column: "status"
-      filter_value: "EARLY"
 
