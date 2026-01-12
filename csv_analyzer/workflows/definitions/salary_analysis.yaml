@@ -1,0 +1,106 @@
+# Salary Analysis Workflow
+# 
+# Analyzes employee monthly salary data to identify most expensive employees.
+# 
+# Pipeline:
+#   upload → preprocess → classify → expensive_employees → export_csv
+#
+# Usage:
+#   python -m csv_analyzer.run_workflow salary_analysis \
+#       --files "monthly_salary.csv" \
+#       --param top_n=10
+#
+# Input:
+#   - Employee monthly salary CSV with columns:
+#     - תפקיד (position), שם עובד (name), תג בשכר (payroll tag)
+#     - תעריף (rate - can be dual like 73/82)
+#     - Monthly columns (1.25, 2.25, ... for Jan 2025, Feb 2025, etc.)
+
+name: salary_analysis
+description: "Analyze employee salary data and identify most expensive employees"
+version: "1.0"
+
+# Global parameters
+parameters:
+  vertical: medical
+  output_dir: ./results
+  top_n: 10
+  include_all: true
+  group_by_position: true
+
+# Storage configuration
+storage:
+  type: s3
+  bucket: ""  # Set via S3_BUCKET env var or --bucket CLI arg
+
+blocks:
+  # Entry point - upload files
+  - id: upload
+    handler: upload_to_s3
+    parameters:
+      skip_upload: true  # Local mode - skip S3 upload
+
+  # Preprocessing - apply transforms (split_delimiter for dual rates)
+  - id: preprocess
+    handler: preprocess_csvs
+    inputs:
+      - name: files
+        source: upload.uploaded_files
+    parameters:
+      detect_time_ranges: false
+      detect_hebrew_dates: false
+      clean_time_prefixes: false
+
+  # Classification - identify as employee_monthly_salary and canonize columns
+  - id: classify
+    handler: classify_csvs
+    inputs:
+      - name: files
+        source: preprocess.processed_files
+    parameters:
+      vertical: "{{vertical}}"
+      threshold: 0.5
+
+  # Expensive employees analysis
+  - id: analyze_costs
+    handler: expensive_employees
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      top_n: "{{top_n}}"
+      include_all: "{{include_all}}"
+      group_by_position: "{{group_by_position}}"
+
+  # Export employee cost rankings to CSV
+  - id: export_rankings
+    handler: export_csv
+    inputs:
+      - field: cost_rank
+        source: analyze_costs.result.cost_rank
+      - field: employee_name
+        source: analyze_costs.result.employee_name
+      - field: position
+        source: analyze_costs.result.position
+      - field: city
+        source: analyze_costs.result.city
+      - field: total_salary
+        source: analyze_costs.result.total_salary
+      - field: avg_monthly_salary
+        source: analyze_costs.result.avg_monthly_salary
+      - field: months_active
+        source: analyze_costs.result.months_active
+      - field: rate_primary
+        source: analyze_costs.result.rate_primary
+      - field: rate_secondary
+        source: analyze_costs.result.rate_secondary
+      - field: has_dual_rate
+        source: analyze_costs.result.has_dual_rate
+      - field: cost_percentile
+        source: analyze_costs.result.cost_percentile
+    parameters:
+      filename: "expensive_employees_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+

@@ -292,9 +292,11 @@ class ValueTransformer:
         # Register transform handlers
         self._handlers: Dict[str, Callable] = {
             "split_range": self._transform_split_range,
+            "split_delimiter": self._transform_split_delimiter,
             "hebrew_date_normalize": self._transform_hebrew_date,
             "clean_prefix": self._transform_clean_prefix,
             "clean_suffix": self._transform_clean_suffix,
+            "clean_number": self._transform_clean_number,
             "extract_pattern": self._transform_extract_pattern,
             "replace_pattern": self._transform_replace_pattern,
             "time_normalize": self._transform_time_normalize,
@@ -373,6 +375,128 @@ class ValueTransformer:
             errors=errors,
         )
     
+    def _transform_split_delimiter(
+        self,
+        df: pd.DataFrame,
+        config: TransformConfig,
+    ) -> Tuple[pd.DataFrame, int, List[str], List[str]]:
+        """
+        Split a column by delimiter into multiple columns.
+        
+        Handles optional second values (e.g., "73" stays as primary only,
+        "73/82" becomes primary=73, secondary=82).
+        
+        Example: "73/82" → rate_primary="73", rate_secondary="82"
+        Example: "73" → rate_primary="73", rate_secondary=None
+        
+        YAML config:
+        ```yaml
+        - source_column: "תעריף"
+          transform_type: split_delimiter
+          pattern: "^(\\d+)(?:/(\\d+))?$"
+          output_columns:
+            - name: rate_primary
+              group: 1
+            - name: rate_secondary
+              group: 2
+        ```
+        """
+        col = config.source_column
+        # Default pattern handles "/" delimiter with optional second value
+        pattern = config.pattern or r'^(\d+)(?:/(\d+))?$'
+        output_cols = config.output_columns or []
+        
+        if not output_cols:
+            # Default output columns
+            output_cols = [
+                {"name": f"{col}_primary", "group": 1},
+                {"name": f"{col}_secondary", "group": 2},
+            ]
+        
+        regex = re.compile(pattern)
+        new_columns = {}
+        rows_affected = 0
+        
+        # Initialize new columns
+        for out_col in output_cols:
+            new_columns[out_col["name"]] = [None] * len(df)
+        
+        # Process each row
+        for idx, value in enumerate(df[col]):
+            if pd.isna(value):
+                continue
+            
+            str_value = str(value).strip()
+            match = regex.match(str_value)
+            
+            if match:
+                rows_affected += 1
+                for out_col in output_cols:
+                    group_num = out_col.get("group", 1)
+                    try:
+                        extracted = match.group(group_num)
+                        if extracted is not None:
+                            # Try to convert to number if possible
+                            try:
+                                extracted = float(extracted) if '.' in extracted else int(extracted)
+                            except (ValueError, TypeError):
+                                extracted = extracted.strip()
+                        new_columns[out_col["name"]][idx] = extracted
+                    except IndexError:
+                        pass
+        
+        # Add new columns to DataFrame
+        columns_added = []
+        for col_name, values in new_columns.items():
+            df[col_name] = values
+            columns_added.append(col_name)
+        
+        return df, rows_affected, columns_added, []
+    
+    def _transform_clean_number(
+        self,
+        df: pd.DataFrame,
+        config: TransformConfig,
+    ) -> Tuple[pd.DataFrame, int, List[str], List[str]]:
+        """
+        Clean numeric values by removing formatting characters.
+        
+        Example: "8,419" → "8419"
+        Example: "1,234.56" → "1234.56"
+        
+        YAML config:
+        ```yaml
+        - source_column: "amount"
+          transform_type: clean_number
+          pattern: ","
+          replacement: ""
+        ```
+        """
+        col = config.source_column
+        pattern = config.pattern or r','
+        replacement = config.replacement or ""
+        
+        regex = re.compile(pattern)
+        rows_affected = 0
+        
+        def clean_value(value):
+            nonlocal rows_affected
+            if pd.isna(value):
+                return value
+            str_val = str(value)
+            if regex.search(str_val):
+                rows_affected += 1
+                cleaned = regex.sub(replacement, str_val)
+                # Try to convert to numeric
+                try:
+                    return float(cleaned) if '.' in cleaned else int(cleaned)
+                except (ValueError, TypeError):
+                    return cleaned
+            return value
+        
+        df[col] = df[col].apply(clean_value)
+        return df, rows_affected, [], [col]
+
     def _transform_split_range(
         self,
         df: pd.DataFrame,

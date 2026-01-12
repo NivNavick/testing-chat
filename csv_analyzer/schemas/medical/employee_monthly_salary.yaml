@@ -1,0 +1,325 @@
+name: employee_monthly_salary
+vertical: medical
+version: "1.0"
+description: "Employee monthly salary data with role-based rates and monthly compensation values"
+
+# =============================================================================
+# PREPROCESSING CONFIGURATION
+# =============================================================================
+preprocessing:
+  # Structure detection hints
+  structure_hints:
+    max_header_rows: 1
+    # Monthly columns follow pattern like "1.25", "2.25" (month.year)
+    detect_monthly_columns: true
+    monthly_column_pattern: "^\\d{1,2}\\.\\d{2}$"
+    
+  # Column value transformations
+  column_transforms:
+    # Split תעריף (rate) column when it has dual values like "73/82"
+    - source_column: "תעריף"
+      transform_type: split_delimiter
+      pattern: "^(\\d+)(?:/(\\d+))?$"
+      output_columns:
+        - name: rate_primary
+          group: 1
+        - name: rate_secondary
+          group: 2
+          
+    # Clean numeric values with commas in monthly columns
+    - source_column_pattern: "^\\d{1,2}\\.25$"
+      transform_type: clean_number
+      pattern: ","
+      replacement: ""
+      
+  # Row filters
+  row_filters:
+    - name: exclude_empty_employee
+      description: "Remove rows without employee name"
+      condition: "\"שם עובד\" IS NOT NULL AND TRIM(\"שם עובד\") != ''"
+      enabled: true
+
+# =============================================================================
+# FIELD DEFINITIONS
+# =============================================================================
+fields:
+  - name: position
+    type: string
+    required: true
+    description: "Employee role or job position type"
+    aliases:
+      # Hebrew
+      - תפקיד
+      - תפקיד_עובד
+      - סוג_תפקיד
+      - משרה
+      - role
+      # English
+      - job_title
+      - role
+      - job_role
+      - employee_type
+      - worker_type
+      - staff_type
+      # Spanish
+      - puesto
+      - cargo
+      # Arabic
+      - المنصب
+      - وظيفة
+      # Russian
+      - должность
+    embedding_text: "position job title role employee type nurse medical staff secretary technician"
+
+  - name: employee_name
+    type: string
+    required: true
+    description: "Full name of the employee"
+    aliases:
+      # Hebrew
+      - שם עובד
+      - שם_עובד
+      - שם
+      - שם_מלא
+      # English
+      - name
+      - full_name
+      - worker_name
+      - staff_name
+      # Spanish
+      - nombre_empleado
+      - nombre
+      # Arabic
+      - اسم_الموظف
+      - اسم
+      # Russian
+      - имя_сотрудника
+      - имя
+    embedding_text: "employee name full name staff worker person"
+
+  - name: payroll_tag
+    type: string
+    required: false
+    description: "Payroll tag or department assignment for salary categorization"
+    aliases:
+      # Hebrew
+      - תג בשכר
+      - תג_בשכר
+      - תג_שכר
+      - קטגוריית_שכר
+      - מחלקה_שכר
+      # English
+      - payroll_department
+      - payroll_category
+      - salary_tag
+      - pay_tag
+      - compensation_group
+      # Spanish
+      - etiqueta_nomina
+      - categoria_salario
+      # Arabic
+      - وسم_الراتب
+    embedding_text: "payroll tag department category salary compensation group assignment"
+
+  - name: city
+    type: string
+    required: false
+    description: "City or location where employee is based"
+    aliases:
+      # Hebrew
+      - עיר
+      - מיקום
+      - סניף
+      # English
+      - location
+      - branch
+      - site
+      # Spanish
+      - ciudad
+      - ubicacion
+      # Arabic
+      - مدينة
+      - موقع
+      # Russian
+      - город
+    embedding_text: "city location branch site where works geographic"
+
+  - name: rate_primary
+    type: float
+    required: false
+    description: "Primary hourly rate or base rate for the employee"
+    aliases:
+      # Hebrew
+      - תעריף
+      - תעריף_בסיס
+      - תעריף_ראשי
+      - תעריף_שעתי
+      - שכר_שעתי
+      # English
+      - hourly_rate
+      - base_rate
+      - primary_rate
+      - rate
+      - pay_rate
+      # Spanish
+      - tarifa_base
+      - tarifa_hora
+      # Arabic
+      - سعر_الساعة
+      - معدل_أساسي
+      # Russian
+      - базовая_ставка
+    embedding_text: "hourly rate base rate primary pay per hour wage"
+
+  - name: rate_secondary
+    type: float
+    required: false
+    description: "Secondary rate for overtime, specialty work, or alternative pay scale"
+    aliases:
+      # Hebrew
+      - תעריף_משני
+      - תעריף_נוסף
+      - תעריף_שעות_נוספות
+      - תעריף_מומחיות
+      # English
+      - overtime_rate
+      - secondary_rate
+      - specialty_rate
+      - alt_rate
+      - bonus_rate
+      # Spanish
+      - tarifa_secundaria
+      - tarifa_extra
+      # Arabic
+      - سعر_إضافي
+      - معدل_ثانوي
+      # Russian
+      - дополнительная_ставка
+    embedding_text: "secondary rate overtime specialty extra alternative bonus rate pay"
+
+  - name: monthly_salary
+    type: float
+    required: false
+    description: "Monthly salary amount (may vary per month)"
+    aliases:
+      # Hebrew
+      - שכר_חודשי
+      - משכורת
+      - משכורת_חודשית
+      - סכום_חודשי
+      # English
+      - salary
+      - monthly_pay
+      - monthly_compensation
+      - monthly_amount
+      - pay
+      # Spanish
+      - salario_mensual
+      - sueldo
+      # Arabic
+      - راتب_شهري
+      - راتب
+      # Russian
+      - месячная_зарплата
+    embedding_text: "monthly salary pay compensation amount wage earnings income"
+
+  - name: salary_month
+    type: string
+    required: false
+    description: "Month for which the salary applies (format: M.YY or YYYY-MM)"
+    aliases:
+      # Hebrew
+      - חודש
+      - חודש_שכר
+      - תקופה
+      # English
+      - month
+      - pay_period
+      - period
+      - salary_period
+      # Spanish
+      - mes
+      - periodo
+      # Arabic
+      - شهر
+      - فترة
+      # Russian
+      - месяц
+    embedding_text: "month period salary pay when date time"
+
+# =============================================================================
+# SPECIAL COLUMN HANDLING
+# Monthly columns (1.25, 2.25, etc.) are pivoted salary values
+# =============================================================================
+pivot_columns:
+  pattern: "^(\\d{1,2})\\.(\\d{2})$"
+  description: "Monthly salary columns in M.YY format (e.g., 1.25 = January 2025)"
+  value_field: monthly_salary
+  key_field: salary_month
+  key_transform: "month_year_from_pattern"  # 1.25 → 2025-01
+
+# =============================================================================
+# VALUE MAPPINGS FOR POSITION TYPES
+# =============================================================================
+value_mappings:
+  position:
+    canonical_values:
+      - id: medical_staff
+        display: "צוות רפואי"
+        patterns:
+          - "צוות רפואי"
+          - "medical staff"
+          
+      - id: nurse
+        display: "אח/אחות"
+        patterns:
+          - "^אח/אחות$"
+          - "nurse"
+          
+      - id: gastro_nurse
+        display: "אח/אחות גסטרו"
+        patterns:
+          - "אח/אחות גסטרו"
+          - "gastro nurse"
+          - "gastroenterology nurse"
+          
+      - id: medical_secretary
+        display: "מזכירה רפואית"
+        patterns:
+          - "מזכירה רפואית"
+          - "medical secretary"
+          
+      - id: eye_technician
+        display: "טכנאית עיניים"
+        patterns:
+          - "טכנאי(ת)? עיניים"
+          - "eye technician"
+          - "ophthalmic technician"
+          
+      - id: manometry_nurse
+        display: "אחות מנומטריה"
+        patterns:
+          - "אחות מנומטריה"
+          - "manometry nurse"
+
+# =============================================================================
+# LOCATION NORMALIZATION
+# =============================================================================
+location_normalization:
+  source_columns:
+    - payroll_tag
+    - city
+  output_column: _normalized_location
+  rules:
+    - patterns:
+        - "בת ים"
+        - "bat.?yam"
+      canonical: "bat_yam"
+      display_name: "בת ים"
+      
+    - patterns:
+        - "חדרה"
+        - "hadera"
+      canonical: "hadera"
+      display_name: "חדרה"
+

@@ -31,6 +31,7 @@ class DataType(Enum):
     LAB_RESULTS = "lab_results"
     PATIENT_APPOINTMENTS = "patient_appointments"
     EMPLOYEE_COMPENSATION = "employee_compensation"
+    EMPLOYEE_MONTHLY_SALARY = "employee_monthly_salary"
     
     # Field types (for field-level connections)
     DATETIME_FIELD = "datetime_field"
@@ -46,6 +47,7 @@ DOCUMENT_TYPES: Set[DataType] = {
     DataType.LAB_RESULTS,
     DataType.PATIENT_APPOINTMENTS,
     DataType.EMPLOYEE_COMPENSATION,
+    DataType.EMPLOYEE_MONTHLY_SALARY,
 }
 
 # Field types for column-level connections

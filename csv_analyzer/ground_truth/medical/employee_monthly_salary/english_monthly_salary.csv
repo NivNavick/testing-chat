@@ -1,0 +1,10 @@
+position,employee_name,payroll_tag,city,rate,jan_25,feb_25,mar_25,apr_25,may_25
+Medical Staff,John Smith,Bat Yam - Freelancers,Bat Yam,47,0,0,0,1751,2355
+Nurse,Sarah Cohen,Bat Yam - Freelancers,Bat Yam,73/82,7565,6715,6937,6367,9631
+Medical Staff,David Lee,Bat Yam - Freelancers,Bat Yam,47,2986,3180,2921,3196,2885
+Gastro Nurse,Anna Wilson,Bat Yam - Freelancers,Bat Yam,85,11683,9399,13060,9973,14009
+Medical Secretary,Lisa Brown,Bat Yam - Salaried,Bat Yam,50,7412,7435,7593,8719,6993
+Eye Technician,Mike Davis,Bat Yam - Salaried,Bat Yam,45,,,,2432,6545
+Nurse,Emily White,Hadera - Freelancers,Hadera,63,3575,3284,2426,3172,3010
+Gastro Nurse,James Taylor,Hadera - Freelancers,Hadera,94,7299,8547,7672,6081,7138
+
