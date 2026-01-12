@@ -6,6 +6,7 @@ and combines them into a single CSV output file.
 """
 
 import logging
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -51,6 +52,14 @@ class CSVExportBlock(BaseBlock):
         output_filename = self.get_param("filename", "output.csv")
         output_dir = self.get_param("output_dir", None)
         include_index = self.get_param("include_index", False)
+        unique_name = self.get_param("unique_name", True)  # Add GUID by default
+        
+        # Generate unique filename with GUID if enabled
+        if unique_name:
+            file_stem = Path(output_filename).stem
+            file_suffix = Path(output_filename).suffix or ".csv"
+            guid = str(uuid.uuid4())[:8]  # Short GUID (8 chars)
+            output_filename = f"{file_stem}_{guid}{file_suffix}"
         
         dataframes = []
         metadata = {}
@@ -190,9 +199,11 @@ class CSVExportBlock(BaseBlock):
     outputs=[],  # No outputs - this is a sink block
     parameters=[
         {"name": "filename", "type": "string", "default": "output.csv", 
-         "description": "Output CSV filename"},
+         "description": "Output CSV filename (base name)"},
         {"name": "output_dir", "type": "string", "default": None,
          "description": "Output directory (defaults to workflow output dir)"},
+        {"name": "unique_name", "type": "boolean", "default": True,
+         "description": "Add unique GUID suffix to filename (e.g. report_a1b2c3d4.csv)"},
         {"name": "include_index", "type": "boolean", "default": False,
          "description": "Include row index in CSV"},
         {"name": "include_source_column", "type": "boolean", "default": False,
