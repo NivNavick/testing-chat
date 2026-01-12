@@ -1,0 +1,22 @@
+{
+  "upload": {
+    "uploaded_files": "/Users/nivnavick/Documents/git/testing-chat/test_results/8244d28a/upload/uploaded_files.json"
+  },
+  "preprocess": {
+    "processed_files": "/Users/nivnavick/Documents/git/testing-chat/test_results/8244d28a/preprocess/processed_files.json"
+  },
+  "classify": {
+    "classified_data": "/Users/nivnavick/Documents/git/testing-chat/test_results/8244d28a/classify/classified_data_manifest.json"
+  },
+  "early_arrival_strict": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/test_results/8244d28a/early_arrival_strict/result.json"
+  },
+  "early_arrival_relaxed": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/test_results/8244d28a/early_arrival_relaxed/result.json"
+  },
+  "export": {
+    "csv_path": "results/early_arrival_report.csv",
+    "row_count": 17,
+    "column_count": 12
+  }
+}
