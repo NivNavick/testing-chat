@@ -54,13 +54,6 @@ blocks:
       vertical: "{{vertical}}"
       threshold: 0.5
 
-  # Router block - routes data by document type
-  - id: router
-    handler: route_by_doc_type
-    inputs:
-      - name: classified_data
-        source: classify.classified_data
-
   # Early arrival insight block
   - id: early_arrival
     handler: early_arrival_matcher
