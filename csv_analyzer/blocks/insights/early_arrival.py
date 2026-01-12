@@ -204,12 +204,16 @@ class EarlyArrivalBlock(BaseBlock):
     - NO_PROCEDURES: No procedures for date/location
     """
     
+    # Required document types for this insight
+    REQUIRED_DOC_TYPES = ["employee_shifts", "medical_actions"]
+    
     def run(self) -> Dict[str, str]:
         """
         Match arrivals to procedures and detect early arrivals.
         
         Returns:
             Dict with 'result' key containing S3 URI of results DataFrame
+            Returns 'skipped': True if required doc types are missing
         """
         max_early_minutes = self.get_param("max_early_minutes", 30)
         
@@ -218,14 +222,25 @@ class EarlyArrivalBlock(BaseBlock):
         # Load classified data
         classified_data = self.load_classified_data("data")
         
+        # Check for required document types
+        missing_types = [dt for dt in self.REQUIRED_DOC_TYPES if dt not in classified_data]
+        if missing_types:
+            self.logger.warning(
+                f"⚠️  Skipping early_arrival: missing required doc types: {missing_types}. "
+                f"Available: {list(classified_data.keys())}"
+            )
+            # Return empty result with skipped flag
+            empty_df = pd.DataFrame(columns=[
+                "employee_name", "employee_id", "shift_date", "location",
+                "arrival_time", "matched_procedure_time", "matched_treatment",
+                "treating_staff", "minutes_early", "status", "evidence"
+            ])
+            result_uri = self.save_to_s3("result", empty_df)
+            return {"result": result_uri, "skipped": True, "reason": f"Missing: {missing_types}"}
+        
         # Find shifts and procedures DataFrames
         shifts_df = classified_data.get("employee_shifts")
         procedures_df = classified_data.get("medical_actions")
-        
-        if shifts_df is None:
-            raise ValueError(f"No shifts data found. Available: {list(classified_data.keys())}")
-        if procedures_df is None:
-            raise ValueError(f"No procedures data found. Available: {list(classified_data.keys())}")
         
         self.logger.info(f"Loaded {len(shifts_df)} shifts and {len(procedures_df)} procedures")
         self.logger.info(f"Shifts columns: {list(shifts_df.columns)}")

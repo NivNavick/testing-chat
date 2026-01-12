@@ -31,12 +31,16 @@ class ExpensiveEmployeesBlock(BaseBlock):
     - Group by position/role for category analysis
     """
     
+    # Required document types for this insight
+    REQUIRED_DOC_TYPES = ["employee_monthly_salary"]
+    
     def run(self) -> Dict[str, str]:
         """
         Analyze employee costs and generate rankings.
         
         Returns:
             Dict with 'result' key containing S3 URI of results DataFrame
+            Returns 'skipped': True if required doc types are missing
         """
         # Get parameters
         top_n = self.get_param("top_n", 10)  # Number of top employees to return
@@ -48,7 +52,7 @@ class ExpensiveEmployeesBlock(BaseBlock):
         # Load classified data
         classified_data = self.load_classified_data("data")
         
-        # Find salary DataFrame
+        # Check for required document types (with fallback check for compensation)
         salary_df = classified_data.get("employee_monthly_salary")
         
         if salary_df is None:
@@ -56,10 +60,22 @@ class ExpensiveEmployeesBlock(BaseBlock):
             for doc_type, df in classified_data.items():
                 if "salary" in doc_type.lower() or "compensation" in doc_type.lower():
                     salary_df = df
+                    self.logger.info(f"Using fallback doc type: {doc_type}")
                     break
         
         if salary_df is None:
-            raise ValueError(f"No salary data found. Available: {list(classified_data.keys())}")
+            self.logger.warning(
+                f"⚠️  Skipping expensive_employees: missing required doc types: {self.REQUIRED_DOC_TYPES}. "
+                f"Available: {list(classified_data.keys())}"
+            )
+            # Return empty result with skipped flag
+            empty_df = pd.DataFrame(columns=[
+                "cost_rank", "employee_name", "position", "city",
+                "total_salary", "avg_monthly_salary", "months_active",
+                "rate_primary", "rate_secondary", "has_dual_rate", "cost_percentile"
+            ])
+            result_uri = self.save_to_s3("result", empty_df)
+            return {"result": result_uri, "skipped": True, "reason": f"Missing: {self.REQUIRED_DOC_TYPES}"}
         
         self.logger.info(f"Loaded salary data: {len(salary_df)} rows, columns: {list(salary_df.columns)}")
         
