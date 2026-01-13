@@ -96,7 +96,12 @@ class SESEmailBlock(BaseBlock):
                     self.logger.warning(f"Skipping unsupported data type: {type(data)}")
                     continue
                 
-                dataframes.append((f"{attachment_prefix}_{idx}.csv", df))
+                # Extract block ID from URI path for meaningful filename
+                # URI format: .../workflow_run_id/block_id/output_name.json
+                block_id = self._extract_block_id_from_uri(uri)
+                filename = f"{block_id}.csv" if block_id else f"{attachment_prefix}_{idx}.csv"
+                
+                dataframes.append((filename, df))
                 self.logger.info(f"  Loaded data source {idx}: {len(df)} rows, {len(df.columns)} columns")
                 
             except Exception as e:
@@ -153,6 +158,38 @@ class SESEmailBlock(BaseBlock):
     def _load_input_data(self, uri: str) -> Any:
         """Load data from URI (S3 or local)."""
         return self.load_from_s3(uri)
+    
+    def _extract_block_id_from_uri(self, uri: str) -> str:
+        """
+        Extract block ID from URI path.
+        
+        URI format examples:
+        - /path/to/results/workflow_run_id/block_id/output_name.json
+        - s3://bucket/workflows/workflow_run_id/block_id/output_name.json
+        
+        Returns the block_id or empty string if not found.
+        """
+        from pathlib import Path
+        
+        try:
+            # Remove s3:// prefix if present
+            path_str = uri.replace("s3://", "")
+            
+            # Get path parts
+            parts = Path(path_str).parts
+            
+            # Look for the part before the filename (output_name.json)
+            # The block_id is typically 2 levels up from the file
+            if len(parts) >= 2:
+                # parts[-1] is filename (e.g., result.json)
+                # parts[-2] is block_id (e.g., early_arrival)
+                block_id = parts[-2]
+                return block_id
+            
+        except Exception as e:
+            self.logger.warning(f"Could not extract block ID from URI {uri}: {e}")
+        
+        return ""
     
     def _generate_summary_text(self, dataframes: List[tuple]) -> str:
         """Generate a summary of the attached data."""
