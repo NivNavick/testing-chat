@@ -48,6 +48,8 @@ export default function WorkflowVisualization({ nodes: initialNodes, edges: init
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-left"
+        elevateEdgesOnSelect={true}
+        elevateNodesOnSelect={false}
       >
         <Background variant="dots" gap={16} size={1} />
         <Controls />

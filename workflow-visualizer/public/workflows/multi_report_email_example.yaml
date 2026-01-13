@@ -1,0 +1,92 @@
+name: multi_report_email_example
+description: >
+  Example workflow showing how to send MULTIPLE insight results in a single email.
+  
+  This workflow:
+  1. Processes medical data
+  2. Generates multiple insights (early arrival, expensive employees, gross profit)
+  3. Sends ALL results in one email with multiple CSV attachments
+
+context: medical
+
+parameters:
+  # Email settings
+  sender_email: "niv@bubblez.ai"
+  recipient_email: "manager@example.com"  # Change this
+  
+  # Data settings
+  csv_path: "csv_analyzer/data/Heart_Disease_Prediction.csv"
+
+blocks:
+  # Step 1: Upload and prepare data
+  - id: upload
+    handler: upload_to_s3
+    parameters:
+      files: ["{{params.csv_path}}"]
+      skip_upload: true
+
+  - id: preprocess
+    handler: preprocess_csv
+    inputs:
+      - name: files
+        source: upload.uploaded_files
+    parameters:
+      detect_structure: true
+
+  - id: classify
+    handler: classify_csv
+    inputs:
+      - name: data
+        source: preprocess.preprocessed_files
+    parameters:
+      use_dspy: false
+
+  # Step 2: Generate multiple insights
+  - id: early_arrival
+    handler: early_arrival_insight
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      early_threshold_minutes: 30
+
+  - id: expensive_employees
+    handler: expensive_employees_insight
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      cost_threshold: 5000
+
+  - id: gross_profit
+    handler: gross_profit_insight
+    inputs:
+      - name: data
+        source: classify.classified_data
+
+  # Step 3: Send ALL reports in one email
+  - id: send_bundle
+    handler: send_email_ses
+    inputs:
+      - name: data
+        source:
+          - early_arrival.result
+          - expensive_employees.result
+          - gross_profit.result
+    parameters:
+      sender_email: "{{params.sender_email}}"
+      recipient_email: "{{params.recipient_email}}"
+      subject: "Daily Medical Reports Bundle"
+      attachment_filename_prefix: "medical_report"
+      body_text: |
+        Hello,
+        
+        Please find attached the daily medical insights reports:
+        - Early Arrival Report
+        - Expensive Employees Analysis
+        - Gross Profit Report
+        
+        Best regards,
+        Automated Reporting System
+      include_summary: true
+

@@ -37,21 +37,42 @@ export function parseWorkflowYAML(yamlContent) {
       // Create edges based on inputs
       if (block.inputs && Array.isArray(block.inputs)) {
         block.inputs.forEach((input) => {
-          const sourceInfo = parseSourceReference(input.source || input.name);
-          if (sourceInfo) {
-            edges.push({
-              id: `${sourceInfo.blockId}-${block.id}-${input.name || input.field || 'data'}`,
-              source: sourceInfo.blockId,
-              target: block.id,
-              label: input.field || input.name || '',
-              type: 'smoothstep',
-              animated: false,
-              data: {
-                sourceField: sourceInfo.field,
-                targetField: input.field || input.name
-              }
-            });
+          // Handle both single "source" and multiple "sources"
+          const sources = [];
+          
+          if (input.sources && Array.isArray(input.sources)) {
+            // Multiple sources
+            sources.push(...input.sources);
+          } else if (input.source) {
+            // Single source
+            sources.push(input.source);
+          } else if (input.name) {
+            // Legacy: name as source
+            sources.push(input.name);
           }
+          
+          // Create edge for each source
+          sources.forEach((sourceRef, idx) => {
+            const sourceInfo = parseSourceReference(sourceRef);
+            if (sourceInfo) {
+              edges.push({
+                id: `${sourceInfo.blockId}-${block.id}-${input.name || input.field || 'data'}-${idx}`,
+                source: sourceInfo.blockId,
+                target: block.id,
+                label: input.field || input.name || '',
+                type: 'smoothstep',
+                animated: false,
+                style: {
+                  strokeWidth: 2,
+                },
+                zIndex: 1000, // Ensure edges render above nodes
+                data: {
+                  sourceField: sourceInfo.field,
+                  targetField: input.field || input.name
+                }
+              });
+            }
+          });
         });
       }
     });
@@ -109,10 +130,23 @@ function calculateBlockPositions(blocks) {
     
     if (block.inputs && Array.isArray(block.inputs)) {
       block.inputs.forEach(input => {
-        const sourceInfo = parseSourceReference(input.source || input.name);
-        if (sourceInfo) {
-          dependencies.get(block.id).add(sourceInfo.blockId);
+        // Handle both single "source" and multiple "sources"
+        const sources = [];
+        
+        if (input.sources && Array.isArray(input.sources)) {
+          sources.push(...input.sources);
+        } else if (input.source) {
+          sources.push(input.source);
+        } else if (input.name) {
+          sources.push(input.name);
         }
+        
+        sources.forEach(sourceRef => {
+          const sourceInfo = parseSourceReference(sourceRef);
+          if (sourceInfo) {
+            dependencies.get(block.id).add(sourceInfo.blockId);
+          }
+        });
       });
     }
   });
@@ -150,6 +184,9 @@ function calculateBlockPositions(blocks) {
     calculateLevel(block.id);
   });
 
+  // Don't adjust levels - keep blocks at their natural dependency level
+  // This prevents sink blocks from being pushed further right and overlapping
+
   // Group blocks by level
   const levelGroups = new Map();
   levels.forEach((level, blockId) => {
@@ -159,11 +196,11 @@ function calculateBlockPositions(blocks) {
     levelGroups.get(level).push(blockId);
   });
 
-  // Position blocks
+  // Position blocks with increased spacing for visibility
   const horizontalSpacing = 420;
-  const verticalSpacing = 180;
+  const verticalSpacing = 220; // Increased to 220 for better edge visibility
   const startX = 100;
-  const startY = 100;
+  const startY = 50;
 
   levelGroups.forEach((blockIds, level) => {
     blockIds.forEach((blockId, indexInLevel) => {
