@@ -1,0 +1,69 @@
+# Example Simple Workflow
+# This is a minimal example to demonstrate the visualizer
+
+name: example_workflow
+description: "A simple example workflow for testing the visualizer"
+version: "1.0"
+
+parameters:
+  environment: production
+  timeout: 300
+
+blocks:
+  # Entry point - load data
+  - id: load_data
+    handler: load_csv
+    parameters:
+      path: "./data/input.csv"
+  
+  # Transform the data
+  - id: transform
+    handler: apply_transformations
+    inputs:
+      - name: data
+        source: load_data.output
+    parameters:
+      normalize: true
+      remove_nulls: true
+  
+  # Validate transformed data
+  - id: validate
+    handler: validate_schema
+    inputs:
+      - name: data
+        source: transform.result
+    parameters:
+      strict_mode: true
+  
+  # Branch 1: Generate report
+  - id: generate_report
+    handler: create_report
+    inputs:
+      - name: data
+        source: validate.validated_data
+    parameters:
+      format: pdf
+      template: standard
+  
+  # Branch 2: Export to database
+  - id: export_db
+    handler: export_to_database
+    inputs:
+      - name: data
+        source: validate.validated_data
+    parameters:
+      table_name: processed_data
+      batch_size: 1000
+  
+  # Final step: Send notification
+  - id: notify
+    handler: send_notification
+    inputs:
+      - name: report
+        source: generate_report.file_path
+      - name: db_status
+        source: export_db.status
+    parameters:
+      recipients: ["admin@example.com"]
+      subject: "Workflow completed"
+

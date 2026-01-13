@@ -1,0 +1,95 @@
+.workflow-block-node {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8eeff 100%);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 220px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 2px solid #d0d9f7;
+  transition: all 0.3s ease;
+  color: #333;
+}
+
+.workflow-block-node:hover {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+  transform: translateY(-2px);
+  border-color: #a8b7e8;
+}
+
+.node-header {
+  margin-bottom: 8px;
+}
+
+.node-label {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+  color: #2d3748;
+}
+
+.node-handler {
+  font-size: 12px;
+  opacity: 0.9;
+  font-family: 'Courier New', monospace;
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.node-description {
+  font-size: 11px;
+  opacity: 0.85;
+  margin: 8px 0;
+  line-height: 1.4;
+  border-top: 1px solid rgba(102, 126, 234, 0.15);
+  padding-top: 8px;
+  color: #4a5568;
+}
+
+.node-stats {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.stat-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(102, 126, 234, 0.15);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.stat-badge.inputs {
+  background: rgba(76, 175, 80, 0.2);
+  color: #2d5a30;
+}
+
+.stat-badge.params {
+  background: rgba(255, 152, 0, 0.2);
+  color: #8b5000;
+}
+
+.workflow-handle {
+  width: 12px;
+  height: 12px;
+  background: #667eea;
+  border: 2px solid #4a5fd8;
+  transition: all 0.2s ease;
+}
+
+.workflow-handle:hover {
+  width: 16px;
+  height: 16px;
+  background: #4a5fd8;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+

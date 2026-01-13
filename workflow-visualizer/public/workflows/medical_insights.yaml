@@ -1,0 +1,284 @@
+# Medical Insights Workflow (Combined)
+# 
+# A unified workflow that processes multiple file types and runs
+# all applicable insight blocks in parallel branches.
+#
+# Architecture:
+#   upload → preprocess → classify ─┬─► early_arrival ──► export_early_arrival
+#                                   ├─► expensive_employees ──► export_salary
+#                                   ├─► manpower_cost ──► export_manpower_cost
+#                                   └─► gross_profit ──► export_gross_profit
+#
+# Key Features:
+# - Single classification step handles ALL input files
+# - Each insight block picks only the doc types it needs
+# - Missing doc types cause graceful skip (not failure)
+# - Each insight has its own export block with unique output
+#
+# Insights:
+# 1. early_arrival: Detect early employee arrivals (needs: employee_shifts, medical_actions)
+# 2. expensive_employees: Rank employees by cost (needs: employee_monthly_salary)
+# 3. manpower_cost: Shift costs + avg cost per procedure (needs: employee_shifts, employee_compensation)
+# 4. gross_profit: Revenue - physician cost - staff cost (needs: employee_shifts, employee_compensation, medical_actions)
+#
+# Usage:
+#   # Run with shifts + actions + compensation (all financial insights run)
+#   python -m csv_analyzer.run_workflow medical_insights \
+#       --files shifts.csv actions.csv compensation.csv --local
+#
+#   # Run with salary data (salary analysis will run, others will skip)
+#   python -m csv_analyzer.run_workflow medical_insights \
+#       --files monthly_salary.csv --local
+#
+#   # Run with ALL file types (all insights run)
+#   python -m csv_analyzer.run_workflow medical_insights \
+#       --files shifts.csv actions.csv monthly_salary.csv compensation.csv --local
+
+name: medical_insights
+description: "Combined medical insights - processes all file types, runs applicable analyses"
+version: "1.0"
+
+# Global parameters (accessible by all blocks)
+parameters:
+  vertical: medical
+  output_dir: ./results
+  # Early arrival parameters
+  max_early_minutes: 30
+  # Expensive employees parameters
+  top_n: 10
+  include_all: true
+  group_by_position: true
+  # Manpower cost / gross profit parameters
+  default_shift_hours: 8.0
+  benefits_loading: 0.25
+
+# Storage configuration
+storage:
+  type: s3
+  bucket: ""  # Set via S3_BUCKET env var or --bucket CLI arg
+
+blocks:
+  # ============================================================
+  # SHARED PIPELINE: Upload → Preprocess → Classify
+  # ============================================================
+  
+  # Entry point - upload files to S3 (or local storage)
+  - id: upload
+    handler: upload_to_s3
+    parameters:
+      skip_upload: true  # Local mode - skip S3 upload
+
+  # Preprocessing - transforms raw CSVs, adds _meta columns
+  - id: preprocess
+    handler: preprocess_csvs
+    inputs:
+      - name: files
+        source: upload.uploaded_files
+    parameters:
+      detect_time_ranges: true
+      detect_hebrew_dates: true
+      clean_time_prefixes: true
+
+  # Classification - canonizes ALL files to their doc types
+  # Outputs: employee_shifts, medical_actions, employee_monthly_salary, etc.
+  - id: classify
+    handler: classify_csvs
+    inputs:
+      - name: files
+        source: preprocess.processed_files
+    parameters:
+      vertical: "{{vertical}}"
+      threshold: 0.5
+
+  # ============================================================
+  # BRANCH 1: Early Arrival Analysis
+  # Requires: employee_shifts + medical_actions
+  # ============================================================
+  
+  - id: early_arrival
+    handler: early_arrival_matcher
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      max_early_minutes: "{{max_early_minutes}}"
+
+  - id: export_early_arrival
+    handler: export_csv
+    inputs:
+      - field: employee_name
+        source: early_arrival.result.employee_name
+      - field: employee_id
+        source: early_arrival.result.employee_id
+      - field: shift_date
+        source: early_arrival.result.shift_date
+      - field: arrival_time
+        source: early_arrival.result.arrival_time
+      - field: matched_procedure_time
+        source: early_arrival.result.matched_procedure_time
+      - field: matched_treatment
+        source: early_arrival.result.matched_treatment
+      - field: treating_staff
+        source: early_arrival.result.treating_staff
+      - field: minutes_early
+        source: early_arrival.result.minutes_early
+      - field: status
+        source: early_arrival.result.status
+      - field: evidence
+        source: early_arrival.result.evidence
+    parameters:
+      filename: "early_arrival_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+
+  # ============================================================
+  # BRANCH 2: Expensive Employees Analysis
+  # Requires: employee_monthly_salary
+  # ============================================================
+  
+  - id: expensive_employees
+    handler: expensive_employees
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      top_n: "{{top_n}}"
+      include_all: "{{include_all}}"
+      group_by_position: "{{group_by_position}}"
+
+  - id: export_salary
+    handler: export_csv
+    inputs:
+      - field: cost_rank
+        source: expensive_employees.result.cost_rank
+      - field: employee_name
+        source: expensive_employees.result.employee_name
+      - field: position
+        source: expensive_employees.result.position
+      - field: city
+        source: expensive_employees.result.city
+      - field: total_salary
+        source: expensive_employees.result.total_salary
+      - field: avg_monthly_salary
+        source: expensive_employees.result.avg_monthly_salary
+      - field: months_active
+        source: expensive_employees.result.months_active
+      - field: rate_primary
+        source: expensive_employees.result.rate_primary
+      - field: rate_secondary
+        source: expensive_employees.result.rate_secondary
+      - field: has_dual_rate
+        source: expensive_employees.result.has_dual_rate
+      - field: cost_percentile
+        source: expensive_employees.result.cost_percentile
+    parameters:
+      filename: "expensive_employees_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+
+  # ============================================================
+  # BRANCH 3: Manpower Cost Analysis
+  # Requires: employee_shifts + employee_compensation + medical_actions (optional)
+  # ============================================================
+  
+  - id: manpower_cost
+    handler: manpower_cost_per_shift
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      default_shift_hours: "{{default_shift_hours}}"
+      benefits_loading: "{{benefits_loading}}"
+
+  - id: export_manpower_cost
+    handler: export_csv
+    inputs:
+      - field: shift_date
+        source: manpower_cost.result.shift_date
+      - field: employee_id
+        source: manpower_cost.result.employee_id
+      - field: employee_name
+        source: manpower_cost.result.employee_name
+      - field: position
+        source: manpower_cost.result.position
+      - field: detected_shift_type
+        source: manpower_cost.result.detected_shift_type
+      - field: shift_start
+        source: manpower_cost.result.shift_start
+      - field: shift_end
+        source: manpower_cost.result.shift_end
+      - field: shift_hours
+        source: manpower_cost.result.shift_hours
+      - field: hourly_cost
+        source: manpower_cost.result.hourly_cost
+      - field: employment_type
+        source: manpower_cost.result.employment_type
+      - field: shift_cost
+        source: manpower_cost.result.shift_cost
+      - field: procedure_count
+        source: manpower_cost.result.procedure_count
+      - field: avg_cost_per_procedure
+        source: manpower_cost.result.avg_cost_per_procedure
+      - field: evidence
+        source: manpower_cost.result.evidence
+    parameters:
+      filename: "manpower_cost_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+
+  # ============================================================
+  # BRANCH 4: Gross Profit Analysis
+  # Requires: employee_shifts + employee_compensation + medical_actions
+  # ============================================================
+  
+  - id: gross_profit
+    handler: gross_profit_per_shift
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      default_shift_hours: "{{default_shift_hours}}"
+      benefits_loading: "{{benefits_loading}}"
+
+  - id: export_gross_profit
+    handler: export_csv
+    inputs:
+      - field: shift_date
+        source: gross_profit.result.shift_date
+      - field: employee_id
+        source: gross_profit.result.employee_id
+      - field: employee_name
+        source: gross_profit.result.employee_name
+      - field: position
+        source: gross_profit.result.position
+      - field: employment_type
+        source: gross_profit.result.employment_type
+      - field: detected_shift_type
+        source: gross_profit.result.detected_shift_type
+      - field: shift_hours
+        source: gross_profit.result.shift_hours
+      - field: shift_cost
+        source: gross_profit.result.shift_cost
+      - field: procedure_count
+        source: gross_profit.result.procedure_count
+      - field: total_revenue
+        source: gross_profit.result.total_revenue
+      - field: total_doctor_fee
+        source: gross_profit.result.total_doctor_fee
+      - field: gross_profit
+        source: gross_profit.result.gross_profit
+      - field: profit_margin_pct
+        source: gross_profit.result.profit_margin_pct
+      - field: procedure_details
+        source: gross_profit.result.procedure_details
+      - field: evidence
+        source: gross_profit.result.evidence
+    parameters:
+      filename: "gross_profit_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+

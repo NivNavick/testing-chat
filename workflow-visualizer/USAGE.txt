@@ -1,0 +1,110 @@
+WORKFLOW VISUALIZER - Usage Guide
+=================================
+
+The Workflow Visualizer is a React application that visualizes YAML workflow files as interactive graphs using React Flow.
+
+GETTING STARTED
+---------------
+
+1. Start the development server:
+   cd workflow-visualizer
+   npm run dev
+
+2. Open your browser to: http://localhost:5173/
+
+3. Load a workflow by:
+   - Dragging and dropping a .yaml/.yml file
+   - Clicking "Choose File" to browse for a file
+   - Clicking "Paste YAML Text" to paste YAML content directly
+
+WORKFLOW FILES LOCATION
+-----------------------
+
+Your workflow YAML files are located at:
+  ../csv_analyzer/workflows/definitions/
+
+Available workflows:
+  - medical_insights.yaml
+  - medical_early_arrival.yaml
+  - salary_analysis.yaml
+  - early_arrival_simple.yaml
+  - medical_insights_dual_entry.yaml
+
+FEATURES
+--------
+
+✓ Interactive graph visualization with zoom/pan
+✓ Drag and drop YAML file upload
+✓ Paste YAML content directly
+✓ Click on nodes to see detailed information
+✓ Automatic hierarchical layout based on dependencies
+✓ MiniMap for navigation
+✓ Workflow metadata display (name, version, description)
+✓ Color-coded nodes with handler information
+✓ Edge labels showing data flow
+
+GRAPH CONTROLS
+--------------
+
+- Mouse wheel: Zoom in/out
+- Click + drag: Pan the canvas
+- Click node: View node details
+- Click background: Deselect node
+- Use controls (bottom-left) for zoom/fit/lock
+
+NODE INFORMATION
+----------------
+
+Each node displays:
+  - Block ID (label)
+  - Handler function name
+  - Number of inputs
+  - Number of parameters
+
+Click a node to see:
+  - Full input list with sources
+  - All parameters and their values
+  - Data flow connections
+
+BUILDING FOR PRODUCTION
+------------------------
+
+To build the visualizer for production:
+  npm run build
+
+The built files will be in the `dist/` directory.
+
+TROUBLESHOOTING
+---------------
+
+If you encounter issues:
+
+1. Node version: Requires Node.js 18.x or 20.x
+   (Vite 5.x is configured for compatibility)
+
+2. Dependencies: Run `npm install` to ensure all packages are installed
+
+3. YAML parsing errors: Ensure your YAML file follows the workflow schema:
+   - Must have a 'blocks' array
+   - Each block needs an 'id' and 'handler'
+   - Inputs should reference other blocks via 'source'
+
+DEVELOPMENT
+-----------
+
+Project structure:
+  src/
+    components/
+      WorkflowLoader.jsx       - File upload and YAML input
+      WorkflowVisualization.jsx - React Flow graph component
+      WorkflowBlockNode.jsx    - Custom node component
+    utils/
+      workflowParser.js        - YAML parsing and graph generation
+    App.jsx                    - Main application component
+
+The parser automatically:
+  - Extracts blocks and their dependencies
+  - Calculates hierarchical positions
+  - Creates nodes and edges for React Flow
+  - Handles both 'name' and 'field' input formats
+

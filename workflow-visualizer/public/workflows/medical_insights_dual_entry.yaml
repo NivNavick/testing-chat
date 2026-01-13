@@ -1,0 +1,160 @@
+# Medical Insights - Dual Entry Point Workflow
+# 
+# Architecture:
+#   upload_shifts ──► preprocess_shifts ──┐
+#                                         ├──► classify ──┬──► early_arrival ──► export
+#   upload_salary ──► preprocess_salary ──┘               └──► expensive_employees ──► export
+#
+# Two independent entry points that merge at classification,
+# then split again for parallel insight generation.
+
+name: medical_insights_dual_entry
+description: "Dual entry point workflow - shifts/actions and salary processed independently then merged"
+version: "1.0"
+
+parameters:
+  vertical: medical
+  output_dir: ./results
+  max_early_minutes: 30
+  top_n: 10
+
+storage:
+  type: s3
+  bucket: ""
+
+blocks:
+  # ============================================================
+  # ENTRY POINT 1: Shifts & Actions
+  # ============================================================
+  
+  - id: upload_shifts
+    handler: upload_to_s3
+    parameters:
+      skip_upload: true
+      file_filter: "shifts|actions"  # Only process shift/action files
+
+  - id: preprocess_shifts
+    handler: preprocess_csvs
+    inputs:
+      - name: files
+        source: upload_shifts.uploaded_files
+    parameters:
+      detect_time_ranges: true
+      detect_hebrew_dates: true
+      clean_time_prefixes: true
+
+  # ============================================================
+  # ENTRY POINT 2: Salary Data
+  # ============================================================
+  
+  - id: upload_salary
+    handler: upload_to_s3
+    parameters:
+      skip_upload: true
+      file_filter: "salary"  # Only process salary files
+
+  - id: preprocess_salary
+    handler: preprocess_csvs
+    inputs:
+      - name: files
+        source: upload_salary.uploaded_files
+    parameters:
+      detect_time_ranges: false
+      detect_hebrew_dates: false
+
+  # ============================================================
+  # MERGE POINT: Classification
+  # Takes inputs from BOTH preprocessing branches
+  # ============================================================
+  
+  - id: classify
+    handler: classify_csvs
+    inputs:
+      - name: files
+        sources:  # MERGE from both branches!
+          - preprocess_shifts.processed_files
+          - preprocess_salary.processed_files
+    parameters:
+      vertical: "{{vertical}}"
+      threshold: 0.5
+
+  # ============================================================
+  # BRANCH 1: Early Arrival (needs shifts + actions)
+  # ============================================================
+  
+  - id: early_arrival
+    handler: early_arrival_matcher
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      max_early_minutes: "{{max_early_minutes}}"
+
+  - id: export_early_arrival
+    handler: export_csv
+    inputs:
+      - field: employee_name
+        source: early_arrival.result.employee_name
+      - field: employee_id
+        source: early_arrival.result.employee_id
+      - field: shift_date
+        source: early_arrival.result.shift_date
+      - field: arrival_time
+        source: early_arrival.result.arrival_time
+      - field: matched_procedure_time
+        source: early_arrival.result.matched_procedure_time
+      - field: matched_treatment
+        source: early_arrival.result.matched_treatment
+      - field: treating_staff
+        source: early_arrival.result.treating_staff
+      - field: minutes_early
+        source: early_arrival.result.minutes_early
+      - field: status
+        source: early_arrival.result.status
+      - field: evidence
+        source: early_arrival.result.evidence
+    parameters:
+      filename: "early_arrival_report.csv"
+      output_dir: "{{output_dir}}"
+
+  # ============================================================
+  # BRANCH 2: Expensive Employees (needs salary)
+  # ============================================================
+  
+  - id: expensive_employees
+    handler: expensive_employees
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      top_n: "{{top_n}}"
+
+  - id: export_salary
+    handler: export_csv
+    inputs:
+      - field: cost_rank
+        source: expensive_employees.result.cost_rank
+      - field: employee_name
+        source: expensive_employees.result.employee_name
+      - field: position
+        source: expensive_employees.result.position
+      - field: city
+        source: expensive_employees.result.city
+      - field: total_salary
+        source: expensive_employees.result.total_salary
+      - field: avg_monthly_salary
+        source: expensive_employees.result.avg_monthly_salary
+      - field: months_active
+        source: expensive_employees.result.months_active
+      - field: rate_primary
+        source: expensive_employees.result.rate_primary
+      - field: rate_secondary
+        source: expensive_employees.result.rate_secondary
+      - field: has_dual_rate
+        source: expensive_employees.result.has_dual_rate
+      - field: cost_percentile
+        source: expensive_employees.result.cost_percentile
+    parameters:
+      filename: "expensive_employees_report.csv"
+      output_dir: "{{output_dir}}"
+

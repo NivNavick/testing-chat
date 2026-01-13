@@ -1,0 +1,104 @@
+# Medical Early Arrival Workflow
+# 
+# Detects early arrivals by matching employee shifts to medical procedures.
+# 
+# Pipeline:
+#   upload → preprocess → classify → early_arrival → export_csv
+#
+# Usage:
+#   python -m csv_analyzer.run_workflow medical_early_arrival \
+#       --files shifts.csv actions.csv \
+#       --param max_early_minutes=30
+#
+# Input Format:
+#   - Legacy: name + source (passes full output)
+#   - Field-level: field + source (correlation engine extracts specific columns)
+#
+# Field-level correlation:
+#   When multiple fields from the same block are specified, rows are 
+#   automatically correlated (row 0 of field A matches row 0 of field B).
+
+name: medical_early_arrival
+description: "Detect early arrivals by matching shifts to procedures"
+version: "1.0"
+
+# Global parameters (accessible by all blocks)
+parameters:
+  vertical: medical
+  output_dir: ./results
+  max_early_minutes: 30
+
+# S3 storage configuration
+storage:
+  type: s3
+  bucket: ""  # Set via S3_BUCKET env var or --bucket CLI arg
+
+blocks:
+  # Entry point block - upload files to S3
+  - id: upload
+    handler: upload_to_s3
+    parameters:
+      # 'files' passed at runtime via CLI: --files shifts.csv actions.csv
+      skip_upload: true  # Set to false for production (requires S3 bucket)
+
+  # Preprocessing block - transforms raw CSVs, adds _meta columns
+  - id: preprocess
+    handler: preprocess_csvs
+    inputs:
+      - name: files
+        source: upload.uploaded_files
+    parameters:
+      detect_time_ranges: true
+      detect_hebrew_dates: true
+      clean_time_prefixes: true
+
+  # Classification block - canonizes column names to schema fields
+  - id: classify
+    handler: classify_csvs
+    inputs:
+      - name: files
+        source: preprocess.processed_files
+    parameters:
+      vertical: "{{vertical}}"
+      threshold: 0.5
+
+  # Early arrival insight block
+  - id: early_arrival
+    handler: early_arrival_matcher
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      max_early_minutes: "{{max_early_minutes}}"  # Default: 30
+
+  # CSV Export block - using field-level correlation
+  # Each 'field' specifies a column to include in the output CSV
+  # Format: block_id.output_name.column_name
+  - id: export
+    handler: export_csv
+    inputs:
+      # Field-level inputs - rows are automatically correlated
+      - field: employee_name
+        source: early_arrival.result.employee_name
+      - field: employee_id
+        source: early_arrival.result.employee_id
+      - field: shift_date
+        source: early_arrival.result.shift_date
+      - field: arrival_time
+        source: early_arrival.result.arrival_time
+      - field: matched_procedure_time
+        source: early_arrival.result.matched_procedure_time
+      - field: matched_treatment
+        source: early_arrival.result.matched_treatment
+      - field: treating_staff
+        source: early_arrival.result.treating_staff
+      - field: minutes_early
+        source: early_arrival.result.minutes_early
+      - field: status
+        source: early_arrival.result.status
+      - field: evidence
+        source: early_arrival.result.evidence
+    parameters:
+      filename: "early_arrival_report.csv"
+      output_dir: ./results
+

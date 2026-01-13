@@ -1,0 +1,52 @@
+# Simple Early Arrival Workflow
+# 
+# Skips classification - assumes files are already categorized:
+# - Shift files → employee_shifts
+# - Medical actions file → medical_actions
+#
+# Usage:
+#   python -m csv_analyzer.run_workflow early_arrival_simple \
+#       --files shifts.csv actions.csv \
+#       --param max_early_minutes=30
+
+name: early_arrival_simple
+description: "Simple early arrival detection (no classification)"
+version: "1.0"
+
+parameters:
+  max_early_minutes: 30
+
+blocks:
+  # Entry point - just pass through local files
+  - id: upload
+    handler: upload_to_s3
+    parameters:
+      skip_upload: true
+
+  # Preprocessing - extract metadata, normalize dates
+  - id: preprocess
+    handler: preprocess_csvs
+    inputs:
+      - name: files
+        source: upload.uploaded_files
+    parameters:
+      detect_time_ranges: true
+      detect_hebrew_dates: true
+      clean_time_prefixes: true
+
+  # Simple categorization - assume last file is medical_actions
+  - id: categorize
+    handler: simple_categorize
+    inputs:
+      - name: files
+        source: preprocess.processed_files
+
+  # Early arrival insight
+  - id: early_arrival
+    handler: early_arrival_matcher
+    inputs:
+      - name: data
+        source: categorize.classified_data
+    parameters:
+      max_early_minutes: "{{max_early_minutes}}"
+
