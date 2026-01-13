@@ -4,16 +4,17 @@
 # all applicable insight blocks in parallel branches.
 #
 # Architecture:
-#   upload → preprocess → classify ─┬─► early_arrival ──► export_early_arrival
-#                                   ├─► expensive_employees ──► export_salary
-#                                   ├─► manpower_cost ──► export_manpower_cost
-#                                   └─► gross_profit ──► export_gross_profit
+#   upload → preprocess → classify ─┬─► early_arrival ──► export_early_arrival ─┐
+#                                   ├─► expensive_employees ──► export_salary ────┤
+#                                   ├─► manpower_cost ──► export_manpower_cost ───┼─► email_all_reports
+#                                   └─► gross_profit ──► export_gross_profit ─────┘
 #
 # Key Features:
 # - Single classification step handles ALL input files
 # - Each insight block picks only the doc types it needs
 # - Missing doc types cause graceful skip (not failure)
 # - Each insight has its own export block with unique output
+# - All reports sent via email (AWS SES) in a single message with attachments
 #
 # Insights:
 # 1. early_arrival: Detect early employee arrivals (needs: employee_shifts, medical_actions)
@@ -42,6 +43,9 @@ version: "1.0"
 parameters:
   vertical: medical
   output_dir: ./results
+  # Email settings (niv@bubblez.ai must be verified in AWS SES)
+  sender_email: niv@bubblez.ai
+  recipient_email: nnavick@gmail.com
   # Early arrival parameters
   max_early_minutes: 30
   # Expensive employees parameters
@@ -281,4 +285,48 @@ blocks:
       output_dir: "{{output_dir}}"
       unique_name: true
       include_source_column: false
+
+  # ============================================================
+  # EMAIL ALL REPORTS
+  # Sends all 4 reports in a single email with attachments
+  # ============================================================
+  
+  - id: email_all_reports
+    handler: send_email_ses
+    inputs:
+      - name: data
+        sources:
+          - early_arrival.result
+          - expensive_employees.result
+          - manpower_cost.result
+          - gross_profit.result
+    parameters:
+      sender_email: "{{sender_email}}"
+      recipient_email: "{{recipient_email}}"
+      subject: "Medical Insights - Daily Reports Bundle"
+      attachment_filename_prefix: "medical_report"
+      body_text: |
+        Hello,
+        
+        Please find attached the complete medical insights analysis:
+        
+        📊 Report 1: Early Arrival Analysis
+           - Employees who arrived significantly before their shifts
+           - Matched with procedure times and treatments
+        
+        💰 Report 2: Expensive Employees Ranking
+           - Top employees by total compensation cost
+           - Grouped by position with salary breakdowns
+        
+        👥 Report 3: Manpower Cost Analysis
+           - Shift-by-shift cost breakdown
+           - Average cost per medical procedure
+        
+        📈 Report 4: Gross Profit Analysis
+           - Revenue vs. cost analysis per shift
+           - Profit margins and procedure details
+        
+        Best regards,
+        Automated Medical Insights System
+      include_summary: true
 

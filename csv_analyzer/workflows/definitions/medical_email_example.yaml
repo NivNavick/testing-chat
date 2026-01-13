@@ -1,0 +1,69 @@
+name: medical_email_example
+description: >
+  Example workflow showing how to send insight results via email using AWS SES.
+  
+  This workflow:
+  1. Uploads medical data
+  2. Preprocesses and classifies it
+  3. Generates early arrival insights
+  4. Sends results via email with CSV attachment
+
+context: medical
+
+parameters:
+  # Email settings
+  sender_email: "niv@bubblez.ai"
+  recipient_email: "recipient@example.com"  # Change this to your email
+  
+  # Data settings
+  csv_path: "csv_analyzer/data/Heart_Disease_Prediction.csv"
+
+blocks:
+  # Step 1: Upload data
+  - id: upload
+    handler: upload_to_s3
+    parameters:
+      files: ["{{params.csv_path}}"]
+      skip_upload: true  # Local mode for testing
+
+  # Step 2: Preprocess
+  - id: preprocess
+    handler: preprocess_csv
+    inputs:
+      - name: files
+        source: upload.uploaded_files
+    parameters:
+      detect_structure: true
+      remove_empty_rows: true
+
+  # Step 3: Classify data
+  - id: classify
+    handler: classify_csv
+    inputs:
+      - name: data
+        source: preprocess.preprocessed_files
+    parameters:
+      use_dspy: false
+
+  # Step 4: Generate early arrival insights
+  - id: early_arrival
+    handler: early_arrival_insight
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      early_threshold_minutes: 30
+
+  # Step 5: Send results via email
+  - id: send_email
+    handler: send_email_ses
+    inputs:
+      - name: data
+        source: early_arrival.result
+    parameters:
+      sender_email: "{{params.sender_email}}"
+      recipient_email: "{{params.recipient_email}}"
+      subject: "Medical Insights: Early Arrival Report"
+      attachment_filename_prefix: "early_arrival_report"
+      include_summary: true
+
