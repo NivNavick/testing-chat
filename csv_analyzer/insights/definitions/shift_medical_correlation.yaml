@@ -1,0 +1,187 @@
+# Insight: Shift-Medical Correlation (Fraud Detection)
+# 
+# Uses CANONICAL columns from schema transformations:
+# - employee_shifts: shift_start, shift_end, day_of_month, city_code
+# - staff_clinical_procedures: procedure_start_time, procedure_end_time, city_code
+# 
+# This insight works with canonicalized data where time ranges and city codes
+# have been pre-extracted, making SQL generation simpler and more reliable.
+
+name: shift_medical_correlation
+version: "1.0"
+description: "Correlate employee shift hours with medical procedure records to detect fraud patterns: early arrivals, no activity at branch, and location mismatches"
+category: fraud_detection
+tags:
+  - fraud
+  - compliance
+  - shifts
+  - procedures
+  - location
+
+requires:
+  - employee_shifts
+  - staff_clinical_procedures
+
+optional:
+  - employee_compensation
+
+parameters:
+  - name: early_tolerance_minutes
+    type: integer
+    default: 30
+    description: "Minutes before shift start considered valid for procedure activity"
+  - name: late_tolerance_minutes
+    type: integer
+    default: 15
+    description: "Minutes after shift end considered valid for procedure activity"
+  - name: min_procedures
+    type: integer
+    default: 1
+    description: "Minimum expected procedures per shift"
+  - name: start_date
+    type: date
+    required: false
+    description: "Filter from this date"
+  - name: end_date
+    type: date
+    required: false
+    description: "Filter until this date"
+
+sql: |
+  -- Correlate shifts with medical procedures using canonical columns
+  WITH shift_data AS (
+    -- Get shifts with canonical columns
+    SELECT 
+      COALESCE(employee_id, employee_name) AS emp_id,
+      employee_name,
+      shift_date,
+      day_of_month,
+      shift_start,
+      shift_end,
+      city_code,
+      department_code,
+      -- Calculate shift duration
+      CASE 
+        WHEN shift_start IS NOT NULL AND shift_end IS NOT NULL 
+        THEN EXTRACT(EPOCH FROM (TRY_CAST(shift_end AS TIME) - TRY_CAST(shift_start AS TIME))) / 3600.0
+        ELSE NULL
+      END AS shift_hours
+    FROM employee_shifts
+    WHERE shift_start IS NOT NULL
+      {? AND shift_date >= '{{start_date}}' ?}
+      {? AND shift_date <= '{{end_date}}' ?}
+  ),
+  
+  procedure_data AS (
+    -- Get procedures with canonical columns
+    SELECT 
+      performed_datetime,
+      EXTRACT(DAY FROM performed_datetime) AS procedure_day,
+      procedure_start_time,
+      procedure_end_time,
+      city_code AS proc_city_code,
+      location,
+      procedure_description,
+      billing_code
+    FROM staff_clinical_procedures
+    WHERE procedure_start_time IS NOT NULL
+      {? AND performed_datetime >= '{{start_date}}' ?}
+      {? AND performed_datetime <= '{{end_date}}' ?}
+  ),
+  
+  shift_procedures AS (
+    -- Join shifts with procedures on day and location
+    SELECT 
+      s.emp_id,
+      s.employee_name,
+      s.shift_date,
+      s.shift_start,
+      s.shift_end,
+      s.city_code,
+      s.shift_hours,
+      p.procedure_start_time,
+      p.procedure_description,
+      p.proc_city_code,
+      
+      -- Check early arrival
+      CASE 
+        WHEN p.procedure_start_time IS NOT NULL 
+         AND TRY_CAST(p.procedure_start_time AS TIME) < 
+             TRY_CAST(s.shift_start AS TIME) - INTERVAL '{{early_tolerance_minutes}}' MINUTES
+        THEN TRUE ELSE FALSE
+      END AS is_early,
+      
+      -- Check location match
+      CASE 
+        WHEN s.city_code IS NOT NULL AND p.proc_city_code IS NOT NULL
+         AND s.city_code != p.proc_city_code
+        THEN TRUE ELSE FALSE
+      END AS location_mismatch
+      
+    FROM shift_data s
+    LEFT JOIN procedure_data p
+      ON s.day_of_month = p.procedure_day
+      AND (s.city_code = p.proc_city_code OR s.city_code IS NULL OR p.proc_city_code IS NULL)
+  ),
+  
+  shift_summary AS (
+    -- Aggregate by shift
+    SELECT 
+      emp_id,
+      employee_name,
+      shift_date,
+      shift_start,
+      shift_end,
+      city_code,
+      shift_hours,
+      COUNT(procedure_start_time) AS procedure_count,
+      SUM(CASE WHEN is_early THEN 1 ELSE 0 END) AS early_arrivals,
+      SUM(CASE WHEN location_mismatch THEN 1 ELSE 0 END) AS location_mismatches
+    FROM shift_procedures
+    GROUP BY emp_id, employee_name, shift_date, shift_start, shift_end, city_code, shift_hours
+  )
+  
+  SELECT 
+    employee_name,
+    shift_date,
+    shift_start,
+    shift_end,
+    city_code,
+    shift_hours,
+    procedure_count,
+    early_arrivals,
+    location_mismatches,
+    
+    -- Determine severity
+    CASE
+      WHEN early_arrivals > 0 THEN 'CRITICAL'
+      WHEN procedure_count = 0 THEN 'WARNING'
+      WHEN location_mismatches > 0 THEN 'WARNING'
+      WHEN procedure_count < {{min_procedures}} THEN 'INFO'
+      ELSE NULL
+    END AS severity,
+    
+    -- Build evidence string
+    CASE
+      WHEN early_arrivals > 0 THEN 
+        employee_name || ' recorded ' || early_arrivals || ' procedure(s) more than {{early_tolerance_minutes}} min before shift start (' ||
+        shift_start || ') at ' || COALESCE(city_code, 'unknown location') || ' on ' || shift_date
+      WHEN procedure_count = 0 THEN 
+        employee_name || ' worked ' || ROUND(shift_hours, 1) || 'h shift at ' || COALESCE(city_code, 'unknown location') || 
+        ' on ' || shift_date || ' but 0 procedures recorded at that branch'
+      WHEN location_mismatches > 0 THEN
+        employee_name || ' has ' || location_mismatches || ' procedure(s) at different location than assigned shift (' ||
+        COALESCE(city_code, 'unknown') || ') on ' || shift_date
+      WHEN procedure_count < {{min_procedures}} THEN
+        employee_name || ' has only ' || procedure_count || ' procedure(s) during ' || ROUND(shift_hours, 1) || 
+        'h shift at ' || COALESCE(city_code, 'unknown') || ' (expected at least {{min_procedures}})'
+      ELSE 'No issues detected'
+    END AS evidence
+    
+  FROM shift_summary
+  WHERE severity IS NOT NULL
+  ORDER BY 
+    CASE severity WHEN 'CRITICAL' THEN 1 WHEN 'WARNING' THEN 2 WHEN 'INFO' THEN 3 ELSE 4 END,
+    shift_date DESC,
+    employee_name
+
