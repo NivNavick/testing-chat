@@ -304,6 +304,9 @@ class EarlyArrivalBlock(BaseBlock):
             result_df["_status_order"] = result_df["status"].map(status_order)
             result_df = result_df.sort_values(["_status_order", "shift_date", "arrival_time"])
             result_df = result_df.drop(columns=["_status_order"])
+            
+            # Add cost calculation based on salary data
+            result_df = self._add_cost_calculation(result_df, classified_data)
         
         self.logger.info(
             f"Early arrival analysis complete: "
@@ -481,6 +484,182 @@ class EarlyArrivalBlock(BaseBlock):
                 })
         
         return results
+    
+    def _add_cost_calculation(
+        self,
+        result_df: pd.DataFrame,
+        classified_data: Dict[str, pd.DataFrame],
+    ) -> pd.DataFrame:
+        """
+        Add wasted_cost column based on employee salary data.
+        
+        Calculates cost for:
+        - EARLY: minutes_early / 60 * hourly_rate
+        - EXCESS: Estimated full shift cost (8 hours * hourly_rate)
+        - OK/NO_PROCEDURES: Empty
+        
+        Args:
+            result_df: Results DataFrame with status column
+            classified_data: Dict of classified DataFrames
+            
+        Returns:
+            DataFrame with added wasted_cost column
+        """
+        # Build hourly rate lookup from salary data
+        hourly_rates = self._build_hourly_rate_lookup(classified_data)
+        
+        if not hourly_rates:
+            self.logger.info("No salary data available - wasted_cost will be empty")
+            result_df["wasted_cost"] = None
+            return result_df
+        
+        # Calculate cost for each row
+        costs = []
+        total_early_cost = 0
+        total_excess_cost = 0
+        
+        for _, row in result_df.iterrows():
+            status = row["status"]
+            employee_id = str(row.get("employee_id", ""))
+            employee_name = str(row.get("employee_name", ""))
+            
+            # Get hourly rate for this employee
+            hourly_rate = hourly_rates.get(employee_id) or hourly_rates.get(employee_name)
+            
+            if status == "OK" or status == "NO_PROCEDURES" or not hourly_rate:
+                costs.append(None)
+                continue
+            
+            # Calculate cost based on status
+            if status == "EARLY":
+                minutes_early = row.get("minutes_early", 0)
+                if minutes_early and pd.notna(minutes_early):
+                    cost = (float(minutes_early) / 60.0) * float(hourly_rate)
+                    costs.append(round(cost, 2))
+                    total_early_cost += cost
+                    self.logger.debug(
+                        f"EARLY cost for {employee_name}: {minutes_early} min × "
+                        f"₪{hourly_rate}/hr = ₪{cost:.2f}"
+                    )
+                else:
+                    costs.append(None)
+            
+            elif status == "EXCESS":
+                # EXCESS is a full wasted shift - estimate 8 hours
+                # (actual hours unknown without shift end time)
+                estimated_hours = 8
+                cost = estimated_hours * float(hourly_rate)
+                costs.append(round(cost, 2))
+                total_excess_cost += cost
+                self.logger.debug(
+                    f"EXCESS cost for {employee_name}: {estimated_hours} hrs × "
+                    f"₪{hourly_rate}/hr = ₪{cost:.2f}"
+                )
+            else:
+                costs.append(None)
+        
+        result_df["wasted_cost"] = costs
+        
+        # Log summary
+        if total_early_cost > 0 or total_excess_cost > 0:
+            self.logger.info(
+                f"💰 Cost analysis: EARLY wasted ₪{total_early_cost:.2f}, "
+                f"EXCESS wasted ₪{total_excess_cost:.2f}, "
+                f"Total: ₪{(total_early_cost + total_excess_cost):.2f}"
+            )
+        
+        return result_df
+    
+    def _build_hourly_rate_lookup(
+        self,
+        classified_data: Dict[str, pd.DataFrame],
+    ) -> Dict[str, float]:
+        """
+        Build employee ID/name -> hourly rate lookup from salary data.
+        
+        Tries multiple sources:
+        1. employee_monthly_salary: Convert monthly -> hourly (÷ 160 hours)
+        2. employee_compensation: Use hourly_rate or rate_primary field
+        
+        Returns:
+            Dict mapping employee_id or employee_name to hourly rate
+        """
+        hourly_rates = {}
+        
+        # Try employee_monthly_salary first
+        if "employee_monthly_salary" in classified_data:
+            salary_df = classified_data["employee_monthly_salary"]
+            self.logger.info(f"Loading salary data from employee_monthly_salary ({len(salary_df)} rows)")
+            
+            # Find relevant columns
+            name_col = self._find_column(salary_df, ["employee_name", "name", "שם", "שם עובד"])
+            id_col = self._find_column(salary_df, ["employee_id", "id", "מספר עובד"])
+            rate_col = self._find_column(salary_df, ["rate_primary", "hourly_rate", "rate", "תעריף"])
+            
+            # Also check for monthly salary columns to convert
+            avg_salary_col = self._find_column(salary_df, ["avg_monthly_salary", "monthly_salary", "salary"])
+            
+            for _, row in salary_df.iterrows():
+                employee_id = str(row.get(id_col, "")) if id_col else ""
+                employee_name = str(row.get(name_col, "")) if name_col else ""
+                
+                # Try to get hourly rate directly
+                hourly_rate = None
+                if rate_col and pd.notna(row.get(rate_col)):
+                    try:
+                        hourly_rate = float(row[rate_col])
+                    except (ValueError, TypeError):
+                        # Skip invalid rate values (e.g., '73/82', non-numeric)
+                        pass
+                
+                # If no hourly rate, try to calculate from monthly salary
+                # Assume 160 work hours per month (20 days × 8 hours)
+                elif avg_salary_col and pd.notna(row.get(avg_salary_col)):
+                    try:
+                        monthly_salary = float(row[avg_salary_col])
+                        hourly_rate = monthly_salary / 160.0
+                        self.logger.debug(
+                            f"Calculated hourly rate for {employee_name}: "
+                            f"₪{monthly_salary}/month ÷ 160 hrs = ₪{hourly_rate:.2f}/hr"
+                        )
+                    except (ValueError, TypeError):
+                        # Skip invalid salary values
+                        pass
+                
+                if hourly_rate and hourly_rate > 0:
+                    if employee_id:
+                        hourly_rates[employee_id] = hourly_rate
+                    if employee_name:
+                        hourly_rates[employee_name] = hourly_rate
+        
+        # Try employee_compensation as fallback
+        elif "employee_compensation" in classified_data:
+            comp_df = classified_data["employee_compensation"]
+            self.logger.info(f"Loading salary data from employee_compensation ({len(comp_df)} rows)")
+            
+            name_col = self._find_column(comp_df, ["employee_name", "name", "שם"])
+            id_col = self._find_column(comp_df, ["employee_id", "id", "מספר עובד"])
+            rate_col = self._find_column(comp_df, ["hourly_rate", "rate", "תעריף"])
+            
+            for _, row in comp_df.iterrows():
+                employee_id = str(row.get(id_col, "")) if id_col else ""
+                employee_name = str(row.get(name_col, "")) if name_col else ""
+                
+                if rate_col and pd.notna(row.get(rate_col)):
+                    try:
+                        hourly_rate = float(row[rate_col])
+                        
+                        if hourly_rate > 0:
+                            if employee_id:
+                                hourly_rates[employee_id] = hourly_rate
+                            if employee_name:
+                                hourly_rates[employee_name] = hourly_rate
+                    except (ValueError, TypeError):
+                        # Skip invalid rate values
+                        pass
+        
+        self.logger.info(f"Built hourly rate lookup for {len(hourly_rates)} employees")
+        return hourly_rates
 
 
 # Register the block
