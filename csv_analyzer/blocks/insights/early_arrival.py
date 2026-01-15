@@ -611,7 +611,10 @@ class EarlyArrivalBlock(BaseBlock):
             
             for arr in matched + unmatched:
                 location_display = arr.get("location", "")
-                if arr.get("location_inferred"):
+                # Replace 'nan' string or NaN values with empty string
+                if not location_display or str(location_display).lower() in ['nan', 'none']:
+                    location_display = ""
+                elif arr.get("location_inferred"):
                     location_display = f"{location_display} (inferred)"
                 
                 results.append({

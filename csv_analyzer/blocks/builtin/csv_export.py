@@ -170,8 +170,8 @@ class CSVExportBlock(BaseBlock):
         
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Write CSV
-        combined_df.to_csv(output_path, index=include_index, encoding="utf-8-sig")
+        # Write CSV (na_rep='' ensures NaN values are written as empty strings, not "nan")
+        combined_df.to_csv(output_path, index=include_index, encoding="utf-8-sig", na_rep='')
         self.logger.info(f"✅ CSV exported to: {output_path}")
         self.logger.info(f"   Rows: {len(combined_df)}, Columns: {len(combined_df.columns)}")
         

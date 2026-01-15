@@ -116,6 +116,8 @@ blocks:
         source: early_arrival.result.employee_id
       - field: shift_date
         source: early_arrival.result.shift_date
+      - field: location
+        source: early_arrival.result.location
       - field: arrival_time
         source: early_arrival.result.arrival_time
       - field: matched_procedure_time
@@ -130,6 +132,8 @@ blocks:
         source: early_arrival.result.status
       - field: evidence
         source: early_arrival.result.evidence
+      - field: wasted_cost
+        source: early_arrival.result.wasted_cost
     parameters:
       filename: "early_arrival_report.csv"
       output_dir: "{{output_dir}}"
