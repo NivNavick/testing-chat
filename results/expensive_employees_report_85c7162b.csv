@@ -1,9 +1,0 @@
-﻿cost_rank,employee_name,position,city,total_salary,avg_monthly_salary,months_active,rate_primary,rate_secondary,has_dual_rate,cost_percentile
-1,Anna Wilson,Gastro Nurse,Bat Yam,58124.0,11624.8,5,85.0,,False,87.5
-2,Lisa Brown,Medical Secretary,Bat Yam,38152.0,7630.4,5,50.0,,False,75.0
-3,Sarah Cohen,Nurse,Bat Yam,37215.0,7443.0,5,,,False,62.5
-4,James Taylor,Gastro Nurse,Hadera,36737.0,7347.4,5,94.0,,False,50.0
-5,Emily White,Nurse,Hadera,15467.0,3093.4,5,63.0,,False,37.5
-6,David Lee,Medical Staff,Bat Yam,15168.0,3033.6,5,47.0,,False,25.0
-7,Mike Davis,Eye Technician,Bat Yam,8977.0,4488.5,2,45.0,,False,12.5
-8,John Smith,Medical Staff,Bat Yam,4106.0,2053.0,2,47.0,,False,0.0
