@@ -74,57 +74,109 @@ def time_diff_minutes(t1: datetime, t2: datetime) -> int:
     return int(delta.total_seconds() / 60)
 
 
+def _requires_multi_staff(treatment_name: str, multi_staff_procedures: Optional[List[Dict]]) -> int:
+    """
+    Check if a procedure requires multiple staff members.
+    
+    Args:
+        treatment_name: Name of the treatment/procedure
+        multi_staff_procedures: List of {identifier: str, required_staff: int}
+    
+    Returns:
+        Number of staff required (1 if not in multi_staff list)
+    """
+    if not multi_staff_procedures or not treatment_name:
+        return 1
+    
+    for config in multi_staff_procedures:
+        identifier = config.get("identifier", "")
+        if identifier and identifier.lower() in treatment_name.lower():
+            return config.get("required_staff", 1)
+    
+    return 1
+
+
 def match_arrivals_to_procedures(
     arrivals: List[Dict],
     procedures: List[Dict],
     max_early_minutes: int = 30,
+    multi_staff_procedures: Optional[List[Dict]] = None,
 ) -> Tuple[List[Dict], List[Dict]]:
     """
     Match arrivals to procedures using greedy algorithm.
     
     For each procedure (sorted by time), find the earliest unmatched arrival
     where: 0 <= (procedure_time - arrival_time) <= max_early_minutes
+    
+    Args:
+        arrivals: List of arrival records
+        procedures: List of procedure records
+        max_early_minutes: Maximum minutes early to still count as OK
+        multi_staff_procedures: List of procedures requiring multiple staff
+            Format: [{"identifier": "גסטרוסקופיה", "required_staff": 2}, ...]
     """
     arrivals_sorted = sorted(arrivals, key=lambda x: x["arrival_time"])
     procedures_sorted = sorted(procedures, key=lambda x: x["procedure_time"])
     
     matched_indices = set()
     matched_arrivals = []
+    procedure_match_count = {}  # Track how many staff matched to each procedure
     
     for proc in procedures_sorted:
         proc_time = proc["procedure_time"]
         proc_name = proc.get("treatment_name", "")
         proc_category = proc.get("category", "")
         proc_staff = proc.get("treating_staff", "")
+        proc_id = f"{proc_time.strftime('%H:%M')}_{proc_name}"
         
-        for i, arr in enumerate(arrivals_sorted):
-            if i in matched_indices:
-                continue
+        # Determine how many staff this procedure requires
+        required_staff = _requires_multi_staff(proc_name, multi_staff_procedures)
+        current_matches = procedure_match_count.get(proc_id, 0)
+        
+        # Match up to required_staff arrivals to this procedure
+        while current_matches < required_staff:
+            matched_this_round = False
             
-            arr_time = arr["arrival_time"]
-            diff = time_diff_minutes(arr_time, proc_time)
+            for i, arr in enumerate(arrivals_sorted):
+                if i in matched_indices:
+                    continue
+                
+                arr_time = arr["arrival_time"]
+                diff = time_diff_minutes(arr_time, proc_time)
+                
+                if 0 <= diff <= max_early_minutes:
+                    matched_indices.add(i)
+                    arr_copy = arr.copy()
+                    arr_copy["matched_procedure_time"] = proc_time.strftime("%H:%M")
+                    arr_copy["matched_treatment"] = proc_name
+                    arr_copy["treating_staff"] = proc_staff
+                    arr_copy["minutes_before_procedure"] = diff
+                    arr_copy["status"] = "OK"
+                    
+                    # Build evidence with location and treatment
+                    loc = arr.get('location')
+                    location_str = f" at {loc}" if loc and loc != 'UNKNOWN' and loc != 'None' and str(loc).lower() != 'nan' else ""
+                    treatment_str = f" Treatment: {proc_name}." if proc_name else ""
+                    category_str = f" Category: {proc_category}." if proc_category else ""
+                    
+                    # Add staff position if multi-staff
+                    staff_position_str = ""
+                    if required_staff > 1:
+                        staff_position_str = f" (Staff {current_matches + 1}/{required_staff})"
+                    
+                    arr_copy["evidence"] = (
+                        f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
+                        f"covered procedure at {proc_time.strftime('%H:%M')} "
+                        f"({diff} min before){staff_position_str}.{treatment_str}{category_str}"
+                    )
+                    matched_arrivals.append(arr_copy)
+                    current_matches += 1
+                    procedure_match_count[proc_id] = current_matches
+                    matched_this_round = True
+                    break
             
-            if 0 <= diff <= max_early_minutes:
-                matched_indices.add(i)
-                arr_copy = arr.copy()
-                arr_copy["matched_procedure_time"] = proc_time.strftime("%H:%M")
-                arr_copy["matched_treatment"] = proc_name
-                arr_copy["treating_staff"] = proc_staff
-                arr_copy["minutes_before_procedure"] = diff
-                arr_copy["status"] = "OK"
-                
-                # Build evidence with location and treatment
-                loc = arr.get('location')
-                location_str = f" at {loc}" if loc and loc != 'UNKNOWN' and loc != 'None' and str(loc).lower() != 'nan' else ""
-                treatment_str = f" Treatment: {proc_name}." if proc_name else ""
-                category_str = f" Category: {proc_category}." if proc_category else ""
-                
-                arr_copy["evidence"] = (
-                    f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
-                    f"covered procedure at {proc_time.strftime('%H:%M')} "
-                    f"({diff} min before).{treatment_str}{category_str}"
-                )
-                matched_arrivals.append(arr_copy)
+            # If no match found this round, stop trying for this procedure
+            if not matched_this_round:
                 break
     
     unmatched_arrivals = []
@@ -164,17 +216,46 @@ def match_arrivals_to_procedures(
                         f"Arrived {minutes_early} min early.{treatment_str}{category_str}"
                     )
                 else:
-                    arr_copy["matched_procedure_time"] = nearest_time.strftime("%H:%M")
-                    arr_copy["matched_treatment"] = nearest_name
-                    arr_copy["treating_staff"] = nearest_staff
-                    arr_copy["minutes_before_procedure"] = gap
-                    arr_copy["minutes_early"] = 0
-                    arr_copy["status"] = "EXCESS"
-                    arr_copy["evidence"] = (
-                        f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
-                        f"but all procedures already have assigned staff. "
-                        f"Nearest procedure at {nearest_time.strftime('%H:%M')}.{treatment_str}{category_str}"
-                    )
+                    # Check if this procedure requires multiple staff
+                    required_staff = _requires_multi_staff(nearest_name, multi_staff_procedures)
+                    
+                    if required_staff > 1:
+                        # Multi-staff procedure - mark as OK (secondary staff)
+                        arr_copy["matched_procedure_time"] = nearest_time.strftime("%H:%M")
+                        arr_copy["matched_treatment"] = nearest_name
+                        arr_copy["treating_staff"] = nearest_staff
+                        arr_copy["minutes_before_procedure"] = gap
+                        arr_copy["minutes_early"] = 0
+                        arr_copy["status"] = "OK"
+                        arr_copy["evidence"] = (
+                            f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
+                            f"for procedure at {nearest_time.strftime('%H:%M')} "
+                            f"({gap} min before). Secondary staff for multi-staff procedure "
+                            f"(requires {required_staff} staff).{treatment_str}{category_str}"
+                        )
+                    else:
+                        # Single-staff procedure but not matched - UNCERTAIN
+                        arr_copy["matched_procedure_time"] = nearest_time.strftime("%H:%M")
+                        arr_copy["matched_treatment"] = nearest_name
+                        arr_copy["treating_staff"] = nearest_staff
+                        arr_copy["minutes_before_procedure"] = gap
+                        arr_copy["minutes_early"] = 0
+                        arr_copy["status"] = "UNCERTAIN"
+                        
+                        # Enhanced evidence with procedure details
+                        procedure_detail = f"{nearest_name}" if nearest_name else "Unknown procedure"
+                        if nearest_category:
+                            procedure_detail = f"{nearest_category} - {procedure_detail}"
+                        
+                        arr_copy["evidence"] = (
+                            f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
+                            f"{gap} min before procedure at {nearest_time.strftime('%H:%M')}. "
+                            f"Procedure: '{procedure_detail}'. "
+                            f"Another employee was matched first (greedy algorithm). "
+                            f"Cannot verify if this employee worked as secondary staff "
+                            f"(nurses not recorded in treating_staff field). "
+                            f"Could be: (1) Redundant (no work), or (2) Assisted primary staff."
+                        )
             else:
                 arr_copy["matched_procedure_time"] = None
                 arr_copy["matched_treatment"] = None
@@ -216,8 +297,11 @@ class EarlyArrivalBlock(BaseBlock):
             Returns 'skipped': True if required doc types are missing
         """
         max_early_minutes = self.get_param("max_early_minutes", 30)
+        multi_staff_procedures = self.get_param("multi_staff_procedures", [])
         
         self.logger.info(f"Running early arrival matcher with max_early_minutes={max_early_minutes}")
+        if multi_staff_procedures:
+            self.logger.info(f"Multi-staff procedures configured: {len(multi_staff_procedures)} types")
         
         # Load classified data
         classified_data = self.load_classified_data("data")
@@ -294,13 +378,13 @@ class EarlyArrivalBlock(BaseBlock):
         shifts_data = self._infer_locations(shifts_data)
         
         # Group and process
-        results = self._process_groups(shifts_data, procedures_data, max_early_minutes)
+        results = self._process_groups(shifts_data, procedures_data, max_early_minutes, multi_staff_procedures)
         
         # Build result DataFrame
         result_df = pd.DataFrame(results)
         
         if not result_df.empty:
-            status_order = {"EARLY": 0, "EXCESS": 1, "NO_PROCEDURES": 2, "OK": 3}
+            status_order = {"EARLY": 0, "UNCERTAIN": 1, "NO_PROCEDURES": 2, "OK": 3}
             result_df["_status_order"] = result_df["status"].map(status_order)
             result_df = result_df.sort_values(["_status_order", "shift_date", "arrival_time"])
             result_df = result_df.drop(columns=["_status_order"])
@@ -428,6 +512,7 @@ class EarlyArrivalBlock(BaseBlock):
         shifts_data: List[Dict],
         procedures_data: List[Dict],
         max_early_minutes: int,
+        multi_staff_procedures: Optional[List[Dict]] = None,
     ) -> List[Dict]:
         """Process shift and procedure groups."""
         # Group shifts by date and location
@@ -461,7 +546,8 @@ class EarlyArrivalBlock(BaseBlock):
             matched, unmatched = match_arrivals_to_procedures(
                 arrivals,
                 matching_procs,
-                max_early_minutes
+                max_early_minutes,
+                multi_staff_procedures
             )
             
             for arr in matched + unmatched:
@@ -495,8 +581,7 @@ class EarlyArrivalBlock(BaseBlock):
         
         Calculates cost for:
         - EARLY: minutes_early / 60 * hourly_rate
-        - EXCESS: Estimated full shift cost (8 hours * hourly_rate)
-        - OK/NO_PROCEDURES: Empty
+        - OK/NO_PROCEDURES/UNCERTAIN: Empty (NULL)
         
         Args:
             result_df: Results DataFrame with status column
@@ -513,20 +598,23 @@ class EarlyArrivalBlock(BaseBlock):
             result_df["wasted_cost"] = None
             return result_df
         
+        # Build shift hours lookup from employee_shifts data
+        shift_hours_lookup = self._build_shift_hours_lookup(classified_data)
+        
         # Calculate cost for each row
         costs = []
         total_early_cost = 0
-        total_excess_cost = 0
         
         for _, row in result_df.iterrows():
             status = row["status"]
             employee_id = str(row.get("employee_id", ""))
             employee_name = str(row.get("employee_name", ""))
+            shift_date = str(row.get("shift_date", ""))
             
             # Get hourly rate for this employee
             hourly_rate = hourly_rates.get(employee_id) or hourly_rates.get(employee_name)
             
-            if status == "OK" or status == "NO_PROCEDURES" or not hourly_rate:
+            if status == "OK" or status == "NO_PROCEDURES" or status == "UNCERTAIN" or not hourly_rate:
                 costs.append(None)
                 continue
             
@@ -543,29 +631,17 @@ class EarlyArrivalBlock(BaseBlock):
                     )
                 else:
                     costs.append(None)
-            
-            elif status == "EXCESS":
-                # EXCESS is a full wasted shift - estimate 8 hours
-                # (actual hours unknown without shift end time)
-                estimated_hours = 8
-                cost = estimated_hours * float(hourly_rate)
-                costs.append(round(cost, 2))
-                total_excess_cost += cost
-                self.logger.debug(
-                    f"EXCESS cost for {employee_name}: {estimated_hours} hrs × "
-                    f"₪{hourly_rate}/hr = ₪{cost:.2f}"
-                )
             else:
+                # Other statuses (UNCERTAIN, etc.) don't have cost
                 costs.append(None)
         
         result_df["wasted_cost"] = costs
         
         # Log summary
-        if total_early_cost > 0 or total_excess_cost > 0:
+        if total_early_cost > 0:
             self.logger.info(
-                f"💰 Cost analysis: EARLY wasted ₪{total_early_cost:.2f}, "
-                f"EXCESS wasted ₪{total_excess_cost:.2f}, "
-                f"Total: ₪{(total_early_cost + total_excess_cost):.2f}"
+                f"💰 Cost analysis: EARLY wasted ₪{total_early_cost:.2f} "
+                f"(UNCERTAIN statuses excluded - cannot verify)"
             )
         
         return result_df
@@ -660,6 +736,60 @@ class EarlyArrivalBlock(BaseBlock):
         
         self.logger.info(f"Built hourly rate lookup for {len(hourly_rates)} employees")
         return hourly_rates
+    
+    def _build_shift_hours_lookup(
+        self,
+        classified_data: Dict[str, pd.DataFrame],
+    ) -> Dict[str, float]:
+        """
+        Build employee+date -> actual shift hours lookup from employee_shifts data.
+        
+        Args:
+            classified_data: Dict of classified DataFrames
+            
+        Returns:
+            Dict mapping "employee_name_date" to actual shift hours
+        """
+        shift_hours = {}
+        
+        if "employee_shifts" not in classified_data:
+            self.logger.debug("No employee_shifts data available for shift hours lookup")
+            return shift_hours
+        
+        shifts_df = classified_data["employee_shifts"]
+        self.logger.info(f"Building shift hours lookup from employee_shifts ({len(shifts_df)} rows)")
+        
+        # Find relevant columns
+        name_col = self._find_column(shifts_df, ["employee_name", "name", "שם", "שם עובד"])
+        date_col = self._find_column(shifts_df, ["shift_date", "date", "תאריך"])
+        hours_col = self._find_column(shifts_df, ["actual_hours", "hours", "שעות"])
+        
+        if not name_col or not date_col or not hours_col:
+            self.logger.warning(
+                f"Could not find required columns for shift hours lookup: "
+                f"name={name_col}, date={date_col}, hours={hours_col}"
+            )
+            return shift_hours
+        
+        for _, row in shifts_df.iterrows():
+            employee_name = str(row.get(name_col, ""))
+            shift_date = str(row.get(date_col, ""))
+            actual_hours = row.get(hours_col)
+            
+            if not employee_name or not shift_date:
+                continue
+            
+            # Try to parse hours as float
+            try:
+                hours_float = float(actual_hours) if pd.notna(actual_hours) else None
+                if hours_float and hours_float > 0:
+                    shift_key = f"{employee_name}_{shift_date}"
+                    shift_hours[shift_key] = hours_float
+            except (ValueError, TypeError):
+                continue
+        
+        self.logger.info(f"Built shift hours lookup for {len(shift_hours)} shift records")
+        return shift_hours
 
 
 # Register the block

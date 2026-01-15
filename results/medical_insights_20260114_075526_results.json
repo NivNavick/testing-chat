@@ -1,0 +1,49 @@
+{
+  "upload": {
+    "uploaded_files": "/Users/nivnavick/Documents/git/testing-chat/results/7f809350/upload/uploaded_files.json"
+  },
+  "preprocess": {
+    "processed_files": "/Users/nivnavick/Documents/git/testing-chat/results/7f809350/preprocess/processed_files.json"
+  },
+  "classify": {
+    "classified_data": "/Users/nivnavick/Documents/git/testing-chat/results/7f809350/classify/classified_data_manifest.json"
+  },
+  "expensive_employees": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/results/7f809350/expensive_employees/result.json"
+  },
+  "manpower_cost": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/results/7f809350/manpower_cost/result.json"
+  },
+  "early_arrival": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/results/7f809350/early_arrival/result.json"
+  },
+  "gross_profit": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/results/7f809350/gross_profit/result.json"
+  },
+  "export_early_arrival": {
+    "csv_path": "results/early_arrival_report_dee65902.csv",
+    "row_count": 80,
+    "column_count": 10
+  },
+  "export_manpower_cost": {
+    "csv_path": "results/manpower_cost_report_9ecf3b44.csv",
+    "row_count": 220,
+    "column_count": 14
+  },
+  "export_gross_profit": {
+    "csv_path": "results/gross_profit_report_60fa9028.csv",
+    "row_count": 220,
+    "column_count": 15
+  },
+  "export_salary": {
+    "csv_path": "results/expensive_employees_report_05445251.csv",
+    "row_count": 56,
+    "column_count": 11
+  },
+  "email_all_reports": {
+    "status": "success",
+    "message_id": "0100019bbb12be16-07b8c797-3b10-47a5-8e1d-a470f97f0f5b-000000",
+    "recipient_count": 1,
+    "attachment_count": 4
+  }
+}

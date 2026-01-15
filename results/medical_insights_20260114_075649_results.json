@@ -1,0 +1,49 @@
+{
+  "upload": {
+    "uploaded_files": "/Users/nivnavick/Documents/git/testing-chat/results/d24f7ee4/upload/uploaded_files.json"
+  },
+  "preprocess": {
+    "processed_files": "/Users/nivnavick/Documents/git/testing-chat/results/d24f7ee4/preprocess/processed_files.json"
+  },
+  "classify": {
+    "classified_data": "/Users/nivnavick/Documents/git/testing-chat/results/d24f7ee4/classify/classified_data_manifest.json"
+  },
+  "early_arrival": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/results/d24f7ee4/early_arrival/result.json",
+    "skipped": true,
+    "reason": "Missing: ['employee_shifts', 'medical_actions']"
+  },
+  "gross_profit": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/results/d24f7ee4/gross_profit/result.json",
+    "skipped": true,
+    "reason": "Missing: ['employee_shifts', 'medical_actions']"
+  },
+  "manpower_cost": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/results/d24f7ee4/manpower_cost/result.json",
+    "skipped": true,
+    "reason": "Missing: ['employee_shifts']"
+  },
+  "expensive_employees": {
+    "result": "/Users/nivnavick/Documents/git/testing-chat/results/d24f7ee4/expensive_employees/result.json"
+  },
+  "export_early_arrival": {
+    "csv_path": ""
+  },
+  "export_manpower_cost": {
+    "csv_path": ""
+  },
+  "export_gross_profit": {
+    "csv_path": ""
+  },
+  "export_salary": {
+    "csv_path": "results/expensive_employees_report_61a34c3f.csv",
+    "row_count": 56,
+    "column_count": 11
+  },
+  "email_all_reports": {
+    "status": "success",
+    "message_id": "0100019bbb1400f7-2c859bdb-a53c-4484-9305-deee6a234f0d-000000",
+    "recipient_count": 1,
+    "attachment_count": 1
+  }
+}

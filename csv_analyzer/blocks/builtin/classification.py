@@ -362,12 +362,90 @@ class ClassificationBlock(BaseBlock):
     
     For each input file:
     1. Detect document type (employee_shifts, medical_actions, etc.)
-    2. Map columns to canonical schema field names
-    3. Merge files of the same document type
+    2. Apply schema-specific preprocessing (e.g., split rate "73/82")
+    3. Map columns to canonical schema field names
+    4. Merge files of the same document type
     
     OPTIMIZED: Batches embeddings across ALL files for maximum throughput.
     Uses cached ML services for fast repeated execution.
     """
+    
+    def _apply_schema_preprocessing(
+        self,
+        df: pd.DataFrame,
+        doc_type: str,
+        vertical: str,
+    ) -> pd.DataFrame:
+        """
+        Apply schema-specific preprocessing transforms.
+        
+        Loads the schema for the detected document type and applies
+        any column_transforms defined in its preprocessing section.
+        
+        Args:
+            df: Input DataFrame
+            doc_type: Detected document type (e.g., "employee_monthly_salary")
+            vertical: Vertical/domain (e.g., "medical")
+            
+        Returns:
+            Transformed DataFrame
+        """
+        try:
+            # Load raw YAML schema to get preprocessing config
+            import yaml
+            from pathlib import Path
+            
+            # Find schema file
+            cache = get_cached_services()
+            schema_registry = cache.schema_registry
+            schemas_dir = Path(schema_registry.schemas_dir) / vertical
+            schema_file = schemas_dir / f"{doc_type}.yaml"
+            
+            if not schema_file.exists():
+                self.logger.debug(f"No schema file found: {schema_file}")
+                return df
+            
+            # Load raw YAML
+            with open(schema_file, 'r', encoding='utf-8') as f:
+                schema_def = yaml.safe_load(f)
+            
+            # Get preprocessing config from schema
+            preprocessing_config = schema_def.get("preprocessing", {})
+            column_transforms = preprocessing_config.get("column_transforms", [])
+            
+            if not column_transforms:
+                return df
+            
+            # Filter transforms to only those with source_column (not source_column_pattern)
+            # TODO: Add support for source_column_pattern matching
+            valid_transforms = [t for t in column_transforms if "source_column" in t]
+            
+            if not valid_transforms:
+                self.logger.debug(f"No applicable transforms for {doc_type} (pattern-based transforms not yet supported)")
+                return df
+            
+            self.logger.info(f"Applying {len(valid_transforms)} schema transforms for {doc_type}")
+            
+            # Apply transforms using ValueTransformer
+            from csv_analyzer.preprocessing.transformers import ValueTransformer, TransformConfig
+            
+            transformer = ValueTransformer()
+            transform_configs = [TransformConfig.from_dict(t) for t in valid_transforms]
+            
+            result = transformer.apply_all(df, transform_configs)
+            
+            if result.errors:
+                for error in result.errors:
+                    self.logger.warning(f"Transform error: {error}")
+            
+            if result.columns_added:
+                self.logger.info(f"  Added columns: {', '.join(result.columns_added)}")
+            
+            return result.df
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to apply schema preprocessing for {doc_type}: {e}")
+            return df
     
     def run(self) -> Dict[str, str]:
         """
@@ -475,6 +553,10 @@ class ClassificationBlock(BaseBlock):
                 self.logger.warning(f"Could not classify: {filename}")
                 continue
             
+            # Apply schema-specific preprocessing (e.g., split rate "73/82")
+            self.logger.info(f"Applying schema preprocessing for {doc_type}...")
+            df_preprocessed = self._apply_schema_preprocessing(df, doc_type, vertical)
+            
             # Build column mappings for canonization
             mappings = {}
             for col_name, matches in file_column_matches.items():
@@ -486,7 +568,7 @@ class ClassificationBlock(BaseBlock):
                             mappings[col_name] = best_match["field_name"]
             
             # Canonize columns
-            df_canonized = df.copy()
+            df_canonized = df_preprocessed.copy()
             for orig_col, canonical_col in mappings.items():
                 if orig_col in df_canonized.columns and orig_col != canonical_col:
                     if canonical_col not in df_canonized.columns:
