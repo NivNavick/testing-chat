@@ -118,9 +118,29 @@ def match_arrivals_to_procedures(
     arrivals_sorted = sorted(arrivals, key=lambda x: x["arrival_time"])
     procedures_sorted = sorted(procedures, key=lambda x: x["procedure_time"])
     
+    # STEP 1: Find all eligible arrivals for each procedure
+    procedure_candidates = {}  # proc_id -> [(arrival_index, arrival_dict, time_diff)]
+    
+    for proc in procedures_sorted:
+        proc_time = proc["procedure_time"]
+        proc_name = proc.get("treatment_name", "")
+        proc_id = f"{proc_time.strftime('%H:%M')}_{proc_name}"
+        
+        # Find all arrivals that are eligible for this procedure (0-30 min before)
+        candidates = []
+        for i, arr in enumerate(arrivals_sorted):
+            arr_time = arr["arrival_time"]
+            diff = time_diff_minutes(arr_time, proc_time)
+            
+            if 0 <= diff <= max_early_minutes:
+                candidates.append((i, arr, diff))
+        
+        procedure_candidates[proc_id] = candidates
+    
+    # STEP 2: Determine matches vs conflicts
     matched_indices = set()
     matched_arrivals = []
-    procedure_match_count = {}  # Track how many staff matched to each procedure
+    conflicted_arrivals = []  # Arrivals with multiple candidates for same procedure
     
     for proc in procedures_sorted:
         proc_time = proc["procedure_time"]
@@ -129,55 +149,76 @@ def match_arrivals_to_procedures(
         proc_staff = proc.get("treating_staff", "")
         proc_id = f"{proc_time.strftime('%H:%M')}_{proc_name}"
         
+        candidates = procedure_candidates.get(proc_id, [])
+        
+        # Skip already matched arrivals
+        available_candidates = [(i, arr, diff) for (i, arr, diff) in candidates if i not in matched_indices]
+        
+        if not available_candidates:
+            continue
+        
         # Determine how many staff this procedure requires
         required_staff = _requires_multi_staff(proc_name, multi_staff_procedures)
-        current_matches = procedure_match_count.get(proc_id, 0)
         
-        # Match up to required_staff arrivals to this procedure
-        while current_matches < required_staff:
-            matched_this_round = False
-            
-            for i, arr in enumerate(arrivals_sorted):
-                if i in matched_indices:
-                    continue
+        # CONFLICT DETECTION: If more arrivals than required staff -> mark all as UNCERTAIN
+        if len(available_candidates) > required_staff:
+            # Multiple employees for same procedure - can't determine who worked it
+            for i, arr, diff in available_candidates:
+                matched_indices.add(i)
+                arr_copy = arr.copy()
+                arr_copy["matched_procedure_time"] = proc_time.strftime("%H:%M")
+                arr_copy["matched_treatment"] = proc_name
+                arr_copy["treating_staff"] = proc_staff
+                arr_copy["minutes_before_procedure"] = diff
+                arr_copy["minutes_early"] = 0
+                arr_copy["status"] = "UNCERTAIN"
                 
-                arr_time = arr["arrival_time"]
-                diff = time_diff_minutes(arr_time, proc_time)
+                loc = arr.get('location')
+                location_str = f" at {loc}" if loc and loc != 'UNKNOWN' and loc != 'None' and str(loc).lower() != 'nan' else ""
                 
-                if 0 <= diff <= max_early_minutes:
-                    matched_indices.add(i)
-                    arr_copy = arr.copy()
-                    arr_copy["matched_procedure_time"] = proc_time.strftime("%H:%M")
-                    arr_copy["matched_treatment"] = proc_name
-                    arr_copy["treating_staff"] = proc_staff
-                    arr_copy["minutes_before_procedure"] = diff
-                    arr_copy["status"] = "OK"
-                    
-                    # Build evidence with location and treatment
-                    loc = arr.get('location')
-                    location_str = f" at {loc}" if loc and loc != 'UNKNOWN' and loc != 'None' and str(loc).lower() != 'nan' else ""
-                    treatment_str = f" Treatment: {proc_name}." if proc_name else ""
-                    category_str = f" Category: {proc_category}." if proc_category else ""
-                    
-                    # Add staff position if multi-staff
-                    staff_position_str = ""
-                    if required_staff > 1:
-                        staff_position_str = f" (Staff {current_matches + 1}/{required_staff})"
-                    
-                    arr_copy["evidence"] = (
-                        f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
-                        f"covered procedure at {proc_time.strftime('%H:%M')} "
-                        f"({diff} min before){staff_position_str}.{treatment_str}{category_str}"
-                    )
-                    matched_arrivals.append(arr_copy)
-                    current_matches += 1
-                    procedure_match_count[proc_id] = current_matches
-                    matched_this_round = True
-                    break
-            
-            # If no match found this round, stop trying for this procedure
-            if not matched_this_round:
-                break
+                procedure_detail = f"{proc_name}" if proc_name else "Unknown procedure"
+                if proc_category:
+                    procedure_detail = f"{proc_category} - {procedure_detail}"
+                
+                arr_copy["evidence"] = (
+                    f"Arrived at {arr['arrival_time'].strftime('%H:%M')}{location_str}, "
+                    f"{diff} min before procedure at {proc_time.strftime('%H:%M')}. "
+                    f"Procedure: '{procedure_detail}'. "
+                    f"CONFLICT: {len(available_candidates)} employees arrived for this procedure "
+                    f"(requires {required_staff} staff). Cannot determine who actually worked it. "
+                    f"Other candidates: {', '.join([c[1].get('employee_name', 'Unknown') for c in available_candidates if c[0] != i][:3])}."
+                )
+                conflicted_arrivals.append(arr_copy)
+        else:
+            # Exact match or under-staffed: Match up to required_staff (earliest first)
+            for idx, (i, arr, diff) in enumerate(available_candidates[:required_staff]):
+                matched_indices.add(i)
+                arr_copy = arr.copy()
+                arr_copy["matched_procedure_time"] = proc_time.strftime("%H:%M")
+                arr_copy["matched_treatment"] = proc_name
+                arr_copy["treating_staff"] = proc_staff
+                arr_copy["minutes_before_procedure"] = diff
+                arr_copy["status"] = "OK"
+                
+                loc = arr.get('location')
+                location_str = f" at {loc}" if loc and loc != 'UNKNOWN' and loc != 'None' and str(loc).lower() != 'nan' else ""
+                treatment_str = f" Treatment: {proc_name}." if proc_name else ""
+                category_str = f" Category: {proc_category}." if proc_category else ""
+                
+                # Add staff position if multi-staff
+                staff_position_str = ""
+                if required_staff > 1:
+                    staff_position_str = f" (Staff {idx + 1}/{required_staff})"
+                
+                arr_copy["evidence"] = (
+                    f"Arrived at {arr['arrival_time'].strftime('%H:%M')}{location_str}, "
+                    f"covered procedure at {proc_time.strftime('%H:%M')} "
+                    f"({diff} min before){staff_position_str}.{treatment_str}{category_str}"
+                )
+                matched_arrivals.append(arr_copy)
+    
+    # Add conflicted arrivals to matched (they've been processed)
+    matched_arrivals.extend(conflicted_arrivals)
     
     unmatched_arrivals = []
     for i, arr in enumerate(arrivals_sorted):
@@ -188,9 +229,27 @@ def match_arrivals_to_procedures(
             location_str = f" at {loc}" if loc and loc != 'UNKNOWN' and loc != 'None' and str(loc).lower() != 'nan' else ""
             
             if procedures_sorted:
+                # Find the nearest FUTURE procedure (arrival must be before procedure)
+                future_procs = [p for p in procedures_sorted if p["procedure_time"] > arr_time]
+                
+                if not future_procs:
+                    # Arrived after all procedures - no work available
+                    arr_copy["matched_procedure_time"] = None
+                    arr_copy["matched_treatment"] = None
+                    arr_copy["treating_staff"] = None
+                    arr_copy["minutes_before_procedure"] = None
+                    arr_copy["minutes_early"] = None
+                    arr_copy["status"] = "NO_PROCEDURES"
+                    arr_copy["evidence"] = (
+                        f"Arrived at {arr_time.strftime('%H:%M')}{location_str}, "
+                        f"after all procedures for this date/location were completed."
+                    )
+                    unmatched_arrivals.append(arr_copy)
+                    continue
+                
                 nearest_proc = min(
-                    procedures_sorted,
-                    key=lambda p: abs(time_diff_minutes(arr_time, p["procedure_time"]))
+                    future_procs,
+                    key=lambda p: time_diff_minutes(arr_time, p["procedure_time"])
                 )
                 nearest_time = nearest_proc["procedure_time"]
                 nearest_name = nearest_proc.get("treatment_name", "")
