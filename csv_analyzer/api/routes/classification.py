@@ -428,3 +428,561 @@ def _list_document_types_sync(vertical: Optional[str]) -> List[DocumentTypeRespo
                 for row in rows
             ]
 
+
+# ============================================================================
+# Ground Truth / Training Endpoints
+# ============================================================================
+
+from pydantic import BaseModel
+from typing import Dict
+
+
+class GroundTruthIngestRequest(BaseModel):
+    """Request model for ground truth ingestion."""
+    vertical: str
+    document_type: str
+    column_mappings: Dict[str, str]
+    external_id: Optional[str] = None
+    source_description: Optional[str] = None
+    labeler: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class GroundTruthResponse(BaseModel):
+    """Response model for ground truth records."""
+    id: int
+    external_id: str
+    vertical: str
+    document_type: str
+    source_description: Optional[str]
+    row_count: int
+    column_count: int
+    column_mappings: Dict[str, str]
+    labeler: Optional[str]
+    notes: Optional[str]
+    created_at: Optional[str]
+
+
+class GroundTruthListResponse(BaseModel):
+    """List of ground truth records."""
+    records: List[GroundTruthResponse]
+    total: int
+
+
+@router.post("/training/ingest", response_model=GroundTruthResponse)
+async def ingest_ground_truth(
+    file: UploadFile = File(...),
+    vertical: str = Form(...),
+    document_type: str = Form(...),
+    column_mappings: str = Form(...),  # JSON string
+    external_id: Optional[str] = Form(None),
+    source_description: Optional[str] = Form(None),
+    labeler: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+):
+    """
+    Ingest a CSV file as ground truth for training the classification engine.
+    
+    This endpoint allows you to add labeled examples that the classification
+    engine will use to recognize similar documents in the future.
+    
+    Args:
+        file: CSV file to ingest as ground truth
+        vertical: Vertical domain (e.g., 'medical', 'banking')
+        document_type: Document type (e.g., 'employee_shifts', 'medical_actions')
+        column_mappings: JSON string mapping source columns to target fields
+                        e.g., '{"emp_id": "employee_id", "work_date": "shift_date"}'
+        external_id: Optional unique identifier (auto-generated if not provided)
+        source_description: Optional description of the data source
+        labeler: Optional name/email of person who labeled this
+        notes: Optional notes about this ground truth
+        
+    Returns:
+        Created ground truth record info
+        
+    Example:
+        curl -X POST /api/v1/classification/training/ingest \\
+          -F "file=@shifts.csv" \\
+          -F "vertical=medical" \\
+          -F "document_type=employee_shifts" \\
+          -F 'column_mappings={"עובד": "employee_name", "תאריך": "shift_date"}'
+    """
+    import json
+    
+    settings = get_settings()
+    
+    # Parse column mappings JSON
+    try:
+        mappings = json.loads(column_mappings)
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid column_mappings JSON: {e}"
+        )
+    
+    if not isinstance(mappings, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="column_mappings must be a JSON object"
+        )
+    
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Save to temp file
+        temp_dir = Path(settings.storage.local_temp_dir)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        
+        temp_path = temp_dir / f"ingest_{uuid.uuid4()}.csv"
+        temp_path.write_bytes(content)
+        
+        try:
+            # Run ingestion in thread pool
+            result = await run_sync(
+                _ingest_ground_truth_sync,
+                str(temp_path),
+                vertical,
+                document_type,
+                mappings,
+                external_id,
+                source_description or f"Uploaded: {file.filename}",
+                labeler,
+                notes,
+            )
+            
+            return result
+            
+        finally:
+            temp_path.unlink(missing_ok=True)
+            
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to ingest ground truth: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ingestion failed: {str(e)}"
+        )
+
+
+def _ingest_ground_truth_sync(
+    csv_path: str,
+    vertical: str,
+    document_type: str,
+    column_mappings: Dict[str, str],
+    external_id: Optional[str],
+    source_description: Optional[str],
+    labeler: Optional[str],
+    notes: Optional[str],
+) -> GroundTruthResponse:
+    """Synchronous ground truth ingestion."""
+    from csv_analyzer.db.connection import init_database, Database
+    from csv_analyzer.engines.ingestion_engine import IngestionEngine
+    from csv_analyzer.multilingual_embeddings_client import get_multilingual_embeddings_client
+    from csv_analyzer.db.repositories.ground_truth_repo import GroundTruthRepository
+    
+    # Initialize database if not already done
+    if not Database.is_initialized():
+        settings = get_settings()
+        init_database(
+            host=settings.database.host,
+            port=settings.database.port,
+            database=settings.database.name,
+            user=settings.database.user,
+            password=settings.database.password,
+            run_migrations=False,
+        )
+    
+    # Get embeddings client
+    embeddings_client = get_multilingual_embeddings_client()
+    
+    if not embeddings_client.is_available:
+        raise ValueError("Embedding model not available")
+    
+    # Create ingestion engine and ingest
+    engine = IngestionEngine(embeddings_client)
+    
+    gt_id = engine.ingest_csv(
+        csv_file=csv_path,
+        vertical=vertical,
+        document_type=document_type,
+        column_mappings=column_mappings,
+        external_id=external_id,
+        source_description=source_description,
+        labeler=labeler,
+        notes=notes,
+    )
+    
+    # Fetch the created record
+    record = GroundTruthRepository.get_by_external_id(
+        external_id or f"gt_{vertical}_{document_type}_{gt_id}"
+    )
+    
+    if not record:
+        # Fallback: fetch by ID
+        with Database.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT gt.id, gt.external_id, v.name as vertical, dt.name as document_type,
+                           gt.source_description, gt.row_count, gt.column_count,
+                           gt.column_mappings, gt.labeler, gt.notes, gt.created_at
+                    FROM ground_truth gt
+                    JOIN document_types dt ON gt.document_type_id = dt.id
+                    JOIN verticals v ON dt.vertical_id = v.id
+                    WHERE gt.id = %s
+                """, (gt_id,))
+                row = cur.fetchone()
+                
+                if row:
+                    import json
+                    return GroundTruthResponse(
+                        id=row[0],
+                        external_id=row[1],
+                        vertical=row[2],
+                        document_type=row[3],
+                        source_description=row[4],
+                        row_count=row[5],
+                        column_count=row[6],
+                        column_mappings=json.loads(row[7]) if isinstance(row[7], str) else row[7],
+                        labeler=row[8],
+                        notes=row[9],
+                        created_at=str(row[10]) if row[10] else None,
+                    )
+    
+    import json
+    return GroundTruthResponse(
+        id=record.get("id", gt_id),
+        external_id=record.get("external_id", ""),
+        vertical=vertical,
+        document_type=document_type,
+        source_description=record.get("source_description"),
+        row_count=record.get("row_count", 0),
+        column_count=record.get("column_count", 0),
+        column_mappings=record.get("column_mappings", {}),
+        labeler=record.get("labeler"),
+        notes=record.get("notes"),
+        created_at=str(record.get("created_at")) if record.get("created_at") else None,
+    )
+
+
+@router.get("/training/ground-truth", response_model=GroundTruthListResponse)
+async def list_ground_truth(
+    vertical: Optional[str] = None,
+    document_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """
+    List ground truth records used for classification training.
+    
+    Args:
+        vertical: Optional filter by vertical
+        document_type: Optional filter by document type
+        limit: Maximum records to return
+        offset: Pagination offset
+        
+    Returns:
+        List of ground truth records
+    """
+    try:
+        records = await run_sync(
+            _list_ground_truth_sync,
+            vertical,
+            document_type,
+            limit,
+            offset,
+        )
+        
+        return GroundTruthListResponse(
+            records=records,
+            total=len(records),
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to list ground truth: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+def _list_ground_truth_sync(
+    vertical: Optional[str],
+    document_type: Optional[str],
+    limit: int,
+    offset: int,
+) -> List[GroundTruthResponse]:
+    """List ground truth records synchronously."""
+    from csv_analyzer.db.connection import Database, init_database
+    import json
+    
+    if not Database.is_initialized():
+        settings = get_settings()
+        init_database(
+            host=settings.database.host,
+            port=settings.database.port,
+            database=settings.database.name,
+            user=settings.database.user,
+            password=settings.database.password,
+            run_migrations=False,
+        )
+    
+    with Database.get_connection() as conn:
+        with conn.cursor() as cur:
+            query = """
+                SELECT gt.id, gt.external_id, v.name as vertical, dt.name as document_type,
+                       gt.source_description, gt.row_count, gt.column_count,
+                       gt.column_mappings, gt.labeler, gt.notes, gt.created_at
+                FROM ground_truth gt
+                JOIN document_types dt ON gt.document_type_id = dt.id
+                JOIN verticals v ON dt.vertical_id = v.id
+                WHERE 1=1
+            """
+            params = []
+            
+            if vertical:
+                query += " AND v.name = %s"
+                params.append(vertical)
+            
+            if document_type:
+                query += " AND dt.name = %s"
+                params.append(document_type)
+            
+            query += " ORDER BY gt.created_at DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+            
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            
+            return [
+                GroundTruthResponse(
+                    id=row[0],
+                    external_id=row[1],
+                    vertical=row[2],
+                    document_type=row[3],
+                    source_description=row[4],
+                    row_count=row[5],
+                    column_count=row[6],
+                    column_mappings=json.loads(row[7]) if isinstance(row[7], str) else row[7],
+                    labeler=row[8],
+                    notes=row[9],
+                    created_at=str(row[10]) if row[10] else None,
+                )
+                for row in rows
+            ]
+
+
+@router.get("/training/ground-truth/{external_id}", response_model=GroundTruthResponse)
+async def get_ground_truth(external_id: str):
+    """
+    Get a specific ground truth record by external ID.
+    
+    Args:
+        external_id: External ID of the ground truth record
+        
+    Returns:
+        Ground truth record details
+    """
+    try:
+        record = await run_sync(_get_ground_truth_sync, external_id)
+        
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Ground truth not found: {external_id}"
+            )
+        
+        return record
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get ground truth: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+def _get_ground_truth_sync(external_id: str) -> Optional[GroundTruthResponse]:
+    """Get ground truth record synchronously."""
+    from csv_analyzer.db.connection import Database, init_database
+    import json
+    
+    if not Database.is_initialized():
+        settings = get_settings()
+        init_database(
+            host=settings.database.host,
+            port=settings.database.port,
+            database=settings.database.name,
+            user=settings.database.user,
+            password=settings.database.password,
+            run_migrations=False,
+        )
+    
+    with Database.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT gt.id, gt.external_id, v.name as vertical, dt.name as document_type,
+                       gt.source_description, gt.row_count, gt.column_count,
+                       gt.column_mappings, gt.labeler, gt.notes, gt.created_at
+                FROM ground_truth gt
+                JOIN document_types dt ON gt.document_type_id = dt.id
+                JOIN verticals v ON dt.vertical_id = v.id
+                WHERE gt.external_id = %s
+            """, (external_id,))
+            row = cur.fetchone()
+            
+            if not row:
+                return None
+            
+            return GroundTruthResponse(
+                id=row[0],
+                external_id=row[1],
+                vertical=row[2],
+                document_type=row[3],
+                source_description=row[4],
+                row_count=row[5],
+                column_count=row[6],
+                column_mappings=json.loads(row[7]) if isinstance(row[7], str) else row[7],
+                labeler=row[8],
+                notes=row[9],
+                created_at=str(row[10]) if row[10] else None,
+            )
+
+
+@router.delete("/training/ground-truth/{external_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_ground_truth(external_id: str):
+    """
+    Delete a ground truth record.
+    
+    Args:
+        external_id: External ID of the ground truth record to delete
+    """
+    try:
+        deleted = await run_sync(_delete_ground_truth_sync, external_id)
+        
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Ground truth not found: {external_id}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete ground truth: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+def _delete_ground_truth_sync(external_id: str) -> bool:
+    """Delete ground truth record synchronously."""
+    from csv_analyzer.db.connection import Database, init_database
+    
+    if not Database.is_initialized():
+        settings = get_settings()
+        init_database(
+            host=settings.database.host,
+            port=settings.database.port,
+            database=settings.database.name,
+            user=settings.database.user,
+            password=settings.database.password,
+            run_migrations=False,
+        )
+    
+    with Database.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM ground_truth WHERE external_id = %s",
+                (external_id,)
+            )
+            deleted = cur.rowcount > 0
+            conn.commit()
+            
+            if deleted:
+                logger.info(f"Deleted ground truth: {external_id}")
+            
+            return deleted
+
+
+@router.get("/training/stats")
+async def get_training_stats():
+    """
+    Get statistics about the training data.
+    
+    Returns:
+        Statistics including counts by vertical and document type
+    """
+    try:
+        stats = await run_sync(_get_training_stats_sync)
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Failed to get training stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+def _get_training_stats_sync() -> Dict[str, Any]:
+    """Get training statistics synchronously."""
+    from csv_analyzer.db.connection import Database, init_database
+    
+    if not Database.is_initialized():
+        settings = get_settings()
+        init_database(
+            host=settings.database.host,
+            port=settings.database.port,
+            database=settings.database.name,
+            user=settings.database.user,
+            password=settings.database.password,
+            run_migrations=False,
+        )
+    
+    with Database.get_connection() as conn:
+        with conn.cursor() as cur:
+            # Total ground truth records
+            cur.execute("SELECT COUNT(*) FROM ground_truth")
+            total_records = cur.fetchone()[0]
+            
+            # Records by vertical
+            cur.execute("""
+                SELECT v.name, COUNT(gt.id)
+                FROM ground_truth gt
+                JOIN document_types dt ON gt.document_type_id = dt.id
+                JOIN verticals v ON dt.vertical_id = v.id
+                GROUP BY v.name
+                ORDER BY COUNT(gt.id) DESC
+            """)
+            by_vertical = {row[0]: row[1] for row in cur.fetchall()}
+            
+            # Records by document type
+            cur.execute("""
+                SELECT v.name || '/' || dt.name, COUNT(gt.id)
+                FROM ground_truth gt
+                JOIN document_types dt ON gt.document_type_id = dt.id
+                JOIN verticals v ON dt.vertical_id = v.id
+                GROUP BY v.name, dt.name
+                ORDER BY COUNT(gt.id) DESC
+            """)
+            by_document_type = {row[0]: row[1] for row in cur.fetchall()}
+            
+            # Column mappings in knowledge base
+            cur.execute("SELECT COUNT(*) FROM column_mappings_kb")
+            total_column_mappings = cur.fetchone()[0]
+            
+            return {
+                "total_ground_truth_records": total_records,
+                "by_vertical": by_vertical,
+                "by_document_type": by_document_type,
+                "total_column_mappings": total_column_mappings,
+            }
+
