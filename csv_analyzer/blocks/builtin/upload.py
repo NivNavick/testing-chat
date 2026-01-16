@@ -39,7 +39,7 @@ class UploadBlock(BaseBlock):
         files = self.require_param("files")
         skip_upload = self.get_param("skip_upload", False)
         
-        # For local development - skip S3, return local paths
+        # For local development - skip S3 upload, but still save manifest
         if skip_upload:
             self.logger.info(f"Skip upload mode: returning {len(files)} local paths")
             result_uri = self.save_to_s3("uploaded_files", files)

@@ -177,7 +177,7 @@ class BaseBlock(ABC):
     
     def load_input(self, name: str) -> Any:
         """
-        Load an input by name from S3.
+        Load an input by name from S3 or return directly if already loaded data.
         
         Args:
             name: Input port name
@@ -190,9 +190,17 @@ class BaseBlock(ABC):
                 f"Input '{name}' not found. Available: {list(self.ctx.inputs.keys())}"
             )
         
-        s3_uri = self.ctx.inputs[name]
-        self.logger.info(f"Loading input '{name}' from {s3_uri}")
-        return self.load_from_s3(s3_uri)
+        value = self.ctx.inputs[name]
+        
+        # If value is already data (list, dict, DataFrame), return it directly
+        # This supports skip_upload mode where data is passed directly
+        if isinstance(value, (list, dict, pd.DataFrame)):
+            self.logger.info(f"Loading input '{name}' from direct data ({type(value).__name__})")
+            return value
+        
+        # Otherwise, it's an S3 URI string
+        self.logger.info(f"Loading input '{name}' from {value}")
+        return self.load_from_s3(value)
     
     def get_correlated_data(self) -> pd.DataFrame:
         """

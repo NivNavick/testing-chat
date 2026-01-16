@@ -1,0 +1,47 @@
+database:
+  host: localhost
+  port: 5432
+  name: csv_mapping
+  user: postgres
+  password: postgres
+  pool_min: 2
+  pool_max: 10
+
+s3:
+  bucket: csv-analyzer-data
+  region: us-east-1
+  # AWS credentials from environment or IAM role
+  # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+  prefix:
+    sessions: sessions/
+    uploads: uploads/
+    workflows: workflows/
+    temp: temp/
+  # Optional: Use LocalStack for local development
+  endpoint_url: null  # Set to http://localhost:4566 for LocalStack
+
+storage:
+  workflows_path: ./csv_analyzer/workflows/definitions
+  upload_max_size_mb: 100
+  temp_files_ttl: 3600
+  # Local temp directory for processing before S3 upload
+  local_temp_dir: /tmp/csv_analyzer
+
+api:
+  title: CSV Analyzer API
+  version: 1.0.0
+  host: 0.0.0.0
+  port: 8000
+  cors_origins:
+    - http://localhost:3000
+    - http://localhost:8080
+  workers: 4
+
+embeddings:
+  model: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+  cache_dir: ./models
+
+logging:
+  level: INFO
+  format: json
+

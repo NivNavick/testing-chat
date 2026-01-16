@@ -18,6 +18,16 @@ openai = "^2.13.0"
 dspy-ai = "^2.6.0"
 duckdb = "^1.1.0"
 scikit-learn = "^1.5.0"
+# FastAPI and async dependencies
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+python-multipart = "^0.0.17"
+asyncpg = "^0.30.0"
+pydantic = "^2.10.0"
+pydantic-settings = "^2.6.0"
+aioboto3 = "^13.3.0"
+boto3 = "^1.35.0"
+aiofiles = "^24.1.0"
 
 
 [build-system]
