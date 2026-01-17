@@ -34,15 +34,14 @@ except ImportError as e:
     logger.warning(f"Could not import workflows router: {e}")
 
 # Include insights router
-# Note: insights_config already has prefix "/api/insights" so we mount it without additional prefix
-try:
-    from csv_analyzer.api.routes.insights_config import router as insights_router
-    # Remove the /api prefix since we're already under /api/v1
-    # The insights router will be at /api/v1/insights
-    insights_router.prefix = "/insights"
-    router.include_router(insights_router, tags=["Insights"])
-except ImportError as e:
-    logger.warning(f"Could not import insights router: {e}")
+# Note: Temporarily disabled - depends on old sync postgres_db module
+# TODO: Migrate to async architecture when insights API is needed
+# try:
+#     from csv_analyzer.api.routes.insights_config import router as insights_router
+#     insights_router.prefix = "/insights"
+#     router.include_router(insights_router, tags=["Insights"])
+# except ImportError as e:
+#     logger.warning(f"Could not import insights router: {e}")
 
 __all__ = ["router"]
 
