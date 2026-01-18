@@ -29,7 +29,6 @@ class DataType(Enum):
     EMPLOYEE_SHIFTS = "employee_shifts"
     MEDICAL_ACTIONS = "medical_actions"
     LAB_RESULTS = "lab_results"
-    PATIENT_APPOINTMENTS = "patient_appointments"
     EMPLOYEE_COMPENSATION = "employee_compensation"
     EMPLOYEE_MONTHLY_SALARY = "employee_monthly_salary"
     
@@ -45,7 +44,6 @@ DOCUMENT_TYPES: Set[DataType] = {
     DataType.EMPLOYEE_SHIFTS,
     DataType.MEDICAL_ACTIONS,
     DataType.LAB_RESULTS,
-    DataType.PATIENT_APPOINTMENTS,
     DataType.EMPLOYEE_COMPENSATION,
     DataType.EMPLOYEE_MONTHLY_SALARY,
 }

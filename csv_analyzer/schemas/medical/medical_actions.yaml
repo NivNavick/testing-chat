@@ -1,7 +1,7 @@
 name: medical_actions
 vertical: medical
 version: "1.0"
-description: "Medical procedures, treatments, clinical actions, and healthcare services"
+description: "Medical procedures, treatments, clinical actions, and healthcare services with billing data"
 
 # =============================================================================
 # PREPROCESSING CONFIGURATION

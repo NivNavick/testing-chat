@@ -27,7 +27,6 @@ class SimpleCategorizeBlock(BaseBlock):
     - Files with "shift" in name → employee_shifts
     - Files with "action" or "medical" in name → medical_actions
     - Files with "lab" in name → lab_results
-    - Files with "appointment" in name → patient_appointments
     """
     
     # Filename patterns for each document type
@@ -35,7 +34,6 @@ class SimpleCategorizeBlock(BaseBlock):
         "employee_shifts": [r"shift", r"shifts", r"attendance", r"clock"],
         "medical_actions": [r"action", r"medical", r"procedure", r"treatment"],
         "lab_results": [r"lab", r"test", r"result"],
-        "patient_appointments": [r"appointment", r"schedule", r"booking"],
     }
     
     def run(self) -> Dict[str, str]:
