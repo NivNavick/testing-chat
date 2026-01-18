@@ -1,0 +1,217 @@
+# Expensive Employees Analysis using DuckDB SQL
+# Migrated from ExpensiveEmployeesBlock (Python pandas) to pure SQL
+#
+# Analyzes employee monthly salary data to:
+# - Calculate total salary across all months per employee
+# - Identify employees with dual rates
+# - Rank by total cost, average monthly cost
+# - Generate position-based summary
+
+name: expensive_employees
+display_name: "Expensive Employees Ranking"
+description: "Analyze employee salary data and rank by total compensation cost"
+version: "1.0"
+category: costs
+type: SQL
+
+tags:
+  - costs
+  - employees
+  - salary
+  - compensation
+  - ranking
+
+# Required document types
+requires:
+  - employee_monthly_salary
+
+# Output columns
+output_columns:
+  - cost_rank
+  - employee_name
+  - position
+  - city
+  - total_salary
+  - avg_monthly_salary
+  - months_active
+  - rate_primary
+  - rate_secondary
+  - has_dual_rate
+  - max_monthly_salary
+  - min_monthly_salary
+  - cost_percentile
+  - payroll_tag
+  - evidence
+
+# Configurable parameters
+parameters:
+  - name: top_n
+    type: integer
+    default: 10
+    description: "Number of top employees to highlight in summary"
+  - name: include_all
+    type: boolean
+    default: true
+    description: "Include all employees in output (not just top N)"
+
+sql: |
+  -- Expensive Employees Analysis using DuckDB SQL
+  -- Aggregates monthly salary columns and ranks employees by total compensation
+  
+  WITH 
+  -- Step 1: Identify and unpivot monthly salary columns
+  -- Monthly columns typically follow pattern: 1.25, 2.25, ... (month.year)
+  -- Note: Uses canonical column names (already normalized by classifier)
+  salary_data AS (
+    SELECT 
+      COALESCE(employee_name, '') AS employee_name,
+      COALESCE(position, '') AS position,
+      COALESCE(city, '') AS city,
+      COALESCE(payroll_tag, '') AS payroll_tag,
+      -- Get rates (handle various formats)
+      TRY_CAST(
+        REPLACE(REPLACE(CAST(rate_primary AS VARCHAR), ',', ''), ' ', '')
+        AS DOUBLE
+      ) AS rate_primary,
+      TRY_CAST(
+        REPLACE(REPLACE(CAST(rate_secondary AS VARCHAR), ',', ''), ' ', '')
+        AS DOUBLE
+      ) AS rate_secondary,
+      -- Sum all monthly columns (pattern M.YY like 1.25, 2.25, etc.)
+      -- We need to handle this dynamically - summing all numeric columns that look like months
+      COALESCE(TRY_CAST(REPLACE(CAST("1.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("2.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("3.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("4.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("5.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("6.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("7.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("8.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("9.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("10.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("11.25" AS VARCHAR), ',', '') AS DOUBLE), 0) +
+      COALESCE(TRY_CAST(REPLACE(CAST("12.25" AS VARCHAR), ',', '') AS DOUBLE), 0) AS total_salary,
+      -- Count months with data
+      (CASE WHEN TRY_CAST(REPLACE(CAST("1.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("2.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("3.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("4.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("5.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("6.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("7.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("8.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("9.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("10.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("11.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN TRY_CAST(REPLACE(CAST("12.25" AS VARCHAR), ',', '') AS DOUBLE) > 0 THEN 1 ELSE 0 END) AS months_active,
+      -- Max monthly value
+      GREATEST(
+        COALESCE(TRY_CAST(REPLACE(CAST("1.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("2.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("3.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("4.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("5.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("6.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("7.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("8.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("9.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("10.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("11.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        COALESCE(TRY_CAST(REPLACE(CAST("12.25" AS VARCHAR), ',', '') AS DOUBLE), 0)
+      ) AS max_monthly_salary,
+      -- Min non-zero monthly value (using NULLIF to handle zeros)
+      LEAST(
+        NULLIF(TRY_CAST(REPLACE(CAST("1.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("2.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("3.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("4.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("5.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("6.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("7.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("8.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("9.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("10.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("11.25" AS VARCHAR), ',', '') AS DOUBLE), 0),
+        NULLIF(TRY_CAST(REPLACE(CAST("12.25" AS VARCHAR), ',', '') AS DOUBLE), 0)
+      ) AS min_monthly_salary
+    FROM employee_monthly_salary
+    WHERE employee_name IS NOT NULL 
+      AND TRIM(CAST(employee_name AS VARCHAR)) != ''
+      AND LOWER(CAST(employee_name AS VARCHAR)) NOT IN ('nan', 'none', '')
+  ),
+  
+  -- Step 2: Calculate averages and rank
+  ranked_employees AS (
+    SELECT 
+      employee_name,
+      position,
+      city,
+      payroll_tag,
+      rate_primary,
+      rate_secondary,
+      -- Has dual rate flag
+      CASE 
+        WHEN rate_secondary IS NOT NULL AND rate_secondary > 0 
+        THEN true 
+        ELSE false 
+      END AS has_dual_rate,
+      ROUND(total_salary, 2) AS total_salary,
+      months_active,
+      -- Average monthly (avoid div by zero)
+      CASE 
+        WHEN months_active > 0 
+        THEN ROUND(total_salary / months_active, 2)
+        ELSE 0
+      END AS avg_monthly_salary,
+      ROUND(max_monthly_salary, 2) AS max_monthly_salary,
+      COALESCE(ROUND(min_monthly_salary, 2), 0) AS min_monthly_salary,
+      -- Rank by total salary
+      ROW_NUMBER() OVER (ORDER BY total_salary DESC) AS cost_rank,
+      -- Calculate percentile
+      PERCENT_RANK() OVER (ORDER BY total_salary ASC) * 100 AS cost_percentile_raw
+    FROM salary_data
+    WHERE total_salary > 0  -- Exclude employees with no salary data
+  ),
+  
+  -- Step 3: Build evidence and final output
+  final_result AS (
+    SELECT 
+      cost_rank,
+      employee_name,
+      position,
+      city,
+      ROUND(total_salary, 2) AS total_salary,
+      avg_monthly_salary,
+      months_active,
+      rate_primary,
+      rate_secondary,
+      has_dual_rate,
+      max_monthly_salary,
+      min_monthly_salary,
+      ROUND(cost_percentile_raw, 1) AS cost_percentile,
+      payroll_tag,
+      -- Build evidence string
+      'Rank #' || CAST(cost_rank AS VARCHAR) || ': ' ||
+      employee_name || ' (' || COALESCE(NULLIF(position, ''), 'N/A') || ')' ||
+      CASE WHEN city != '' THEN ' from ' || city ELSE '' END ||
+      '. Total compensation: $' || CAST(ROUND(total_salary, 0) AS VARCHAR) ||
+      ' over ' || CAST(months_active AS VARCHAR) || ' months' ||
+      ' (avg $' || CAST(ROUND(avg_monthly_salary, 0) AS VARCHAR) || '/month).' ||
+      CASE 
+        WHEN rate_primary IS NOT NULL 
+        THEN ' Primary rate: $' || CAST(ROUND(rate_primary, 2) AS VARCHAR) || '/hr.'
+        ELSE ''
+      END ||
+      CASE 
+        WHEN has_dual_rate 
+        THEN ' Has dual rate structure.'
+        ELSE ''
+      END ||
+      ' Top ' || CAST(ROUND(100 - cost_percentile_raw, 1) AS VARCHAR) || '% earner.' AS evidence
+    FROM ranked_employees
+  )
+  
+  -- Final output sorted by cost rank
+  SELECT * FROM final_result
+  ORDER BY cost_rank
+

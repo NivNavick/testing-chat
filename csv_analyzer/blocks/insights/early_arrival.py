@@ -4,7 +4,21 @@ Early Arrival Block - Detect early employee arrivals.
 Matches employee arrivals to medical procedures to determine
 which employees arrived earlier than necessary.
 
-Migrated from CodeInsightsRegistry to BlockRegistry.
+DEPRECATED: This pandas-based block has been replaced by a SQL version.
+Use the sql_insight block with insight_name='early_arrival' instead.
+
+Migration path:
+  OLD (this file):
+    handler: early_arrival_matcher
+    
+  NEW (SQL):
+    handler: sql_insight
+    parameters:
+      insight_name: early_arrival
+      max_early_minutes: 30
+
+The SQL version is defined in:
+  csv_analyzer/insights/definitions/early_arrival.yaml
 """
 
 import logging

@@ -1,0 +1,317 @@
+# Medical Insights Workflow (v2 - SQL-based)
+# 
+# This workflow uses SQLInsightBlock to execute insights via DuckDB SQL.
+#
+# Architecture:
+#   upload → preprocess → classify ─┬─► sql_insight(early_arrival) ──► export_early_arrival ─┐
+#                                   ├─► sql_insight(expensive_employees) ──► export_salary ────┤
+#                                   ├─► sql_insight(manpower_cost) ──► export_manpower_cost ───┼─► email_all_reports
+#                                   └─► sql_insight(gross_profit) ──► export_gross_profit ─────┘
+#
+# Usage:
+#   python -m csv_analyzer.run_workflow medical_insights_v2 \
+#       --files shifts.csv actions.csv compensation.csv --local
+
+name: medical_insights_sql
+description: "Combined medical insights - processes all file types, runs applicable analyses"
+version: "1.0"
+
+# Global parameters (accessible by all blocks)
+parameters:
+  vertical: medical
+  output_dir: ./results
+  # Email settings
+  sender_email: niv@bubblez.ai
+  recipient_email: nnavick@gmail.com
+  # Early arrival parameters
+  max_early_minutes: 30
+  # Expensive employees parameters
+  top_n: 10
+  include_all: true
+  # Manpower cost / gross profit parameters
+  default_shift_hours: 8.0
+  benefits_loading: 0.25
+  default_monthly_hours: 186.0
+
+# Storage configuration
+storage:
+  type: s3
+  bucket: ""  # Set via S3_BUCKET env var or --bucket CLI arg
+
+blocks:
+  # ============================================================
+  # SHARED PIPELINE: Upload → Preprocess → Classify
+  # ============================================================
+  
+  - id: upload
+    handler: upload_to_s3
+    parameters:
+      skip_upload: true  # Local mode - skip S3 upload
+
+  - id: preprocess
+    handler: preprocess_csvs
+    inputs:
+      - name: files
+        source: upload.uploaded_files
+    parameters:
+      detect_time_ranges: true
+      detect_hebrew_dates: true
+      clean_time_prefixes: true
+
+  - id: classify
+    handler: classify_csvs
+    inputs:
+      - name: files
+        source: preprocess.processed_files
+    parameters:
+      vertical: "{{vertical}}"
+      threshold: 0.5
+
+  # ============================================================
+  # BRANCH 1: Early Arrival Analysis (DuckDB SQL)
+  # Requires: employee_shifts + medical_actions
+  # ============================================================
+  
+  - id: early_arrival
+    handler: sql_insight
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      insight_name: early_arrival
+      max_early_minutes: "{{max_early_minutes}}"
+
+  - id: export_early_arrival
+    handler: export_csv
+    inputs:
+      - field: employee_name
+        source: early_arrival.result.employee_name
+      - field: employee_id
+        source: early_arrival.result.employee_id
+      - field: shift_date
+        source: early_arrival.result.shift_date
+      - field: location
+        source: early_arrival.result.location
+      - field: arrival_time
+        source: early_arrival.result.arrival_time
+      - field: matched_procedure_time
+        source: early_arrival.result.matched_procedure_time
+      - field: matched_treatment
+        source: early_arrival.result.matched_treatment
+      - field: treating_staff
+        source: early_arrival.result.treating_staff
+      - field: minutes_before_procedure
+        source: early_arrival.result.minutes_before_procedure
+      - field: minutes_early
+        source: early_arrival.result.minutes_early
+      - field: status
+        source: early_arrival.result.status
+      - field: evidence
+        source: early_arrival.result.evidence
+      - field: wasted_cost
+        source: early_arrival.result.wasted_cost
+    parameters:
+      filename: "early_arrival_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+
+  # ============================================================
+  # BRANCH 2: Expensive Employees Analysis (DuckDB SQL)
+  # Requires: employee_monthly_salary
+  # ============================================================
+  
+  - id: expensive_employees
+    handler: sql_insight
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      insight_name: expensive_employees
+      top_n: "{{top_n}}"
+      include_all: "{{include_all}}"
+
+  - id: export_salary
+    handler: export_csv
+    inputs:
+      - field: cost_rank
+        source: expensive_employees.result.cost_rank
+      - field: employee_name
+        source: expensive_employees.result.employee_name
+      - field: position
+        source: expensive_employees.result.position
+      - field: city
+        source: expensive_employees.result.city
+      - field: total_salary
+        source: expensive_employees.result.total_salary
+      - field: avg_monthly_salary
+        source: expensive_employees.result.avg_monthly_salary
+      - field: months_active
+        source: expensive_employees.result.months_active
+      - field: rate_primary
+        source: expensive_employees.result.rate_primary
+      - field: rate_secondary
+        source: expensive_employees.result.rate_secondary
+      - field: has_dual_rate
+        source: expensive_employees.result.has_dual_rate
+      - field: cost_percentile
+        source: expensive_employees.result.cost_percentile
+      - field: evidence
+        source: expensive_employees.result.evidence
+    parameters:
+      filename: "expensive_employees_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+
+  # ============================================================
+  # BRANCH 3: Manpower Cost Analysis (DuckDB SQL)
+  # Requires: employee_shifts + employee_compensation + medical_actions (optional)
+  # ============================================================
+  
+  - id: manpower_cost
+    handler: sql_insight
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      insight_name: manpower_cost
+      default_shift_hours: "{{default_shift_hours}}"
+      benefits_loading: "{{benefits_loading}}"
+      default_monthly_hours: "{{default_monthly_hours}}"
+
+  - id: export_manpower_cost
+    handler: export_csv
+    inputs:
+      - field: shift_date
+        source: manpower_cost.result.shift_date
+      - field: employee_id
+        source: manpower_cost.result.employee_id
+      - field: employee_name
+        source: manpower_cost.result.employee_name
+      - field: position
+        source: manpower_cost.result.position
+      - field: detected_shift_type
+        source: manpower_cost.result.detected_shift_type
+      - field: shift_start
+        source: manpower_cost.result.shift_start
+      - field: shift_end
+        source: manpower_cost.result.shift_end
+      - field: shift_hours
+        source: manpower_cost.result.shift_hours
+      - field: hourly_cost
+        source: manpower_cost.result.hourly_cost
+      - field: employment_type
+        source: manpower_cost.result.employment_type
+      - field: shift_cost
+        source: manpower_cost.result.shift_cost
+      - field: procedure_count
+        source: manpower_cost.result.procedure_count
+      - field: avg_cost_per_procedure
+        source: manpower_cost.result.avg_cost_per_procedure
+      - field: evidence
+        source: manpower_cost.result.evidence
+    parameters:
+      filename: "manpower_cost_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+
+  # ============================================================
+  # BRANCH 4: Gross Profit Analysis (DuckDB SQL)
+  # Requires: employee_shifts + employee_compensation + medical_actions
+  # ============================================================
+  
+  - id: gross_profit
+    handler: sql_insight
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      insight_name: gross_profit
+      default_shift_hours: "{{default_shift_hours}}"
+      benefits_loading: "{{benefits_loading}}"
+      default_monthly_hours: "{{default_monthly_hours}}"
+
+  - id: export_gross_profit
+    handler: export_csv
+    inputs:
+      - field: shift_date
+        source: gross_profit.result.shift_date
+      - field: employee_id
+        source: gross_profit.result.employee_id
+      - field: employee_name
+        source: gross_profit.result.employee_name
+      - field: position
+        source: gross_profit.result.position
+      - field: employment_type
+        source: gross_profit.result.employment_type
+      - field: detected_shift_type
+        source: gross_profit.result.detected_shift_type
+      - field: shift_hours
+        source: gross_profit.result.shift_hours
+      - field: shift_cost
+        source: gross_profit.result.shift_cost
+      - field: procedure_count
+        source: gross_profit.result.procedure_count
+      - field: total_revenue
+        source: gross_profit.result.total_revenue
+      - field: total_doctor_fee
+        source: gross_profit.result.total_doctor_fee
+      - field: gross_profit
+        source: gross_profit.result.gross_profit
+      - field: profit_margin_pct
+        source: gross_profit.result.profit_margin_pct
+      - field: procedure_details
+        source: gross_profit.result.procedure_details
+      - field: evidence
+        source: gross_profit.result.evidence
+    parameters:
+      filename: "gross_profit_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+
+  # ============================================================
+  # EMAIL ALL REPORTS
+  # ============================================================
+  
+  - id: email_all_reports
+    handler: send_email_ses
+    inputs:
+      - name: data
+        sources:
+          - early_arrival.result
+          - expensive_employees.result
+          - manpower_cost.result
+          - gross_profit.result
+    parameters:
+      sender_email: "{{sender_email}}"
+      recipient_email: "{{recipient_email}}"
+      subject: "Medical Insights - Daily Reports Bundle"
+      attachment_filename_prefix: "medical_report"
+      body_text: |
+        Hello,
+        
+        Please find attached the complete medical insights analysis:
+        
+        📊 Report 1: Early Arrival Analysis
+           - Employees who arrived significantly before their shifts
+           - Matched with procedure times and treatments
+        
+        💰 Report 2: Expensive Employees Ranking
+           - Top employees by total compensation cost
+           - Grouped by position with salary breakdowns
+        
+        👥 Report 3: Manpower Cost Analysis
+           - Shift-by-shift cost breakdown
+           - Average cost per medical procedure
+        
+        📈 Report 4: Gross Profit Analysis
+           - Revenue vs. cost analysis per shift
+           - Profit margins and procedure details
+        
+        Best regards,
+        Automated Medical Insights System
+      include_summary: true
+

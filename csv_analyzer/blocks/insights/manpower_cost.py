@@ -4,6 +4,23 @@ Manpower Cost Block - Calculate shift costs and average cost per procedure.
 Analyzes employee shifts and compensation data to calculate:
 - Total manpower cost per shift
 - Average cost per procedure performed during shift
+
+DEPRECATED: This pandas-based block has been replaced by a SQL version.
+Use the sql_insight block with insight_name='manpower_cost' instead.
+
+Migration path:
+  OLD (this file):
+    handler: manpower_cost_per_shift
+    
+  NEW (SQL):
+    handler: sql_insight
+    parameters:
+      insight_name: manpower_cost
+      default_shift_hours: 8.0
+      benefits_loading: 0.25
+
+The SQL version is defined in:
+  csv_analyzer/insights/definitions/manpower_cost.yaml
 """
 
 import logging

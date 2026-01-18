@@ -2,6 +2,23 @@
 Gross Profit Block - Calculate gross profit per shift.
 
 Calculates: Revenue - Physician Cost - Staff Cost = Gross Profit
+
+DEPRECATED: This pandas-based block has been replaced by a SQL version.
+Use the sql_insight block with insight_name='gross_profit' instead.
+
+Migration path:
+  OLD (this file):
+    handler: gross_profit_per_shift
+    
+  NEW (SQL):
+    handler: sql_insight
+    parameters:
+      insight_name: gross_profit
+      default_shift_hours: 8.0
+      benefits_loading: 0.25
+
+The SQL version is defined in:
+  csv_analyzer/insights/definitions/gross_profit.yaml
 """
 
 import logging

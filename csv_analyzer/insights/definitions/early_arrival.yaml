@@ -1,82 +1,267 @@
+# Early Arrival Detection using DuckDB SQL
+# Migrated from EarlyArrivalBlock (Python pandas) to pure SQL
+#
+# Matches employee shift arrivals to medical procedures to detect:
+# - EARLY: Arrived too early (gap > max_early_minutes before nearest procedure)
+# - OK: Matched to procedure within threshold  
+# - UNCERTAIN: Multiple employees for same procedure, cannot determine match
+# - NO_PROCEDURES: No procedures found for date/location
+
 name: early_arrival
-display_name: "Early Arrival Alert"
-description: "Detects when employees arrived more than 30 minutes before the first procedure at their location"
+display_name: "Early Arrival Detection"
+description: "Detect employees who arrived too early before their first procedure"
 version: "1.0"
 category: compliance
+type: SQL
 
-# Required document types (auto-detected from input files)
+tags:
+  - compliance
+  - attendance
+  - early_arrival
+  - medical
+
+# Required document types
 requires:
   - employee_shifts
   - medical_actions
 
-# Output columns for the CSV
+# Optional tables for cost calculation
+optional_tables:
+  - employee_monthly_salary
+  - employee_compensation
+
+# Output columns
 output_columns:
-  - employee
-  - emp_id
+  - employee_name
+  - employee_id
   - shift_date
-  - shift_start
-  - first_procedure_time
   - location
+  - arrival_time
+  - matched_procedure_time
+  - matched_treatment
+  - treating_staff
+  - minutes_before_procedure
   - minutes_early
   - status
+  - wasted_cost
+  - evidence
 
-# Alert threshold (minutes early that triggers alert)
+# Configurable parameters
 parameters:
-  - name: alert_threshold
+  - name: max_early_minutes
     type: integer
     default: 30
-    description: "Minutes early threshold to trigger alert"
+    description: "Maximum allowed minutes early before flagging as EARLY"
 
-# SQL uses canonical field names (after column mapping)
-# Column mappings: 
-#   employee_shifts: כניסה→shift_start, יציאה→shift_end, תאריך→(unmapped, kept as תאריך)
-#   medical_actions: שעות טיפול בפועל_start→treatment_start_time
 sql: |
-  WITH shift_data AS (
-      SELECT 
-          employee_name as employee,
-          employee_id as emp_id,
-          "תאריך" as shift_date,
-          shift_start,
-          shift_end,
-          "הערה" as notes,
-          _normalized_location as location_id,
-          _normalized_location_display as location_name
-      FROM employee_shifts
-      WHERE shift_start IS NOT NULL AND shift_start != ''
-  ),
-  shift_with_formatted_date AS (
-      SELECT *,
-          SUBSTR(shift_date, 9, 2) || '/' || SUBSTR(shift_date, 6, 2) || '/' || SUBSTR(shift_date, 1, 4) as shift_date_formatted
-      FROM shift_data
-  ),
-  first_procedure AS (
-      SELECT 
-          treatment_date,
-          _normalized_location as location_id,
-          MIN(treatment_start_time) as first_procedure_time
-      FROM medical_actions
-      WHERE treatment_category = 'גסטרו'
-      GROUP BY treatment_date, _normalized_location
-  )
-  SELECT 
-      s.employee,
-      s.emp_id,
-      s.shift_date,
-      s.shift_start,
-      p.first_procedure_time,
-      s.location_name as location,
-      (CAST(SUBSTR(p.first_procedure_time, 1, 2) AS INT) * 60 + CAST(SUBSTR(p.first_procedure_time, 4, 2) AS INT)) -
-      (CAST(SUBSTR(s.shift_start, 1, 2) AS INT) * 60 + CAST(SUBSTR(s.shift_start, 4, 2) AS INT)) as minutes_early,
+  -- Early Arrival Detection using DuckDB SQL
+  -- Uses window functions for greedy matching algorithm
+  
+  WITH 
+  -- Step 1: Prepare shift data with parsed times
+  shifts_prepared AS (
+    SELECT 
+      COALESCE(employee_name, _meta_employee_name, '') AS employee_name,
+      COALESCE(employee_id, _meta_employee_id, '') AS employee_id,
+      COALESCE(shift_date, _meta_date_range_start) AS shift_date,
+      COALESCE(department_code, location, '') AS location,
+      -- Parse shift_start time (handle various formats)
       CASE 
-          WHEN (CAST(SUBSTR(p.first_procedure_time, 1, 2) AS INT) * 60 + CAST(SUBSTR(p.first_procedure_time, 4, 2) AS INT)) -
-               (CAST(SUBSTR(s.shift_start, 1, 2) AS INT) * 60 + CAST(SUBSTR(s.shift_start, 4, 2) AS INT)) > 30
-          THEN 'ALERT'
-          ELSE 'OK'
-      END as status
-  FROM shift_with_formatted_date s
-  JOIN first_procedure p 
-      ON s.shift_date_formatted = p.treatment_date
-      AND s.location_id = p.location_id
-  WHERE s.notes = 'גסטרו'
-  ORDER BY s.shift_date
+        WHEN shift_start IS NULL OR TRIM(CAST(shift_start AS VARCHAR)) = '' THEN NULL
+        ELSE TRY_CAST(
+          TRIM(REPLACE(REPLACE(CAST(shift_start AS VARCHAR), '*', ''), ' ', '')) 
+          AS TIME
+        )
+      END AS arrival_time,
+      shift_start AS arrival_time_raw
+    FROM employee_shifts
+    WHERE shift_start IS NOT NULL 
+      AND TRIM(CAST(shift_start AS VARCHAR)) != ''
+  ),
+  
+  -- Step 2: Prepare procedure data with parsed times
+  -- Note: Uses canonical column names (already normalized by classifier)
+  procedures_prepared AS (
+    SELECT 
+      treatment_date AS procedure_date,
+      COALESCE(treatment_category, '') AS category,
+      COALESCE(treatment_name, '') AS treatment_name,
+      COALESCE(treating_staff, '') AS treating_staff,
+      -- Parse treatment_start_time
+      CASE 
+        WHEN treatment_start_time IS NULL OR TRIM(CAST(treatment_start_time AS VARCHAR)) = '' THEN NULL
+        ELSE TRY_CAST(
+          TRIM(REPLACE(REPLACE(CAST(treatment_start_time AS VARCHAR), '*', ''), ' ', ''))
+          AS TIME
+        )
+      END AS procedure_time,
+      treatment_start_time AS procedure_time_raw
+    FROM medical_actions
+    WHERE treatment_start_time IS NOT NULL 
+      AND TRIM(CAST(treatment_start_time AS VARCHAR)) != ''
+  ),
+  
+  -- Step 3: Cross join shifts with procedures on same date, matching location/category
+  shift_proc_cross AS (
+    SELECT 
+      s.employee_name,
+      s.employee_id,
+      s.shift_date,
+      s.location,
+      s.arrival_time,
+      s.arrival_time_raw,
+      p.procedure_time,
+      p.procedure_time_raw,
+      p.treatment_name,
+      p.treating_staff,
+      p.category,
+      -- Calculate minutes between arrival and procedure
+      -- DuckDB requires casting TIME to epoch for subtraction
+      CASE 
+        WHEN s.arrival_time IS NOT NULL AND p.procedure_time IS NOT NULL 
+        THEN (
+          EXTRACT(HOUR FROM p.procedure_time) * 60 + EXTRACT(MINUTE FROM p.procedure_time)
+          - EXTRACT(HOUR FROM s.arrival_time) * 60 - EXTRACT(MINUTE FROM s.arrival_time)
+        )
+        ELSE NULL 
+      END AS minutes_before
+    FROM shifts_prepared s
+    LEFT JOIN procedures_prepared p
+      ON CAST(s.shift_date AS DATE) = CAST(p.procedure_date AS DATE)
+      -- Match location to category (flexible matching)
+      AND (
+        s.location = p.category 
+        OR LOWER(s.location) LIKE '%' || LOWER(p.category) || '%'
+        OR LOWER(p.category) LIKE '%' || LOWER(s.location) || '%'
+        OR s.location IS NULL OR s.location = ''  -- Allow fallback if no location
+        OR p.category IS NULL OR p.category = ''  -- Allow fallback if no category
+      )
+  ),
+  
+  -- Step 4: Find closest future procedure for each arrival (greedy matching)
+  ranked_matches AS (
+    SELECT 
+      *,
+      -- Rank procedures by how close they are to arrival (only future procedures)
+      ROW_NUMBER() OVER (
+        PARTITION BY employee_id, shift_date, arrival_time 
+        ORDER BY 
+          CASE WHEN minutes_before >= 0 THEN minutes_before ELSE 9999 END
+      ) AS match_rank,
+      -- Count how many arrivals are candidates for this procedure
+      COUNT(*) OVER (
+        PARTITION BY shift_date, category, procedure_time
+      ) AS arrivals_for_this_procedure
+    FROM shift_proc_cross
+    WHERE minutes_before >= 0  -- Arrival must be before or at procedure time
+       OR procedure_time IS NULL  -- Include shifts with no matching procedures
+  ),
+  
+  -- Step 5: Determine status and calculate early minutes
+  status_calc AS (
+    SELECT 
+      employee_name,
+      employee_id,
+      shift_date,
+      location,
+      arrival_time_raw AS arrival_time,
+      procedure_time_raw AS matched_procedure_time,
+      treatment_name AS matched_treatment,
+      treating_staff,
+      CAST(minutes_before AS INTEGER) AS minutes_before_procedure,
+      -- Calculate minutes early (beyond allowed threshold)
+      CASE 
+        WHEN minutes_before IS NULL THEN NULL
+        WHEN minutes_before > {{max_early_minutes}} THEN CAST(minutes_before - {{max_early_minutes}} AS INTEGER)
+        ELSE 0
+      END AS minutes_early,
+      -- Determine status
+      CASE 
+        -- No procedure found
+        WHEN procedure_time IS NULL THEN 'NO_PROCEDURES'
+        -- Multiple arrivals for single-staff procedure = UNCERTAIN
+        WHEN arrivals_for_this_procedure > 1 AND match_rank > 1 THEN 'UNCERTAIN'
+        -- Arrived too early
+        WHEN minutes_before > {{max_early_minutes}} THEN 'EARLY'
+        -- Good match
+        ELSE 'OK'
+      END AS status,
+      match_rank,
+      arrivals_for_this_procedure
+    FROM ranked_matches
+    WHERE match_rank = 1 OR procedure_time IS NULL  -- Keep best match or no-procedure cases
+  ),
+  
+  -- Step 6: Build evidence strings
+  with_evidence AS (
+    SELECT 
+      employee_name,
+      employee_id,
+      shift_date,
+      location,
+      arrival_time,
+      matched_procedure_time,
+      matched_treatment,
+      treating_staff,
+      minutes_before_procedure,
+      minutes_early,
+      status,
+      -- Build evidence string
+      CASE status
+        WHEN 'EARLY' THEN
+          'Arrived at ' || arrival_time || 
+          CASE WHEN location != '' THEN ' at ' || location ELSE '' END ||
+          ', nearest procedure at ' || matched_procedure_time ||
+          ' (' || CAST(minutes_before_procedure AS VARCHAR) || ' min gap > ' || 
+          '{{max_early_minutes}}' || ' allowed). Arrived ' || 
+          CAST(minutes_early AS VARCHAR) || ' min early.' ||
+          CASE WHEN matched_treatment != '' THEN ' Treatment: ' || matched_treatment || '.' ELSE '' END
+        WHEN 'OK' THEN
+          'Arrived at ' || arrival_time || 
+          CASE WHEN location != '' THEN ' at ' || location ELSE '' END ||
+          ', covered procedure at ' || matched_procedure_time ||
+          ' (' || CAST(minutes_before_procedure AS VARCHAR) || ' min before).' ||
+          CASE WHEN matched_treatment != '' THEN ' Treatment: ' || matched_treatment || '.' ELSE '' END
+        WHEN 'UNCERTAIN' THEN
+          'Arrived at ' || arrival_time || 
+          CASE WHEN location != '' THEN ' at ' || location ELSE '' END ||
+          ', ' || CAST(minutes_before_procedure AS VARCHAR) || 
+          ' min before procedure at ' || matched_procedure_time || 
+          '. CONFLICT: ' || CAST(arrivals_for_this_procedure AS VARCHAR) || 
+          ' employees arrived for this procedure. Cannot determine who actually worked it.'
+        WHEN 'NO_PROCEDURES' THEN
+          'Arrived at ' || arrival_time ||
+          CASE WHEN location != '' THEN ' at ' || location ELSE '' END ||
+          ', but no procedures found for this date/location.'
+        ELSE 'Status unknown'
+      END AS evidence
+    FROM status_calc
+  )
+  
+  -- Final output sorted by status priority
+  SELECT 
+    employee_name,
+    employee_id,
+    shift_date,
+    location,
+    arrival_time,
+    matched_procedure_time,
+    matched_treatment,
+    treating_staff,
+    minutes_before_procedure,
+    minutes_early,
+    status,
+    NULL AS wasted_cost,  -- Cost calculation requires compensation data join
+    evidence
+  FROM with_evidence
+  ORDER BY 
+    -- Status priority: EARLY first, then UNCERTAIN, NO_PROCEDURES, OK last
+    CASE status 
+      WHEN 'EARLY' THEN 1 
+      WHEN 'UNCERTAIN' THEN 2 
+      WHEN 'NO_PROCEDURES' THEN 3 
+      ELSE 4 
+    END,
+    shift_date,
+    arrival_time
+

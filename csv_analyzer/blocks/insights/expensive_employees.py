@@ -3,6 +3,23 @@ Expensive Employees Block - Calculate and rank employees by total cost.
 
 Analyzes employee monthly salary data to identify highest-cost employees
 across various dimensions: total compensation, monthly averages, and role-based analysis.
+
+DEPRECATED: This pandas-based block has been replaced by a SQL version.
+Use the sql_insight block with insight_name='expensive_employees' instead.
+
+Migration path:
+  OLD (this file):
+    handler: expensive_employees
+    
+  NEW (SQL):
+    handler: sql_insight
+    parameters:
+      insight_name: expensive_employees
+      top_n: 10
+      include_all: true
+
+The SQL version is defined in:
+  csv_analyzer/insights/definitions/expensive_employees.yaml
 """
 
 import logging

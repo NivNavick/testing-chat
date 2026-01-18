@@ -1,0 +1,300 @@
+# Gross Profit per Shift using DuckDB SQL
+# Migrated from GrossProfitBlock (Python pandas) to pure SQL
+#
+# Calculates: Gross Profit = Revenue - Physician Cost - Staff Cost
+# Where:
+# - Revenue: Sum of treatment_price for procedures during shift
+# - Physician Cost: Sum of doctor_fee for procedures
+# - Staff Cost: shift_hours × hourly_rate
+
+name: gross_profit
+display_name: "Gross Profit per Shift"
+description: "Calculate gross profit per shift (revenue - physician cost - staff cost)"
+version: "1.0"
+category: profitability
+type: SQL
+
+tags:
+  - profitability
+  - costs
+  - revenue
+  - shifts
+  - procedures
+
+# Required document types
+requires:
+  - employee_shifts
+  - medical_actions
+
+# Optional tables (one compensation source required)
+optional_tables:
+  - employee_compensation
+  - employee_monthly_salary
+
+# Output columns
+output_columns:
+  - shift_date
+  - employee_id
+  - employee_name
+  - position
+  - employment_type
+  - detected_shift_type
+  - shift_hours
+  - shift_cost
+  - procedure_count
+  - total_revenue
+  - total_doctor_fee
+  - gross_profit
+  - profit_margin_pct
+  - procedure_details
+  - evidence
+
+# Configurable parameters
+parameters:
+  - name: default_shift_hours
+    type: float
+    default: 8.0
+    description: "Default shift hours when duration cannot be calculated"
+  - name: benefits_loading
+    type: float
+    default: 0.25
+    description: "Benefits loading factor for salaried employees (0.25 = 25%)"
+  - name: default_monthly_hours
+    type: float
+    default: 186.0
+    description: "Default monthly hours for salary to hourly conversion"
+
+sql: |
+  -- Gross Profit per Shift using DuckDB SQL
+  -- Joins employee_shifts + medical_actions + employee_compensation
+  
+  WITH 
+  -- Step 1: Prepare shift data with parsed times and duration
+  shifts_prepared AS (
+    SELECT 
+      COALESCE(employee_id, _meta_employee_id, '') AS employee_id,
+      COALESCE(employee_name, _meta_employee_name, '') AS employee_name,
+      COALESCE(shift_date, _meta_date_range_start) AS shift_date,
+      shift_start,
+      shift_end,
+      -- Parse times
+      TRY_CAST(
+        TRIM(REPLACE(REPLACE(CAST(shift_start AS VARCHAR), '*', ''), ' ', ''))
+        AS TIME
+      ) AS shift_start_parsed,
+      TRY_CAST(
+        TRIM(REPLACE(REPLACE(CAST(shift_end AS VARCHAR), '*', ''), ' ', ''))
+        AS TIME
+      ) AS shift_end_parsed,
+      -- Get duration if available
+      duration_minutes
+    FROM employee_shifts
+    WHERE employee_id IS NOT NULL OR _meta_employee_id IS NOT NULL
+  ),
+  
+  -- Step 2: Calculate shift hours and detect shift type
+  shifts_with_hours AS (
+    SELECT 
+      *,
+      -- Calculate hours (DuckDB doesn't support TIME-TIME subtraction directly)
+      CASE 
+        WHEN duration_minutes IS NOT NULL THEN duration_minutes / 60.0
+        WHEN shift_start_parsed IS NOT NULL AND shift_end_parsed IS NOT NULL THEN
+          CASE 
+            WHEN shift_end_parsed > shift_start_parsed THEN
+              (EXTRACT(HOUR FROM shift_end_parsed) * 60 + EXTRACT(MINUTE FROM shift_end_parsed)
+               - EXTRACT(HOUR FROM shift_start_parsed) * 60 - EXTRACT(MINUTE FROM shift_start_parsed)) / 60.0
+            ELSE  -- Handle overnight shifts
+              (24 * 60 + EXTRACT(HOUR FROM shift_end_parsed) * 60 + EXTRACT(MINUTE FROM shift_end_parsed)
+               - EXTRACT(HOUR FROM shift_start_parsed) * 60 - EXTRACT(MINUTE FROM shift_start_parsed)) / 60.0
+          END
+        ELSE {{default_shift_hours}}
+      END AS shift_hours,
+      -- Detect shift type
+      CASE 
+        WHEN shift_start_parsed IS NOT NULL THEN
+          CASE 
+            WHEN EXTRACT(HOUR FROM shift_start_parsed) >= 5 AND EXTRACT(HOUR FROM shift_start_parsed) < 12 THEN 'MORNING'
+            WHEN EXTRACT(HOUR FROM shift_start_parsed) >= 12 AND EXTRACT(HOUR FROM shift_start_parsed) < 14 THEN 'MID_DAY'
+            WHEN EXTRACT(HOUR FROM shift_start_parsed) >= 14 AND EXTRACT(HOUR FROM shift_start_parsed) < 17 THEN 'AFTERNOON'
+            WHEN EXTRACT(HOUR FROM shift_start_parsed) >= 17 AND EXTRACT(HOUR FROM shift_start_parsed) < 21 THEN 'EVENING'
+            ELSE 'NIGHT'
+          END
+        ELSE 'UNKNOWN'
+      END AS detected_shift_type
+    FROM shifts_prepared
+  ),
+  
+  -- Step 3: Build compensation lookup
+  compensation_lookup AS (
+    SELECT 
+      COALESCE(employee_id, '') AS emp_id,
+      COALESCE(employee_name, '') AS emp_name,
+      COALESCE(position, job_title, '') AS position,
+      COALESCE(employment_type, 'salaried') AS employment_type,
+      COALESCE(
+        effective_hourly_cost,
+        hourly_rate,
+        CASE 
+          WHEN gross_salary IS NOT NULL AND monthly_hours IS NOT NULL AND monthly_hours > 0 
+          THEN gross_salary * (1 + {{benefits_loading}}) / monthly_hours
+          ELSE 0
+        END
+      ) AS hourly_cost
+    FROM employee_compensation
+    WHERE employee_id IS NOT NULL OR employee_name IS NOT NULL
+  ),
+  
+  -- Step 4: Prepare procedures with revenue data
+  -- Note: Uses canonical column names (already normalized by classifier)
+  procedures_prepared AS (
+    SELECT 
+      CAST(treatment_date AS DATE) AS procedure_date,
+      TRY_CAST(
+        TRIM(REPLACE(REPLACE(CAST(treatment_start_time AS VARCHAR), '*', ''), ' ', ''))
+        AS TIME
+      ) AS procedure_time,
+      COALESCE(treating_staff, '') AS treating_staff,
+      COALESCE(treatment_name, '') AS treatment_name,
+      -- Parse price/revenue
+      COALESCE(
+        TRY_CAST(REPLACE(REPLACE(CAST(treatment_price AS VARCHAR), ',', ''), '₪', '') AS DOUBLE),
+        TRY_CAST(REPLACE(REPLACE(CAST(price AS VARCHAR), ',', ''), '$', '') AS DOUBLE),
+        0
+      ) AS price,
+      -- Parse doctor fee
+      COALESCE(
+        TRY_CAST(REPLACE(REPLACE(CAST(doctor_fee AS VARCHAR), ',', ''), '₪', '') AS DOUBLE),
+        0
+      ) AS doctor_fee
+    FROM medical_actions
+    WHERE treatment_date IS NOT NULL
+  ),
+  
+  -- Step 5: Join shifts with compensation
+  shifts_with_comp AS (
+    SELECT 
+      s.employee_id,
+      s.employee_name,
+      s.shift_date,
+      s.shift_start,
+      s.shift_end,
+      s.shift_start_parsed,
+      s.shift_end_parsed,
+      s.shift_hours,
+      s.detected_shift_type,
+      COALESCE(c.position, '') AS position,
+      COALESCE(c.employment_type, 'unknown') AS employment_type,
+      COALESCE(c.hourly_cost, 0) AS hourly_cost,
+      ROUND(s.shift_hours * COALESCE(c.hourly_cost, 0), 2) AS shift_cost
+    FROM shifts_with_hours s
+    LEFT JOIN compensation_lookup c
+      ON s.employee_id = c.emp_id 
+      OR s.employee_name = c.emp_name
+  ),
+  
+  -- Step 6: Match procedures to shifts and aggregate revenue
+  shift_revenue AS (
+    SELECT 
+      s.employee_id,
+      s.shift_date,
+      s.shift_start_parsed,
+      COUNT(p.treatment_name) AS procedure_count,
+      COALESCE(SUM(p.price), 0) AS total_revenue,
+      COALESCE(SUM(p.doctor_fee), 0) AS total_doctor_fee,
+      -- Build procedure details (first 5)
+      STRING_AGG(
+        p.treatment_name || ' ($' || CAST(ROUND(p.price, 0) AS VARCHAR) || ')',
+        '; '
+      ) AS procedure_details
+    FROM shifts_with_comp s
+    LEFT JOIN procedures_prepared p
+      ON CAST(s.shift_date AS DATE) = p.procedure_date
+      AND (
+        -- Match by time window
+        (s.shift_start_parsed IS NOT NULL AND s.shift_end_parsed IS NOT NULL 
+         AND p.procedure_time BETWEEN s.shift_start_parsed AND s.shift_end_parsed)
+        OR
+        -- Fallback: match by staff name
+        (LOWER(s.employee_name) LIKE '%' || LOWER(p.treating_staff) || '%'
+         OR LOWER(p.treating_staff) LIKE '%' || LOWER(s.employee_name) || '%')
+      )
+    GROUP BY s.employee_id, s.shift_date, s.shift_start_parsed
+  ),
+  
+  -- Step 7: Calculate gross profit
+  final_result AS (
+    SELECT 
+      s.shift_date,
+      s.employee_id,
+      s.employee_name,
+      s.position,
+      s.employment_type,
+      s.detected_shift_type,
+      ROUND(s.shift_hours, 2) AS shift_hours,
+      s.shift_cost,
+      COALESCE(r.procedure_count, 0) AS procedure_count,
+      ROUND(COALESCE(r.total_revenue, 0), 2) AS total_revenue,
+      ROUND(COALESCE(r.total_doctor_fee, 0), 2) AS total_doctor_fee,
+      -- Gross Profit = Revenue - Doctor Fee - Staff Cost
+      ROUND(
+        COALESCE(r.total_revenue, 0) - COALESCE(r.total_doctor_fee, 0) - s.shift_cost,
+        2
+      ) AS gross_profit,
+      -- Profit margin percentage
+      CASE 
+        WHEN COALESCE(r.total_revenue, 0) > 0 THEN
+          ROUND(
+            ((COALESCE(r.total_revenue, 0) - COALESCE(r.total_doctor_fee, 0) - s.shift_cost) 
+             / r.total_revenue) * 100,
+            1
+          )
+        ELSE 0
+      END AS profit_margin_pct,
+      r.procedure_details,
+      -- Build evidence string
+      '[' || s.detected_shift_type || ' SHIFT] ' ||
+      s.employee_id || ' (' || COALESCE(s.employee_name, 'Unknown') || ', ' || 
+      COALESCE(NULLIF(s.position, ''), 'N/A') || ') ' ||
+      'worked ' || CAST(ROUND(s.shift_hours, 1) AS VARCHAR) || 'h on ' || 
+      CAST(s.shift_date AS VARCHAR) || '. ' ||
+      'Staff cost: $' || CAST(s.shift_cost AS VARCHAR) || '. ' ||
+      CASE 
+        WHEN COALESCE(r.procedure_count, 0) = 0 THEN 
+          'No procedures recorded - support/admin role or documentation gap. ' ||
+          'Net cost: -$' || CAST(s.shift_cost AS VARCHAR) || '.'
+        ELSE 
+          'Performed ' || CAST(r.procedure_count AS VARCHAR) || ' procedure(s). ' ||
+          'Revenue: $' || CAST(ROUND(r.total_revenue, 2) AS VARCHAR) || '. ' ||
+          CASE 
+            WHEN r.total_doctor_fee > 0 THEN 
+              'Doctor fee: $' || CAST(ROUND(r.total_doctor_fee, 2) AS VARCHAR) || '. '
+            ELSE ''
+          END ||
+          'Gross profit: $' || 
+          CAST(ROUND(COALESCE(r.total_revenue, 0) - COALESCE(r.total_doctor_fee, 0) - s.shift_cost, 2) AS VARCHAR) ||
+          ' (' || 
+          CAST(ROUND(
+            CASE 
+              WHEN r.total_revenue > 0 THEN
+                ((r.total_revenue - COALESCE(r.total_doctor_fee, 0) - s.shift_cost) / r.total_revenue) * 100
+              ELSE 0
+            END, 1
+          ) AS VARCHAR) || '% margin).' ||
+          CASE 
+            WHEN (r.total_revenue - COALESCE(r.total_doctor_fee, 0) - s.shift_cost) < 0 
+            THEN ' ⚠️ Shift operated at a loss.'
+            ELSE ''
+          END
+      END AS evidence
+    FROM shifts_with_comp s
+    LEFT JOIN shift_revenue r
+      ON s.employee_id = r.employee_id 
+      AND s.shift_date = r.shift_date
+      AND s.shift_start_parsed = r.shift_start_parsed
+  )
+  
+  -- Final output sorted by gross profit (descending)
+  SELECT * FROM final_result
+  ORDER BY gross_profit DESC
+
