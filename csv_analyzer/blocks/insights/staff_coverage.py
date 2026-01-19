@@ -85,17 +85,22 @@ def parse_time_range(time_range_str: str) -> Tuple[Optional[time], Optional[time
     return None, None
 
 
-def normalize_date(date_val) -> Optional[str]:
+def normalize_date(date_val, prefer_dmy: bool = False) -> Optional[str]:
     """
     Normalize date to YYYY-MM-DD format.
     
     Handles multiple formats:
     - MM/DD/YYYY (American) - e.g., 12/1/2025 = December 1, 2025
     - DD/MM/YYYY (European) - e.g., 25/12/2025 = December 25, 2025
+    - DD.MM.YYYY (European with dots) - e.g., 01.12.2025 = December 1, 2025
     - YYYY-MM-DD (ISO) - already normalized
     
+    Args:
+        date_val: The date value to normalize
+        prefer_dmy: If True, prefer DD/MM/YYYY when ambiguous. Default False (MM/DD/YYYY).
+    
     Disambiguation: if first number > 12, it must be a day (European format).
-    Otherwise, assume American format (month/day/year).
+    Otherwise, use prefer_dmy parameter to decide.
     """
     if pd.isna(date_val):
         return None
@@ -105,6 +110,12 @@ def normalize_date(date_val) -> Optional[str]:
     match = re.match(r'(\d{4})-(\d{1,2})-(\d{1,2})', date_str)
     if match:
         year, month, day = match.groups()
+        return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+    
+    # Try DD.MM.YYYY format (European with dots) - always DD/MM
+    match = re.match(r'(\d{1,2})\.(\d{1,2})\.(\d{4})', date_str)
+    if match:
+        day, month, year = match.groups()
         return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
     
     # Try X/Y/YYYY format - need to disambiguate MM/DD vs DD/MM
@@ -120,8 +131,9 @@ def normalize_date(date_val) -> Optional[str]:
         # If second number > 12, it must be a day (American MM/DD/YYYY)
         elif second_num > 12:
             month, day = first, second
-        # Both <= 12: assume American format (MM/DD/YYYY) as default
-        # This is common in Israeli business software exports
+        # Both <= 12: use prefer_dmy parameter
+        elif prefer_dmy:
+            day, month = first, second
         else:
             month, day = first, second
         
@@ -504,10 +516,10 @@ class StaffTimingValidationBlock(BaseBlock):
             )
             return pd.DataFrame()
         
-        # Normalize date
+        # Normalize date (procedures use DD/MM/YYYY format)
         if date_col:
             result['procedure_date'] = df[date_col].apply(
-                lambda x: normalize_date(x) if pd.notna(x) else None
+                lambda x: normalize_date(x, prefer_dmy=True) if pd.notna(x) else None
             )
         else:
             result['procedure_date'] = None
