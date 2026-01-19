@@ -7,7 +7,8 @@
 #   upload → preprocess → classify ─┬─► early_arrival ──► export_early_arrival ─┐
 #                                   ├─► expensive_employees ──► export_salary ────┤
 #                                   ├─► manpower_cost ──► export_manpower_cost ───┼─► email_all_reports
-#                                   └─► gross_profit ──► export_gross_profit ─────┘
+#                                   ├─► gross_profit ──► export_gross_profit ─────┤
+#                                   └─► staff_coverage ──► export_staff_coverage ─┘
 #
 # Key Features:
 # - Single classification step handles ALL input files
@@ -21,6 +22,7 @@
 # 2. expensive_employees: Rank employees by cost (needs: employee_monthly_salary)
 # 3. manpower_cost: Shift costs + avg cost per procedure (needs: employee_shifts, employee_compensation)
 # 4. gross_profit: Revenue - physician cost - staff cost (needs: employee_shifts, employee_compensation, medical_actions)
+# 5. staff_coverage: Validate staff roles against schedule (needs: shift_schedule, employee_shifts, medical_actions)
 #
 # Usage:
 #   # Run with shifts + actions + compensation (all financial insights run)
@@ -55,6 +57,10 @@ parameters:
   # Manpower cost / gross profit parameters
   default_shift_hours: 8.0
   benefits_loading: 0.25
+  # Staff coverage parameters
+  shift_time_boundary: "13:00"
+  morning_shift_start: "06:00"
+  evening_shift_end: "21:00"
 
 # Storage configuration
 storage:
@@ -291,8 +297,55 @@ blocks:
       include_source_column: false
 
   # ============================================================
+  # BRANCH 5: Staff Coverage Validation
+  # Requires: shift_schedule + employee_shifts + medical_actions (optional)
+  # Validates: 1 recovery nurse per shift, gastro nurses >= concurrent doctors
+  # ============================================================
+  
+  - id: staff_coverage
+    handler: staff_coverage_validation
+    inputs:
+      - name: data
+        source: classify.classified_data
+    parameters:
+      shift_time_boundary: "{{shift_time_boundary}}"
+      morning_shift_start: "{{morning_shift_start}}"
+      evening_shift_end: "{{evening_shift_end}}"
+
+  - id: export_staff_coverage
+    handler: export_csv
+    inputs:
+      - field: date
+        source: staff_coverage.result.date
+      - field: shift_type
+        source: staff_coverage.result.shift_type
+      - field: role
+        source: staff_coverage.result.role
+      - field: validation_type
+        source: staff_coverage.result.validation_type
+      - field: expected_count
+        source: staff_coverage.result.expected_count
+      - field: actual_count
+        source: staff_coverage.result.actual_count
+      - field: status
+        source: staff_coverage.result.status
+      - field: employees_expected
+        source: staff_coverage.result.employees_expected
+      - field: employees_arrived
+        source: staff_coverage.result.employees_arrived
+      - field: doctor_name
+        source: staff_coverage.result.doctor_name
+      - field: evidence
+        source: staff_coverage.result.evidence
+    parameters:
+      filename: "staff_coverage_report.csv"
+      output_dir: "{{output_dir}}"
+      unique_name: true
+      include_source_column: false
+
+  # ============================================================
   # EMAIL ALL REPORTS
-  # Sends all 4 reports in a single email with attachments
+  # Sends all 5 reports in a single email with attachments
   # ============================================================
   
   - id: email_all_reports
@@ -304,6 +357,7 @@ blocks:
           - expensive_employees.result
           - manpower_cost.result
           - gross_profit.result
+          - staff_coverage.result
     parameters:
       sender_email: "{{sender_email}}"
       recipient_email: "{{recipient_email}}"
@@ -329,6 +383,11 @@ blocks:
         📈 Report 4: Gross Profit Analysis
            - Revenue vs. cost analysis per shift
            - Profit margins and procedure details
+        
+        👩‍⚕️ Report 5: Staff Coverage Validation
+           - Recovery nurse count validation (1 per shift)
+           - Gastro nurse coverage vs concurrent doctors
+           - Schedule attendance tracking
         
         Best regards,
         Automated Medical Insights System

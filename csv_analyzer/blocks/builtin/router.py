@@ -64,6 +64,7 @@ class RouterBlock(BaseBlock):
         {"name": "medical_actions", "ontology": DataType.MEDICAL_ACTIONS, "optional": True},
         {"name": "lab_results", "ontology": DataType.LAB_RESULTS, "optional": True},
         {"name": "patient_appointments", "ontology": DataType.PATIENT_APPOINTMENTS, "optional": True},
+        {"name": "shift_schedule", "ontology": DataType.SHIFT_SCHEDULE, "optional": True},
     ],
     block_class=RouterBlock,
     description="Route classified data into separate outputs by document type",

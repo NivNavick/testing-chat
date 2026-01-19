@@ -35,7 +35,8 @@ class SimpleCategorizeBlock(BaseBlock):
         "employee_shifts": [r"shift", r"shifts", r"attendance", r"clock"],
         "medical_actions": [r"action", r"medical", r"procedure", r"treatment"],
         "lab_results": [r"lab", r"test", r"result"],
-        "patient_appointments": [r"appointment", r"schedule", r"booking"],
+        "patient_appointments": [r"appointment", r"booking"],
+        "shift_schedule": [r"משמרות", r"schedule", r"roster", r"assignment"],  # Staff role assignments
     }
     
     def run(self) -> Dict[str, str]:

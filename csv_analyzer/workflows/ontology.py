@@ -32,6 +32,7 @@ class DataType(Enum):
     PATIENT_APPOINTMENTS = "patient_appointments"
     EMPLOYEE_COMPENSATION = "employee_compensation"
     EMPLOYEE_MONTHLY_SALARY = "employee_monthly_salary"
+    SHIFT_SCHEDULE = "shift_schedule"  # Staff role assignments per shift
     
     # Field types (for field-level connections)
     DATETIME_FIELD = "datetime_field"
@@ -48,6 +49,7 @@ DOCUMENT_TYPES: Set[DataType] = {
     DataType.PATIENT_APPOINTMENTS,
     DataType.EMPLOYEE_COMPENSATION,
     DataType.EMPLOYEE_MONTHLY_SALARY,
+    DataType.SHIFT_SCHEDULE,
 }
 
 # Field types for column-level connections

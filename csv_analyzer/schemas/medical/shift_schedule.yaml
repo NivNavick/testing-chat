@@ -1,0 +1,122 @@
+name: shift_schedule
+vertical: medical
+version: "1.0"
+description: "Planned staff schedule and role assignments - who should work what role on which day. Contains planned role assignments, not actual time tracking."
+
+# =============================================================================
+# This schema is for PLANNED schedules showing:
+# - Which employee is assigned to which role (gastro nurse, recovery nurse, etc.)
+# - On which date
+# - For which shift type (morning/evening)
+#
+# This is DIFFERENT from employee_shifts which tracks actual clock in/out times.
+# =============================================================================
+
+preprocessing:
+  structure_hints:
+    max_header_rows: 3
+    metadata_row_patterns:
+      - "^[א-ת\\s]+"  # Location name in first row
+
+fields:
+  - name: employee_name
+    type: string
+    required: true
+    description: "Name of the scheduled employee"
+    aliases:
+      - עובד
+      - שם_עובד
+      - שם
+      - worker
+      - staff
+      - name
+      - employee
+    embedding_text: "employee name worker staff person עובד שם scheduled assigned"
+
+  - name: role_name
+    type: string
+    required: true
+    description: "The role/job title assigned for this shift - the specific function (gastro nurse, recovery nurse, doctor, assistant)"
+    aliases:
+      - שם משמרת
+      - שם_משמרת
+      - תפקיד
+      - role
+      - position
+      - job_title
+      - assignment
+      - duty
+      - function
+    embedding_text: "role name position job title assignment אח גסטרו אח התאוששות רופא כע עזר gastro nurse recovery nurse doctor assistant shift role שם משמרת"
+
+  - name: shift_code
+    type: string
+    required: false
+    description: "Shift type code - morning (בוקר) or evening (ערב)"
+    aliases:
+      - ק.משמרת
+      - קוד_משמרת
+      - קוד משמרת
+      - shift_type
+      - shift_code
+      - type
+    embedding_text: "shift code type morning evening בוקר ערב קוד משמרת time period"
+
+  - name: schedule_date
+    type: date
+    required: true
+    description: "The date when this role assignment is scheduled"
+    target_format: "YYYY-MM-DD"
+    accepts_formats:
+      - "YYYY-MM-DD"
+      - "DD/MM/YYYY"
+      - "MM/DD/YYYY"
+      - "M/D/YYYY"
+    aliases:
+      - יום בחודש
+      - יום_בחודש
+      - תאריך
+      - date
+      - schedule_date
+      - assignment_date
+      - day
+    embedding_text: "date schedule day when יום בחודש תאריך assignment planned"
+
+  - name: department
+    type: string
+    required: false
+    description: "Department or unit name"
+    aliases:
+      - חטיבה
+      - מחלקה
+      - יחידה
+      - department
+      - unit
+      - division
+      - section
+    embedding_text: "department unit division section חטיבה מחלקה יחידה"
+
+  - name: quantity
+    type: integer
+    required: false
+    description: "Quantity or count for the assignment (usually 1)"
+    aliases:
+      - כמות
+      - count
+      - qty
+      - amount
+    embedding_text: "quantity count amount כמות number"
+
+  - name: site
+    type: string
+    required: false
+    description: "Site or location name"
+    aliases:
+      - אתר
+      - מיקום
+      - site
+      - location
+      - branch
+      - facility
+    embedding_text: "site location facility branch אתר מיקום"
+
