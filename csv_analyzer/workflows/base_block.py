@@ -119,8 +119,8 @@ class BaseBlock(ABC):
         # Auto-detect format based on data type and size
         if format is None:
             if isinstance(data, pd.DataFrame):
-                # Use Parquet for large DataFrames (>10K rows) for efficiency
-                format = "parquet" if len(data) > 10_000 else "json"
+                # Always use Parquet for DataFrames - 10x faster than JSON
+                format = "parquet"
             else:
                 format = "json"
         
@@ -562,6 +562,7 @@ class BaseBlock(ABC):
             # For S3, write to temp then upload
             import tempfile
             file_path = Path(tempfile.mkdtemp()) / f"{name}.parquet"
+            file_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Write data
         if isinstance(data, duckdb.DuckDBPyRelation):

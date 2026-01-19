@@ -552,6 +552,9 @@ class WorkflowEngine:
     
     def _load_data_from_uri(self, uri: str) -> Any:
         """Load data from S3 URI or local path."""
+        # Check if this is a Parquet file
+        is_parquet = uri.endswith(".parquet")
+        
         if uri.startswith("s3://"):
             # S3 loading
             import boto3
@@ -559,13 +562,20 @@ class WorkflowEngine:
             bucket = parts[0]
             key = parts[1]
             
-            s3 = boto3.client("s3")
-            response = s3.get_object(Bucket=bucket, Key=key)
-            data = json.loads(response["Body"].read().decode("utf-8"))
+            if is_parquet:
+                # Use pandas to read Parquet directly from S3
+                return pd.read_parquet(uri)
+            else:
+                s3 = boto3.client("s3")
+                response = s3.get_object(Bucket=bucket, Key=key)
+                data = json.loads(response["Body"].read().decode("utf-8"))
         else:
             # Local file
-            with open(uri, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            if is_parquet:
+                return pd.read_parquet(uri)
+            else:
+                with open(uri, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
         
         # Convert to DataFrame if it's a list of dicts
         if isinstance(data, list) and data and isinstance(data[0], dict):

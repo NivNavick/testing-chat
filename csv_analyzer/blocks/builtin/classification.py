@@ -608,7 +608,7 @@ class ClassificationBlock(BaseBlock):
         threshold = self.get_param("threshold", 0.5)
         use_duckdb = self.get_param("use_duckdb", None)  # None = auto-detect
         sample_size = self.get_param("sample_size", DEFAULT_SAMPLE_SIZE)
-        output_format = self.get_param("output_format", "json")  # or "parquet"
+        output_format = self.get_param("output_format", "parquet")  # Default to parquet for 10x faster I/O
         
         # Get or create cached canonizer
         try:
