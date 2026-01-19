@@ -497,6 +497,7 @@ class SchemaEmbeddingsService:
         Get column matches filtered to a specific document type.
         
         Uses cached embeddings to avoid regenerating them.
+        IMPORTANT: Also checks alias index for exact matches (priority over embeddings).
         
         Args:
             columns: List of column profiles
@@ -511,6 +512,9 @@ class SchemaEmbeddingsService:
         from csv_analyzer.core.text_representation import column_to_embedding_text
         from csv_analyzer.core.type_compatibility import get_type_compatibility
         
+        # Build alias index for exact matching (IMPORTANT!)
+        alias_index = self._build_alias_index(vertical)
+        
         column_matches = {}
         
         for col in columns:
@@ -518,7 +522,38 @@ class SchemaEmbeddingsService:
             col_type = col.get("detected_type", "unknown")
             col_text = column_to_embedding_text(col)
             
-            # Use cached embedding
+            enriched_matches = []
+            existing_field_ids = set()
+            
+            # FIRST: Check for exact alias matches (priority!)
+            col_name_lower = col_name.lower().strip()
+            if col_name_lower in alias_index:
+                alias_matches = alias_index[col_name_lower]
+                # Filter to the target document type
+                for match in alias_matches:
+                    if match["document_type"] == document_type:
+                        target_type = match.get("field_type", "string")
+                        type_compat = get_type_compatibility(col_type, target_type)
+                        field_id = f"{match['vertical']}_{match['document_type']}_{match['field_name']}"
+                        
+                        if field_id not in existing_field_ids:
+                            enriched_matches.append({
+                                "field_id": field_id,
+                                "field_name": match["field_name"],
+                                "document_type": match["document_type"],
+                                "vertical": match["vertical"],
+                                "field_type": target_type,
+                                "required": match["required"],
+                                "description": match["description"],
+                                "source_type": col_type,
+                                "raw_similarity": 1.0,  # Exact alias match!
+                                "type_compatibility": round(type_compat, 3),
+                                "similarity": round(1.0 * type_compat, 4),
+                                "match_source": "alias",
+                            })
+                            existing_field_ids.add(field_id)
+            
+            # SECOND: Use cached embedding for additional matches
             query_embedding = column_embeddings.get(col_name)
             if query_embedding is None:
                 logger.warning(f"No cached embedding for column '{col_name}', generating new one")
@@ -538,24 +573,26 @@ class SchemaEmbeddingsService:
                 query_embedding=query_embedding,
             )
             
-            # Enrich matches with source type and type-adjusted similarity
-            enriched_matches = []
+            # Add embedding matches (but don't duplicate alias matches)
             for match in matches:
+                if match["field_id"] in existing_field_ids:
+                    continue  # Skip - already have alias match
+                    
                 target_type = match.get("field_type", "string")
                 type_compat = get_type_compatibility(col_type, target_type)
                 raw_similarity = match["similarity"]
                 adjusted_similarity = raw_similarity * type_compat
                 
-                enriched_match = {
+                enriched_matches.append({
                     **match,
                     "source_type": col_type,
                     "raw_similarity": raw_similarity,
                     "type_compatibility": round(type_compat, 3),
                     "similarity": round(adjusted_similarity, 4),
-                }
-                enriched_matches.append(enriched_match)
+                    "match_source": "embedding",
+                })
             
-            # Sort by adjusted similarity
+            # Sort by adjusted similarity (alias matches with 1.0 will be at top)
             enriched_matches.sort(key=lambda x: x["similarity"], reverse=True)
             column_matches[col_name] = enriched_matches
         

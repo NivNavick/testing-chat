@@ -52,5 +52,15 @@ poetry run python ingest_ground_truth.py \
   --external-id "gt_employee_shifts_hebrew_detailed" \
   --description "Hebrew detailed schedule with actual hours and supervisor flag"
 
+# bat_yam_roster.csv - Staffing roster format with roles (no specific times)
+# Uses shift codes (בוקר/ערב) instead of specific start/end times
+poetry run python ingest_ground_truth.py \
+  --csv ground_truth/medical/employee_shifts/bat_yam_roster.csv \
+  --vertical medical \
+  --document-type employee_shifts \
+  --mappings '{"חטיבה": "department_code", "עובד": "employee_name", "ק.משמרת": "shift_type", "שם משמרת": "role", "יום בחודש": "shift_date"}' \
+  --external-id "gt_employee_shifts_bat_yam_roster" \
+  --description "Bat Yam staffing roster December 2025 - roster format with roles and shift codes"
+
 echo "✅ All Hebrew ground truth files ingested!"
 

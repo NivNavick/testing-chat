@@ -1,7 +1,7 @@
 name: employee_shifts
 vertical: medical
-version: "1.1"
-description: "Employee work schedules, shift assignments, staff rosters, nursing schedules"
+version: "1.2"
+description: "Employee work schedules, shift assignments, staff rosters, nursing schedules, staffing assignments"
 
 # =============================================================================
 # PREPROCESSING CONFIGURATION
@@ -67,7 +67,7 @@ fields:
 
   - name: employee_id
     type: string
-    required: true
+    required: false
     description: "Unique identifier for the employee, staff member, or healthcare worker"
     aliases:
       # English variations
@@ -88,7 +88,6 @@ fields:
       - מספר_עובד
       - קוד_עובד
       - מזהה_עובד
-      - עובד
       - זיהוי_עובד
       - ת_עובד
       - מס_עובד
@@ -114,7 +113,7 @@ fields:
 
   - name: shift_date
     type: date
-    required: true
+    required: false
     description: "The calendar date when the shift occurs"
     # Format transformation support
     target_format: "YYYY-MM-DD"
@@ -138,6 +137,8 @@ fields:
       - תאריך_עבודה
       - תאריך
       - יום_עבודה
+      - יום בחודש
+      - יום_בחודש
       # Spanish
       - fecha_turno
       - fecha_trabajo
@@ -156,8 +157,8 @@ fields:
 
   - name: shift_start
     type: datetime
-    required: true
-    description: "The scheduled/planned time when the shift begins"
+    required: false
+    description: "The scheduled/planned time when the shift begins (optional for roster-style schedules)"
     embedding_text: "shift start scheduled planned begin time entry arrival clock in"
     aliases:
       - scheduled_start
@@ -194,8 +195,8 @@ fields:
 
   - name: shift_end
     type: datetime
-    required: true
-    description: "The scheduled/planned time when the shift ends"
+    required: false
+    description: "The scheduled/planned time when the shift ends (optional for roster-style schedules)"
     embedding_text: "shift end scheduled planned finish time departure exit clock out"
     aliases:
       - scheduled_end
@@ -378,6 +379,7 @@ fields:
       - קוד_מחלקה
       - אגף
       - מחלקת_עבודה
+      - חטיבה
       # Spanish
       - departamento
       - unidad
@@ -392,26 +394,27 @@ fields:
       # French
       - departement
       - service
-    embedding_text: "department unit ward section location area hospital clinic"
+    embedding_text: "department unit ward section division חטיבה מחלקה יחידה אגף location area hospital clinic"
 
   - name: shift_type
     type: string
     required: false
-    description: "Type of shift - morning, evening, night, day, overnight"
+    description: "Type of shift - morning, evening, night, day, overnight - the time period of the shift"
     aliases:
       - type
       - shift_kind
       - shift_category
-      - shift_name
       - category
       - shift_class
-      - assignment
       # Hebrew
       - סוג_משמרת
       - סוג
       - סוג_תורנות
       - תורנות
       - סיווג_משמרת
+      - ק.משמרת
+      - קוד_משמרת
+      - קוד משמרת
       # Spanish
       - tipo_turno
       - turno
@@ -423,7 +426,7 @@ fields:
       - тип
       # French
       - type_poste
-    embedding_text: "shift type morning evening night day overnight category kind"
+    embedding_text: "shift type time period morning בוקר evening ערב night לילה day overnight when schedule code קוד משמרת"
 
   - name: employee_name
     type: string
@@ -436,6 +439,7 @@ fields:
       - worker_name
       - staff_member
       # Hebrew
+      - עובד
       - שם_עובד
       - שם
       - שם_מלא
@@ -451,7 +455,7 @@ fields:
       # French
       - nom_employe
       - nom
-    embedding_text: "employee name full name staff worker"
+    embedding_text: "employee name full name staff worker person nurse doctor עובד שם"
 
   - name: is_supervisor
     type: boolean
@@ -509,3 +513,96 @@ fields:
       # French
       - pause
     embedding_text: "break rest pause time off"
+
+  # ============================================
+  # ROLE AND LOCATION FIELDS
+  # For staffing roster/assignment schedules
+  # ============================================
+
+  - name: role
+    type: string
+    required: false
+    description: "The role or position assigned for this shift - what job the person does (e.g., gastro nurse, recovery nurse, doctor, assistant)"
+    aliases:
+      # English variations
+      - position
+      - job_role
+      - job_title
+      - assignment_role
+      - staff_role
+      - function
+      - duty
+      - task
+      - shift_role
+      - assigned_role
+      - shift_name
+      - assignment
+      # Hebrew (עברית)
+      - שם משמרת
+      - שם_משמרת
+      - תפקיד
+      - תפקיד_משמרת
+      - סוג_תפקיד
+      - תפקיד_עובד
+      - משימה
+      - סוג עובד
+      # Spanish (Español)
+      - rol
+      - puesto
+      - cargo
+      - funcion
+      # Arabic (العربية)
+      - الدور
+      - المنصب
+      - الوظيفة
+      # Russian (Русский)
+      - роль
+      - должность
+      - позиция
+      # French (Français)
+      - role
+      - poste
+      - fonction
+    embedding_text: "role position job title what person does אח גסטרו אח התאוששות רופא כע עזר nurse doctor assistant recovery gastro שם משמרת תפקיד"
+
+  - name: site
+    type: string
+    required: false
+    description: "The physical site, location, or facility where the shift takes place"
+    aliases:
+      # English variations
+      - facility
+      - location_name
+      - branch
+      - clinic_name
+      - hospital_name
+      - center
+      - campus
+      - building
+      # Hebrew (עברית)
+      - אתר
+      - מיקום
+      - סניף
+      - מרכז
+      - בניין
+      - מתחם
+      - מקום
+      # Spanish (Español)
+      - sitio
+      - ubicacion
+      - centro
+      - sucursal
+      # Arabic (العربية)
+      - الموقع
+      - المركز
+      - الفرع
+      # Russian (Русский)
+      - объект
+      - место
+      - филиал
+      # French (Français)
+      - site
+      - lieu
+      - centre
+    embedding_text: "site location facility branch clinic hospital center campus building"
+
