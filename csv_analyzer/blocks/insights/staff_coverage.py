@@ -171,7 +171,8 @@ def normalize_employee_name(name: str) -> str:
 # - min_count, max_count: Role count limits per shift
 # - scope: "per_shift" or "per_concurrent_doctor"
 # - arrival_buffer_minutes: Must arrive this many minutes before first relevant procedure
-# - departure_buffer_minutes: Can leave this many minutes after last relevant procedure
+# - departure_buffer_minutes: Minimum time to stay after last procedure (0 = can leave when procedure ends)
+# - departure_max_minutes: Maximum time allowed to stay after last procedure (null = no limit)
 # - match_to: "all_procedures", "gastro_procedures", or "own_procedures"
 DEFAULT_TIMING_RULES = {
     "אח התאוששות": {
@@ -179,7 +180,8 @@ DEFAULT_TIMING_RULES = {
         "max_count": 1,
         "scope": "per_shift",
         "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 60,  # Can leave 1 hour after last procedure
+        "departure_buffer_minutes": 0,   # Can leave when last procedure ends
+        "departure_max_minutes": 60,     # Must leave within 1 hour after last procedure
         "match_to": "all_procedures"
     },
     "אח התאוששות ערב": {
@@ -187,7 +189,8 @@ DEFAULT_TIMING_RULES = {
         "max_count": 1,
         "scope": "per_shift",
         "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 60,
+        "departure_buffer_minutes": 0,
+        "departure_max_minutes": 60,
         "match_to": "all_procedures"
     },
     "אח גסטרו": {
@@ -1030,6 +1033,9 @@ class StaffTimingValidationBlock(BaseBlock):
             # Check if arrived too early
             gap_minutes = first_proc_minutes - arrival_minutes
             
+            # Build match explanation
+            match_explanation = self._get_match_explanation(match_to, len(date_procedures))
+            
             if gap_minutes > arrival_buffer:
                 # Arrived too early
                 minutes_too_early = gap_minutes - arrival_buffer
@@ -1037,14 +1043,16 @@ class StaffTimingValidationBlock(BaseBlock):
                 evidence = (
                     f"{employee_name} ({role}) arrived at {arrival_time} on {shift_date} ({shift_type}), "
                     f"but first procedure is at {first_procedure_time}. "
-                    f"Arrived {minutes_too_early} min earlier than the {arrival_buffer} min buffer allows."
+                    f"Arrived {minutes_too_early} min earlier than the {arrival_buffer} min buffer allows. "
+                    f"[{match_explanation}]"
                 )
             else:
                 status = 'OK'
                 evidence = (
                     f"{employee_name} ({role}) arrived at {arrival_time} on {shift_date} ({shift_type}), "
                     f"first procedure at {first_procedure_time}. "
-                    f"Arrival {gap_minutes} min before procedure is within {arrival_buffer} min buffer."
+                    f"Arrival {gap_minutes} min before procedure is within {arrival_buffer} min buffer. "
+                    f"[{match_explanation}]"
                 )
             
             results.append({
@@ -1109,6 +1117,7 @@ class StaffTimingValidationBlock(BaseBlock):
             # Get timing rules for this role
             role_config = timing_rules.get(role, {})
             departure_buffer = role_config.get('departure_buffer_minutes', 0)
+            departure_max = role_config.get('departure_max_minutes')  # None = no max limit
             match_to = role_config.get('match_to', 'all_procedures')
             
             # Filter procedures for this date and shift type
@@ -1160,7 +1169,16 @@ class StaffTimingValidationBlock(BaseBlock):
             # Calculate actual departure minutes
             departure_minutes = departure_time.hour * 60 + departure_time.minute
             
-            # Check if left too early
+            # Build match explanation
+            match_explanation = self._get_match_explanation(match_to, len(date_procedures))
+            
+            # Calculate max allowed departure time if configured
+            max_departure_minutes = last_proc_minutes + departure_max if departure_max else None
+            
+            # Calculate how long after procedure they stayed
+            minutes_after_procedure = departure_minutes - last_proc_minutes
+            
+            # Check if left too early (before minimum buffer)
             if departure_minutes < allowed_departure_minutes:
                 minutes_too_early = allowed_departure_minutes - departure_minutes
                 status = 'EARLY_DEPARTURE'
@@ -1169,15 +1187,36 @@ class StaffTimingValidationBlock(BaseBlock):
                     f"{employee_name} ({role}) left at {departure_time} on {shift_date} ({shift_type}), "
                     f"but last procedure ended at {last_procedure_end}. "
                     f"With {departure_buffer} min buffer, should stay until {allowed_time}. "
-                    f"Left {minutes_too_early} min too early."
+                    f"Left {minutes_too_early} min too early. "
+                    f"[{match_explanation}]"
                 )
-            else:
-                status = 'OK'
+            # Check if stayed too late (after maximum allowed)
+            elif max_departure_minutes and departure_minutes > max_departure_minutes:
+                minutes_too_late = departure_minutes - max_departure_minutes
+                status = 'LATE_DEPARTURE'
+                max_time = f"{max_departure_minutes // 60:02d}:{max_departure_minutes % 60:02d}"
                 evidence = (
                     f"{employee_name} ({role}) left at {departure_time} on {shift_date} ({shift_type}). "
                     f"Last procedure ended at {last_procedure_end}. "
-                    f"Departure is {departure_buffer} min or more after last procedure - OK."
+                    f"Should leave within {departure_max} min (by {max_time}), but stayed {minutes_too_late} min too late. "
+                    f"[{match_explanation}]"
                 )
+            else:
+                status = 'OK'
+                if departure_max:
+                    evidence = (
+                        f"{employee_name} ({role}) left at {departure_time} on {shift_date} ({shift_type}). "
+                        f"Last procedure ended at {last_procedure_end}. "
+                        f"Left {minutes_after_procedure} min after (within 0-{departure_max} min window) - OK. "
+                        f"[{match_explanation}]"
+                    )
+                else:
+                    evidence = (
+                        f"{employee_name} ({role}) left at {departure_time} on {shift_date} ({shift_type}). "
+                        f"Last procedure ended at {last_procedure_end}. "
+                        f"Departure is {departure_buffer} min or more after last procedure - OK. "
+                        f"[{match_explanation}]"
+                    )
             
             results.append({
                 'date': shift_date,
@@ -1194,6 +1233,26 @@ class StaffTimingValidationBlock(BaseBlock):
             })
         
         return results
+    
+    def _get_match_explanation(self, match_to: str, procedure_count: int) -> str:
+        """
+        Get human-readable explanation of why procedures were matched to this role.
+        
+        Args:
+            match_to: The match_to setting from timing rules
+            procedure_count: Number of procedures matched
+            
+        Returns:
+            Explanation string
+        """
+        if match_to == 'all_procedures':
+            return f"Role covers ALL {procedure_count} procedures in this shift"
+        elif match_to == 'gastro_procedures':
+            return f"Role covers {procedure_count} GASTRO procedures (category contains 'גסטרו')"
+        elif match_to == 'own_procedures':
+            return f"Matched to {procedure_count} procedures where employee is treating staff"
+        else:
+            return f"Matched to {procedure_count} procedures (match_to={match_to})"
     
     def _get_empty_result_df(self) -> pd.DataFrame:
         """Get an empty result DataFrame with correct columns."""

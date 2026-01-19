@@ -62,20 +62,25 @@ parameters:
   evening_shift_end: "21:00"
   # Timing rules per role (configurable)
   # Each role can have: min_count, max_count, scope, arrival_buffer_minutes, departure_buffer_minutes, match_to
+  # Timing rules per role:
+  # - departure_buffer_minutes: Minimum time to stay after last procedure (0 = can leave immediately)
+  # - departure_max_minutes: Maximum time allowed after last procedure (null = no limit)
   timing_rules:
     אח התאוששות:
       min_count: 1
       max_count: 1
       scope: per_shift
       arrival_buffer_minutes: 30
-      departure_buffer_minutes: 60   # Can leave 1 hour after last procedure
+      departure_buffer_minutes: 0    # Can leave when last procedure ends
+      departure_max_minutes: 60      # Must leave within 1 hour after last procedure
       match_to: all_procedures
     אח התאוששות ערב:
       min_count: 1
       max_count: 1
       scope: per_shift
       arrival_buffer_minutes: 30
-      departure_buffer_minutes: 60
+      departure_buffer_minutes: 0
+      departure_max_minutes: 60
       match_to: all_procedures
     אח גסטרו:
       min_count: 1
