@@ -462,7 +462,149 @@ def profile_column(
     )
     return asdict(prof)
 def profile_dataframe(df: pd.DataFrame, sample_size: int = 2000) -> List[Dict[str, Any]]:
+    """
+    Profile all columns in a DataFrame.
+    
+    Args:
+        df: DataFrame to profile
+        sample_size: Maximum rows to sample per column
+        
+    Returns:
+        List of column profile dictionaries
+    """
     profiles = []
     for col in df.columns:
         profiles.append(profile_column(df[col], column_name=str(col), sample_size=sample_size))
     return profiles
+
+
+def profile_dataframe_duckdb(
+    file_path: str,
+    sample_size: int = 5000,
+    sample_method: str = "reservoir",
+    duckdb_conn=None,
+) -> List[Dict[str, Any]]:
+    """
+    Profile columns in a file using DuckDB sampling.
+    
+    This enables profiling files larger than available memory by
+    sampling rows directly from the file without loading it entirely.
+    
+    Args:
+        file_path: Path to CSV or Parquet file
+        sample_size: Number of rows to sample (default 5000)
+        sample_method: "reservoir" (uniform random) or "system" (faster, less uniform)
+        duckdb_conn: Optional DuckDB connection (uses global manager if not provided)
+        
+    Returns:
+        List of column profile dictionaries
+        
+    Example:
+        # Profile a 10GB CSV without loading it into memory
+        profiles = profile_dataframe_duckdb("huge_file.csv", sample_size=5000)
+        print(profiles[0]["detected_type"])  # "datetime"
+    """
+    import duckdb
+    
+    # Get DuckDB connection
+    if duckdb_conn is None:
+        try:
+            from csv_analyzer.core.duckdb_manager import get_duckdb
+            duckdb_conn = get_duckdb().conn
+        except ImportError:
+            # Fallback to local connection if manager not available
+            duckdb_conn = duckdb.connect(":memory:")
+    
+    # Build sampling clause
+    if sample_method == "reservoir":
+        sample_clause = f"USING SAMPLE RESERVOIR({sample_size} ROWS)"
+    elif sample_method == "system":
+        sample_clause = f"USING SAMPLE {sample_size} ROWS"
+    else:
+        sample_clause = f"USING SAMPLE RESERVOIR({sample_size} ROWS)"
+    
+    # Read file based on extension
+    if file_path.endswith('.parquet'):
+        read_func = f"read_parquet('{file_path}')"
+    elif file_path.endswith('.json'):
+        read_func = f"read_json_auto('{file_path}')"
+    else:
+        # Default to CSV
+        read_func = f"read_csv_auto('{file_path}')"
+    
+    # Sample the file
+    try:
+        sample_df = duckdb_conn.execute(f"""
+            SELECT * FROM {read_func} {sample_clause}
+        """).fetchdf()
+    except Exception as e:
+        raise ValueError(f"Failed to sample file {file_path}: {e}")
+    
+    # Profile the sampled DataFrame using existing logic
+    return profile_dataframe(sample_df, sample_size=sample_size)
+
+
+def profile_file_streaming(
+    file_path: str,
+    sample_size: int = 5000,
+    sample_strategy: str = "stratified",
+) -> List[Dict[str, Any]]:
+    """
+    Profile a file using stratified sampling for better coverage.
+    
+    Stratified sampling takes rows from the beginning, middle, and end
+    of the file, which can provide better type detection for files
+    where data characteristics change over time.
+    
+    Args:
+        file_path: Path to CSV or Parquet file
+        sample_size: Total number of rows to sample
+        sample_strategy: "stratified" or "reservoir"
+        
+    Returns:
+        List of column profile dictionaries
+    """
+    if sample_strategy == "reservoir":
+        return profile_dataframe_duckdb(file_path, sample_size, "reservoir")
+    
+    # Stratified sampling: beginning, middle, end
+    import duckdb
+    
+    try:
+        from csv_analyzer.core.duckdb_manager import get_duckdb
+        conn = get_duckdb().conn
+    except ImportError:
+        conn = duckdb.connect(":memory:")
+    
+    # Get total row count
+    if file_path.endswith('.parquet'):
+        read_func = f"read_parquet('{file_path}')"
+    else:
+        read_func = f"read_csv_auto('{file_path}')"
+    
+    total_rows = conn.execute(f"SELECT COUNT(*) FROM {read_func}").fetchone()[0]
+    
+    if total_rows <= sample_size:
+        # File is small enough to profile entirely
+        return profile_dataframe_duckdb(file_path, sample_size, "reservoir")
+    
+    # Calculate strata sizes
+    strata_size = sample_size // 3
+    
+    # Sample from beginning, middle, and end
+    middle_start = (total_rows - strata_size) // 2
+    end_start = total_rows - strata_size
+    
+    sample_df = conn.execute(f"""
+        WITH numbered AS (
+            SELECT *, ROW_NUMBER() OVER () as _row_num
+            FROM {read_func}
+        )
+        SELECT * EXCLUDE (_row_num) FROM numbered
+        WHERE 
+            _row_num <= {strata_size}  -- Beginning
+            OR (_row_num >= {middle_start} AND _row_num < {middle_start + strata_size})  -- Middle
+            OR _row_num >= {end_start}  -- End
+    """).fetchdf()
+    
+    return profile_dataframe(sample_df, sample_size=sample_size)

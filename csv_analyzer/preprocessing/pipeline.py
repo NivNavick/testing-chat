@@ -3,6 +3,13 @@ Preprocessing Pipeline Orchestrator.
 
 Combines structure detection, value transformations, and row filtering
 into a unified preprocessing pipeline.
+
+Supports two execution modes:
+1. Legacy: Pandas-based transforms with DataFrame copies
+2. Optimized: DuckDB SQL-based transforms for large files
+   - Zero-copy column operations
+   - Streaming I/O to Parquet
+   - Out-of-core processing for files larger than memory
 """
 
 import logging
@@ -32,6 +39,9 @@ from csv_analyzer.preprocessing.row_filter import (
 from csv_analyzer.sessions.session import ExtractedMetadata
 
 logger = logging.getLogger(__name__)
+
+# Threshold for switching to DuckDB mode
+LARGE_FILE_THRESHOLD = 50_000  # rows
 
 
 @dataclass
@@ -672,6 +682,196 @@ class PreprocessingPipeline:
     def close(self) -> None:
         """Release resources."""
         self.row_filter.close()
+    
+    # =========================================================================
+    # DuckDB-based Processing (for large files)
+    # =========================================================================
+    
+    def process_with_duckdb(
+        self,
+        csv_file: Union[str, Path],
+        output_path: Optional[str] = None,
+        transforms: Optional[List[TransformConfig]] = None,
+    ) -> str:
+        """
+        Process a CSV using DuckDB SQL transforms for large-scale data.
+        
+        This method uses streaming I/O and zero-copy operations,
+        enabling processing of files larger than available memory.
+        
+        Args:
+            csv_file: Path to input CSV or Parquet file
+            output_path: Path for output Parquet file (auto-generated if None)
+            transforms: List of transform configurations
+            
+        Returns:
+            Path to output Parquet file
+            
+        Example:
+            pipeline = PreprocessingPipeline()
+            output = pipeline.process_with_duckdb(
+                "huge_file.csv",
+                transforms=[
+                    TransformConfig(
+                        source_column="time_range",
+                        transform_type="split_range",
+                        pattern=r'^(\\d{2}:\\d{2})\\s*-\\s*(\\d{2}:\\d{2})$',
+                        output_columns=[
+                            {"name": "start_time", "group": 1},
+                            {"name": "end_time", "group": 2},
+                        ],
+                    ),
+                ],
+            )
+        """
+        import duckdb
+        
+        try:
+            from csv_analyzer.core.duckdb_manager import get_duckdb
+            conn = get_duckdb().conn
+        except ImportError:
+            conn = duckdb.connect(":memory:")
+        
+        csv_path = str(csv_file)
+        
+        # Determine output path
+        if output_path is None:
+            output_path = str(Path(csv_path).with_suffix('.processed.parquet'))
+        
+        # Get columns from file
+        if csv_path.endswith('.parquet'):
+            read_func = f"read_parquet('{csv_path}')"
+        else:
+            read_func = f"read_csv_auto('{csv_path}')"
+        
+        cols_result = conn.execute(f"""
+            SELECT column_name FROM (DESCRIBE SELECT * FROM {read_func})
+        """).fetchall()
+        all_columns = [row[0] for row in cols_result]
+        
+        # Build SQL select expressions for transforms
+        select_exprs = self._build_sql_transforms(all_columns, transforms or [])
+        
+        # Ensure output directory exists
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        
+        # Execute transform and write to Parquet (streaming)
+        sql = f"""
+            COPY (
+                SELECT {', '.join(select_exprs)}
+                FROM {read_func}
+            )
+            TO '{output_path}' (FORMAT PARQUET, COMPRESSION ZSTD)
+        """
+        
+        logger.info(f"Executing DuckDB transform pipeline...")
+        conn.execute(sql)
+        
+        logger.info(f"Processed file saved to {output_path}")
+        return output_path
+    
+    def _build_sql_transforms(
+        self,
+        columns: List[str],
+        transforms: List[TransformConfig],
+    ) -> List[str]:
+        """
+        Build SQL SELECT expressions for transforms.
+        
+        Converts TransformConfig objects to SQL expressions.
+        
+        Args:
+            columns: List of column names
+            transforms: List of transform configurations
+            
+        Returns:
+            List of SQL SELECT expressions
+        """
+        # Build map of source column -> transform
+        transform_map = {t.source_column: t for t in transforms if t.source_column}
+        
+        # Columns to exclude (they're being transformed into new columns)
+        exclude_cols = set()
+        
+        select_exprs = []
+        additional_exprs = []  # New columns from transforms
+        
+        for col in columns:
+            if col in transform_map:
+                transform = transform_map[col]
+                
+                if transform.transform_type == "split_range":
+                    # Split "19:00 - 19:15" into two columns
+                    pattern = transform.pattern or r'^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$'
+                    
+                    for out_col in transform.output_columns:
+                        group = out_col.get("group", 1)
+                        out_name = out_col.get("name", f"{col}_{group}")
+                        additional_exprs.append(
+                            f"REGEXP_EXTRACT(\"{col}\", '{pattern}', {group}) AS \"{out_name}\""
+                        )
+                    
+                    # Keep original column unless explicitly removed
+                    if not transform.drop_source:
+                        select_exprs.append(f'"{col}"')
+                    else:
+                        exclude_cols.add(col)
+                
+                elif transform.transform_type == "clean_prefix":
+                    # Remove prefix like "* " from values
+                    pattern = transform.pattern or r'^\*\s*'
+                    select_exprs.append(
+                        f"REGEXP_REPLACE(\"{col}\", '{pattern}', '') AS \"{col}\""
+                    )
+                
+                elif transform.transform_type == "hebrew_date_normalize":
+                    # Normalize Hebrew dates - basic implementation
+                    # This is a simplified version; full implementation would need more logic
+                    select_exprs.append(f'"{col}"')
+                
+                elif transform.transform_type == "rename":
+                    # Rename column
+                    new_name = transform.output_column or col
+                    select_exprs.append(f'"{col}" AS "{new_name}"')
+                
+                else:
+                    # Unknown transform - keep original
+                    select_exprs.append(f'"{col}"')
+            else:
+                # No transform for this column
+                if col not in exclude_cols:
+                    select_exprs.append(f'"{col}"')
+        
+        # Add new columns from transforms
+        select_exprs.extend(additional_exprs)
+        
+        return select_exprs
+    
+    def count_rows_fast(self, file_path: str) -> int:
+        """
+        Count rows in a file using DuckDB (fast, memory-efficient).
+        
+        For Parquet files, this reads metadata only.
+        For CSV files, this scans but doesn't load into memory.
+        """
+        import duckdb
+        
+        try:
+            from csv_analyzer.core.duckdb_manager import get_duckdb
+            conn = get_duckdb().conn
+        except ImportError:
+            conn = duckdb.connect(":memory:")
+        
+        if file_path.endswith('.parquet'):
+            result = conn.execute(f"SELECT COUNT(*) FROM read_parquet('{file_path}')").fetchone()
+        else:
+            result = conn.execute(f"SELECT COUNT(*) FROM read_csv_auto('{file_path}')").fetchone()
+        
+        return result[0] if result else 0
+    
+    def is_large_file(self, file_path: str, threshold: int = LARGE_FILE_THRESHOLD) -> bool:
+        """Check if a file is large enough to warrant DuckDB processing."""
+        return self.count_rows_fast(file_path) > threshold
 
 
 # Factory function for easy creation
@@ -692,4 +892,26 @@ def create_pipeline(
         PreprocessingPipeline instance
     """
     return PreprocessingPipeline(openai_client, context, context_path)
+
+
+def process_large_file(
+    input_path: str,
+    output_path: Optional[str] = None,
+    transforms: Optional[List[TransformConfig]] = None,
+    context_path: Optional[str] = None,
+) -> str:
+    """
+    Convenience function to process a large file using DuckDB.
+    
+    Args:
+        input_path: Path to input CSV or Parquet file
+        output_path: Path for output (auto-generated if None)
+        transforms: List of transform configurations
+        context_path: Optional path to context YAML
+        
+    Returns:
+        Path to output Parquet file
+    """
+    pipeline = create_pipeline(context_path=context_path)
+    return pipeline.process_with_duckdb(input_path, output_path, transforms)
 
