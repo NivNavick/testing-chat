@@ -1,13 +1,23 @@
 """
 Early Arrival Block - Detect early employee arrivals.
 
+DEPRECATED: This functionality has been merged into staff_coverage.py
+(now called staff_timing_validation). The unified block provides:
+- Early arrival detection (this block's functionality)
+- Early departure detection (new)
+- Role count validation
+- Gastro nurse concurrent coverage
+- Configurable timing rules per role
+
+Use staff_timing_validation instead for new workflows.
+This block is kept for backward compatibility.
+
+Original description:
 Matches employee arrivals to medical procedures to determine
 which employees arrived earlier than necessary.
 
 Uses DuckDB SQL with ASOF JOIN for O(n log m) performance,
 enabling efficient processing of large datasets.
-
-Migrated from CodeInsightsRegistry to BlockRegistry.
 """
 
 import logging

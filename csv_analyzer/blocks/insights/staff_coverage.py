@@ -1,10 +1,17 @@
 """
-Staff Coverage Validation Block - Validate staff roles against schedule and business rules.
+Staff Timing Validation Block - Unified staff timing and coverage validation.
 
 Validates:
 1. Actual arrivals match scheduled role assignments
 2. Business rules like: 1 recovery nurse per shift, 1 gastro nurse per concurrent doctor
 3. Adequate coverage during all procedure times
+4. Early arrival detection (arrived before needed)
+5. Early departure detection (left before coverage ended)
+
+Configurable timing rules per role:
+- arrival_buffer_minutes: How early should they arrive before first procedure
+- departure_buffer_minutes: How long after last procedure can they leave
+- match_to: Which procedures to match (all_procedures, gastro_procedures, own_procedures)
 
 Uses DuckDB SQL for efficient interval overlap detection and staff counting.
 """
@@ -147,27 +154,82 @@ def normalize_employee_name(name: str) -> str:
     return ' '.join(parts).lower()
 
 
-# Default role limits configuration
-DEFAULT_ROLE_LIMITS = {
-    "אח התאוששות": {"min": 1, "max": 1, "scope": "per_shift"},
-    "אח התאוששות ערב": {"min": 1, "max": 1, "scope": "per_shift"},
-    "אח גסטרו": {"min": 1, "max": None, "scope": "per_concurrent_doctor"},
-    "כע עזר": {"min": 1, "max": None, "scope": "per_shift"},
-    "כע עזר ערב": {"min": 1, "max": None, "scope": "per_shift"},
-    "כח עזר": {"min": 1, "max": None, "scope": "per_shift"},
+# Default timing rules configuration
+# Each role can have:
+# - min_count, max_count: Role count limits per shift
+# - scope: "per_shift" or "per_concurrent_doctor"
+# - arrival_buffer_minutes: Must arrive this many minutes before first relevant procedure
+# - departure_buffer_minutes: Can leave this many minutes after last relevant procedure
+# - match_to: "all_procedures", "gastro_procedures", or "own_procedures"
+DEFAULT_TIMING_RULES = {
+    "אח התאוששות": {
+        "min_count": 1,
+        "max_count": 1,
+        "scope": "per_shift",
+        "arrival_buffer_minutes": 30,
+        "departure_buffer_minutes": 60,  # Can leave 1 hour after last procedure
+        "match_to": "all_procedures"
+    },
+    "אח התאוששות ערב": {
+        "min_count": 1,
+        "max_count": 1,
+        "scope": "per_shift",
+        "arrival_buffer_minutes": 30,
+        "departure_buffer_minutes": 60,
+        "match_to": "all_procedures"
+    },
+    "אח גסטרו": {
+        "min_count": 1,
+        "max_count": None,
+        "scope": "per_concurrent_doctor",
+        "arrival_buffer_minutes": 15,
+        "departure_buffer_minutes": 0,
+        "match_to": "gastro_procedures"
+    },
+    "כע עזר": {
+        "min_count": 1,
+        "max_count": None,
+        "scope": "per_shift",
+        "arrival_buffer_minutes": 30,
+        "departure_buffer_minutes": 30,
+        "match_to": "all_procedures"
+    },
+    "כע עזר ערב": {
+        "min_count": 1,
+        "max_count": None,
+        "scope": "per_shift",
+        "arrival_buffer_minutes": 30,
+        "departure_buffer_minutes": 30,
+        "match_to": "all_procedures"
+    },
+    "כח עזר": {
+        "min_count": 1,
+        "max_count": None,
+        "scope": "per_shift",
+        "arrival_buffer_minutes": 30,
+        "departure_buffer_minutes": 30,
+        "match_to": "all_procedures"
+    },
 }
 
+# Keep backward compatibility alias
+DEFAULT_ROLE_LIMITS = DEFAULT_TIMING_RULES
 
-class StaffCoverageValidationBlock(BaseBlock):
+
+class StaffTimingValidationBlock(BaseBlock):
     """
-    Staff coverage validation block.
+    Unified staff timing and coverage validation block.
     
     Validates:
     1. Actual staff arrivals match scheduled role assignments
     2. Business rules (configurable role counts per shift/doctor)
     3. Gastro nurse coverage for concurrent doctors
+    4. Early arrival detection (arrived too early before procedures)
+    5. Early departure detection (left before coverage period ended)
     
     Uses DuckDB SQL for efficient time interval analysis.
+    
+    Configurable timing rules per role via 'timing_rules' parameter.
     """
     
     # Required document types
@@ -190,26 +252,28 @@ class StaffCoverageValidationBlock(BaseBlock):
     
     # Column candidates for medical_actions (procedures)
     # Includes both original Hebrew names AND canonized schema field names
-    PROC_TIME_CANDIDATES = ['treatment_hours', 'שעות טיפול בפועל', 'treatment_time', 'procedure_time', 'time_range']
+    PROC_TIME_CANDIDATES = ['treatment_time_range', 'שעות טיפול בפועל', 'treatment_time', 'procedure_time', 'time_range']
+    PROC_START_CANDIDATES = ['treatment_start_time', 'שעות טיפול בפועל_start', 'start_time', 'procedure_start']
+    PROC_END_CANDIDATES = ['treatment_end_time', 'שעות טיפול בפועל_end', 'end_time', 'procedure_end']
     PROC_DATE_CANDIDATES = ['treatment_date', 'תאריך טיפול', 'תאריך', 'date']
     PROC_STAFF_CANDIDATES = ['treating_staff', 'צוות מטפל', 'staff_name', 'provider', 'doctor']
     PROC_CAT_CANDIDATES = ['treatment_category', 'קטגורית טיפול', 'category']
     
     def run(self) -> Dict[str, str]:
         """
-        Validate staff coverage against schedule and business rules.
+        Validate staff timing and coverage against schedule and business rules.
         
         Returns:
             Dict with 'result' key containing S3 URI of validation results
         """
         # Get configuration parameters
-        role_limits = self.get_param("role_limits", DEFAULT_ROLE_LIMITS)
+        timing_rules = self.get_param("timing_rules", DEFAULT_TIMING_RULES)
         shift_time_boundary = self.get_param("shift_time_boundary", "13:00")
         morning_shift_start = self.get_param("morning_shift_start", "06:00")
         evening_shift_end = self.get_param("evening_shift_end", "21:00")
         
-        self.logger.info("Running staff coverage validation")
-        self.logger.info(f"Role limits: {role_limits}")
+        self.logger.info("Running staff timing validation")
+        self.logger.info(f"Timing rules configured for {len(timing_rules)} roles")
         
         # Load classified data
         classified_data = self.load_classified_data("data")
@@ -218,7 +282,7 @@ class StaffCoverageValidationBlock(BaseBlock):
         missing_types = [dt for dt in self.REQUIRED_DOC_TYPES if dt not in classified_data]
         if missing_types:
             self.logger.warning(
-                f"⚠️  Skipping staff_coverage: missing required doc types: {missing_types}. "
+                f"⚠️  Skipping staff_timing: missing required doc types: {missing_types}. "
                 f"Available: {list(classified_data.keys())}"
             )
             empty_df = self._get_empty_result_df()
@@ -240,15 +304,18 @@ class StaffCoverageValidationBlock(BaseBlock):
         schedule_prepared = self._prepare_schedule(schedule_df)
         shifts_prepared = self._prepare_shifts(shifts_df, shift_time_boundary)
         procedures_prepared = None
+        all_procedures_prepared = None
         if procedures_df is not None and len(procedures_df) > 0:
-            procedures_prepared = self._prepare_procedures(procedures_df)
+            procedures_prepared = self._prepare_procedures_gastro(procedures_df)
+            all_procedures_prepared = self._prepare_all_procedures(procedures_df)
         
         # Run validation
-        results = self._validate_coverage(
+        results = self._validate_all(
             schedule_prepared,
             shifts_prepared,
             procedures_prepared,
-            role_limits,
+            all_procedures_prepared,
+            timing_rules,
             shift_time_boundary,
         )
         
@@ -258,7 +325,7 @@ class StaffCoverageValidationBlock(BaseBlock):
         # Log summary
         issues = results[results['status'] != 'OK']
         self.logger.info(
-            f"Staff coverage validation complete: "
+            f"Staff timing validation complete: "
             f"{len(results)} checks, {len(issues)} issues found"
         )
         
@@ -390,27 +457,52 @@ class StaffCoverageValidationBlock(BaseBlock):
         self.logger.info(f"Prepared {len(result)} actual shift arrivals")
         return result
     
-    def _prepare_procedures(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Prepare procedures DataFrame with time intervals for concurrent doctor detection."""
+    def _prepare_procedures_gastro(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Prepare gastro procedures DataFrame for concurrent doctor detection."""
+        result = self._prepare_all_procedures(df)
+        
+        if result.empty:
+            return result
+        
+        # Filter to only gastro procedures (where gastro nurse is needed)
+        result = result[result['category'].str.contains('גסטרו', case=False, na=False)]
+        
+        self.logger.info(f"Prepared {len(result)} gastro procedures for concurrent doctor detection")
+        return result
+    
+    def _prepare_all_procedures(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Prepare all procedures DataFrame with time intervals for timing validation."""
         result = pd.DataFrame()
         
-        # Find columns
+        # Find columns - try direct start/end columns first, then time range
+        start_col = self._find_column(df, self.PROC_START_CANDIDATES)
+        end_col = self._find_column(df, self.PROC_END_CANDIDATES)
         time_col = self._find_column(df, self.PROC_TIME_CANDIDATES)
         date_col = self._find_column(df, self.PROC_DATE_CANDIDATES)
         staff_col = self._find_column(df, self.PROC_STAFF_CANDIDATES)
         cat_col = self._find_column(df, self.PROC_CAT_CANDIDATES)
         
-        if not time_col or not staff_col:
+        # Parse times - prefer direct columns over time range
+        if start_col and end_col:
+            result['start_time'] = df[start_col].apply(
+                lambda x: parse_time(str(x)) if pd.notna(x) else None
+            )
+            result['end_time'] = df[end_col].apply(
+                lambda x: parse_time(str(x)) if pd.notna(x) else None
+            )
+            self.logger.info(f"Using direct time columns: start={start_col}, end={end_col}")
+        elif time_col:
+            # Parse time ranges like "19:00 - 19:15"
+            time_ranges = df[time_col].apply(parse_time_range)
+            result['start_time'] = time_ranges.apply(lambda x: x[0])
+            result['end_time'] = time_ranges.apply(lambda x: x[1])
+            self.logger.info(f"Using time range column: {time_col}")
+        else:
             self.logger.warning(
-                f"Could not find required procedure columns. "
-                f"Found: time={time_col}, staff={staff_col}"
+                f"Could not find procedure time columns. "
+                f"Available: {list(df.columns)}"
             )
             return pd.DataFrame()
-        
-        # Parse time ranges
-        time_ranges = df[time_col].apply(parse_time_range)
-        result['start_time'] = time_ranges.apply(lambda x: x[0])
-        result['end_time'] = time_ranges.apply(lambda x: x[1])
         
         # Normalize date
         if date_col:
@@ -420,36 +512,38 @@ class StaffCoverageValidationBlock(BaseBlock):
         else:
             result['procedure_date'] = None
         
-        # Doctor name
-        result['doctor'] = df[staff_col].astype(str)
+        # Doctor/staff name (normalize for matching)
+        if staff_col:
+            result['doctor'] = df[staff_col].astype(str)
+            result['doctor_normalized'] = result['doctor'].apply(normalize_employee_name)
+        else:
+            result['doctor'] = ''
+            result['doctor_normalized'] = ''
         
-        # Category (for filtering gastro procedures)
+        # Category (for filtering by procedure type)
         if cat_col:
             result['category'] = df[cat_col].astype(str)
         else:
             result['category'] = 'unknown'
         
-        # Filter to only gastro procedures (where gastro nurse is needed)
-        result = result[result['category'].str.contains('גסטרו', case=False, na=False)]
-        
         # Filter out invalid rows
         result = result[result['start_time'].notna()]
         result = result[result['procedure_date'].notna()]
-        result = result[result['doctor'].str.strip() != '']
         
-        self.logger.info(f"Prepared {len(result)} gastro procedures for concurrent doctor detection")
+        self.logger.info(f"Prepared {len(result)} total procedures for timing validation")
         return result
     
-    def _validate_coverage(
+    def _validate_all(
         self,
         schedule_df: pd.DataFrame,
         shifts_df: pd.DataFrame,
-        procedures_df: Optional[pd.DataFrame],
-        role_limits: Dict[str, Dict],
+        gastro_procedures_df: Optional[pd.DataFrame],
+        all_procedures_df: Optional[pd.DataFrame],
+        timing_rules: Dict[str, Dict],
         shift_time_boundary: str,
     ) -> pd.DataFrame:
         """
-        Validate staff coverage using DuckDB for efficient analysis.
+        Validate all staff timing and coverage rules using DuckDB.
         
         Returns DataFrame with validation results.
         """
@@ -463,23 +557,43 @@ class StaffCoverageValidationBlock(BaseBlock):
         self.duckdb.register("schedule", schedule_df)
         self.duckdb.register("arrivals", shifts_df)
         
+        # Enrich shifts with role information from schedule
+        enriched_shifts = self._enrich_shifts_with_roles(schedule_df, shifts_df)
+        if not enriched_shifts.empty:
+            self.duckdb.register("enriched_arrivals", enriched_shifts)
+        
         # 1. Validate schedule vs actual arrivals (who showed up?)
         schedule_validation = self._validate_schedule_attendance(schedule_df, shifts_df)
         results.extend(schedule_validation)
         
         # 2. Validate role counts per shift
         role_count_validation = self._validate_role_counts(
-            schedule_df, shifts_df, role_limits
+            schedule_df, shifts_df, timing_rules
         )
         results.extend(role_count_validation)
         
         # 3. Validate gastro nurse coverage for concurrent doctors
-        if procedures_df is not None and not procedures_df.empty:
-            self.duckdb.register("procedures", procedures_df)
+        if gastro_procedures_df is not None and not gastro_procedures_df.empty:
+            self.duckdb.register("gastro_procedures", gastro_procedures_df)
             gastro_validation = self._validate_gastro_coverage(
-                schedule_df, shifts_df, procedures_df, role_limits
+                schedule_df, shifts_df, gastro_procedures_df, timing_rules
             )
             results.extend(gastro_validation)
+        
+        # 4. Validate arrival timing (did they arrive too early?)
+        if all_procedures_df is not None and not all_procedures_df.empty and not enriched_shifts.empty:
+            self.duckdb.register("all_procedures", all_procedures_df)
+            arrival_validation = self._validate_arrival_timing(
+                enriched_shifts, all_procedures_df, timing_rules, shift_time_boundary
+            )
+            results.extend(arrival_validation)
+        
+        # 5. Validate departure timing (did they leave too early?)
+        if all_procedures_df is not None and not all_procedures_df.empty and not enriched_shifts.empty:
+            departure_validation = self._validate_departure_timing(
+                enriched_shifts, all_procedures_df, timing_rules, shift_time_boundary
+            )
+            results.extend(departure_validation)
         
         # Convert to DataFrame
         if results:
@@ -553,7 +667,7 @@ class StaffCoverageValidationBlock(BaseBlock):
         self,
         schedule_df: pd.DataFrame,
         shifts_df: pd.DataFrame,
-        role_limits: Dict[str, Dict],
+        timing_rules: Dict[str, Dict],
     ) -> List[Dict]:
         """Validate role counts per shift against limits."""
         results = []
@@ -587,10 +701,10 @@ class StaffCoverageValidationBlock(BaseBlock):
                 scheduled_count = role_row['count']
                 scheduled_employees = role_row['employees']
                 
-                # Check role limits
-                role_config = role_limits.get(role, {})
-                min_count = role_config.get('min', 0)
-                max_count = role_config.get('max')
+                # Check timing rules (supports both old and new format)
+                role_config = timing_rules.get(role, {})
+                min_count = role_config.get('min_count') or role_config.get('min', 0) or 0
+                max_count = role_config.get('max_count') or role_config.get('max')
                 scope = role_config.get('scope', 'per_shift')
                 
                 # Skip roles with per_concurrent_doctor scope (handled separately)
@@ -601,7 +715,7 @@ class StaffCoverageValidationBlock(BaseBlock):
                 status = 'OK'
                 evidence = f"Role {role} on {shift_date} ({shift_type}): "
                 
-                if scheduled_count < min_count:
+                if min_count and scheduled_count < min_count:
                     status = 'UNDERSTAFFED'
                     evidence += f"scheduled {scheduled_count}, minimum required {min_count}."
                 elif max_count is not None and scheduled_count > max_count:
@@ -621,7 +735,7 @@ class StaffCoverageValidationBlock(BaseBlock):
                     'actual_count': scheduled_count,
                     'status': status,
                     'employees_expected': scheduled_employees,
-                    'employees_arrived': '',  # Would need to cross-reference with arrivals
+                    'employees_arrived': '',
                     'doctor_name': '',
                     'evidence': evidence,
                 })
@@ -633,7 +747,7 @@ class StaffCoverageValidationBlock(BaseBlock):
         schedule_df: pd.DataFrame,
         shifts_df: pd.DataFrame,
         procedures_df: pd.DataFrame,
-        role_limits: Dict[str, Dict],
+        timing_rules: Dict[str, Dict],
     ) -> List[Dict]:
         """
         Validate gastro nurse coverage for concurrent doctors.
@@ -655,7 +769,7 @@ class StaffCoverageValidationBlock(BaseBlock):
                 end_time,
                 EXTRACT(HOUR FROM start_time) * 60 + EXTRACT(MINUTE FROM start_time) as start_min,
                 EXTRACT(HOUR FROM end_time) * 60 + EXTRACT(MINUTE FROM end_time) as end_min
-            FROM procedures
+            FROM gastro_procedures
             WHERE start_time IS NOT NULL AND end_time IS NOT NULL
         ),
         
@@ -764,6 +878,311 @@ class StaffCoverageValidationBlock(BaseBlock):
         
         return results
     
+    def _enrich_shifts_with_roles(
+        self,
+        schedule_df: pd.DataFrame,
+        shifts_df: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        Enrich shift arrivals with role information from schedule.
+        
+        Joins arrivals with schedule to determine what role each arriving
+        employee was scheduled for.
+        
+        Returns:
+            DataFrame with arrival + role information
+        """
+        if schedule_df.empty or shifts_df.empty:
+            return pd.DataFrame()
+        
+        # Use DuckDB for efficient join
+        sql = """
+        SELECT 
+            a.employee_name,
+            a.employee_name_normalized,
+            a.shift_date,
+            a.arrival_time,
+            a.departure_time,
+            a.inferred_shift_type,
+            s.role,
+            s.shift_type as scheduled_shift_type
+        FROM arrivals a
+        LEFT JOIN schedule s 
+            ON a.shift_date = s.shift_date
+            AND a.employee_name_normalized = s.employee_name_normalized
+        WHERE a.arrival_time IS NOT NULL
+        """
+        
+        try:
+            result = self.duckdb.execute(sql).fetchdf()
+            self.logger.info(f"Enriched {len(result)} arrivals with role information")
+            return result
+        except Exception as e:
+            self.logger.warning(f"Error enriching shifts with roles: {e}")
+            return pd.DataFrame()
+    
+    def _validate_arrival_timing(
+        self,
+        enriched_shifts: pd.DataFrame,
+        procedures_df: pd.DataFrame,
+        timing_rules: Dict[str, Dict],
+        shift_time_boundary: str,
+    ) -> List[Dict]:
+        """
+        Validate that employees arrived at appropriate times based on their role.
+        
+        Checks if employees arrived too early (before needed) based on:
+        - Role's arrival_buffer_minutes setting
+        - First relevant procedure time
+        - Role's match_to setting (all_procedures, gastro_procedures, own_procedures)
+        
+        Returns:
+            List of validation result dicts
+        """
+        results = []
+        
+        if enriched_shifts.empty or procedures_df.empty:
+            return results
+        
+        # Parse boundary time
+        boundary_time = parse_time(shift_time_boundary)
+        boundary_minutes = boundary_time.hour * 60 + boundary_time.minute if boundary_time else 780  # 13:00
+        
+        # Group by date and shift type to find first/last procedures
+        for _, arrival in enriched_shifts.iterrows():
+            shift_date = arrival['shift_date']
+            employee_name = arrival['employee_name']
+            role = arrival.get('role')
+            arrival_time = arrival['arrival_time']
+            shift_type = arrival.get('scheduled_shift_type') or arrival.get('inferred_shift_type')
+            
+            if pd.isna(role) or not role or role == 'nan':
+                continue  # Skip arrivals without known role
+            
+            # Get timing rules for this role
+            role_config = timing_rules.get(role, {})
+            arrival_buffer = role_config.get('arrival_buffer_minutes', 30)
+            match_to = role_config.get('match_to', 'all_procedures')
+            
+            # Filter procedures for this date and shift type
+            date_procedures = procedures_df[procedures_df['procedure_date'] == shift_date].copy()
+            
+            if date_procedures.empty:
+                continue
+            
+            # Convert procedure times to minutes for filtering by shift type
+            date_procedures['start_minutes'] = date_procedures['start_time'].apply(
+                lambda t: t.hour * 60 + t.minute if pd.notna(t) else None
+            )
+            
+            # Filter by shift type (morning < boundary, evening >= boundary)
+            if shift_type == 'בוקר':
+                date_procedures = date_procedures[date_procedures['start_minutes'] < boundary_minutes]
+            elif shift_type == 'ערב':
+                date_procedures = date_procedures[date_procedures['start_minutes'] >= boundary_minutes]
+            
+            if date_procedures.empty:
+                continue
+            
+            # Apply match_to filter
+            if match_to == 'gastro_procedures':
+                date_procedures = date_procedures[
+                    date_procedures['category'].str.contains('גסטרו', case=False, na=False)
+                ]
+            elif match_to == 'own_procedures':
+                # Match to procedures where this employee is the treating staff
+                emp_normalized = normalize_employee_name(employee_name)
+                date_procedures = date_procedures[
+                    date_procedures['doctor_normalized'] == emp_normalized
+                ]
+            # 'all_procedures' uses all procedures
+            
+            if date_procedures.empty:
+                continue
+            
+            # Find first procedure for this shift
+            first_procedure_time = date_procedures['start_time'].min()
+            if pd.isna(first_procedure_time):
+                continue
+            
+            # Calculate expected arrival time (first_procedure - buffer)
+            first_proc_minutes = first_procedure_time.hour * 60 + first_procedure_time.minute
+            expected_arrival_minutes = first_proc_minutes - arrival_buffer
+            
+            # Calculate actual arrival minutes
+            arrival_minutes = arrival_time.hour * 60 + arrival_time.minute if pd.notna(arrival_time) else None
+            
+            if arrival_minutes is None:
+                continue
+            
+            # Check if arrived too early
+            gap_minutes = first_proc_minutes - arrival_minutes
+            
+            if gap_minutes > arrival_buffer:
+                # Arrived too early
+                minutes_too_early = gap_minutes - arrival_buffer
+                status = 'EARLY_ARRIVAL'
+                evidence = (
+                    f"{employee_name} ({role}) arrived at {arrival_time} on {shift_date} ({shift_type}), "
+                    f"but first procedure is at {first_procedure_time}. "
+                    f"Arrived {minutes_too_early} min earlier than the {arrival_buffer} min buffer allows."
+                )
+            else:
+                status = 'OK'
+                evidence = (
+                    f"{employee_name} ({role}) arrived at {arrival_time} on {shift_date} ({shift_type}), "
+                    f"first procedure at {first_procedure_time}. "
+                    f"Arrival {gap_minutes} min before procedure is within {arrival_buffer} min buffer."
+                )
+            
+            results.append({
+                'date': shift_date,
+                'shift_type': shift_type,
+                'role': role,
+                'validation_type': 'arrival_timing',
+                'expected_count': arrival_buffer,
+                'actual_count': gap_minutes,
+                'status': status,
+                'employees_expected': f'Arrive by {expected_arrival_minutes // 60:02d}:{expected_arrival_minutes % 60:02d}',
+                'employees_arrived': employee_name,
+                'doctor_name': '',
+                'evidence': evidence,
+            })
+        
+        return results
+    
+    def _validate_departure_timing(
+        self,
+        enriched_shifts: pd.DataFrame,
+        procedures_df: pd.DataFrame,
+        timing_rules: Dict[str, Dict],
+        shift_time_boundary: str,
+    ) -> List[Dict]:
+        """
+        Validate that employees didn't leave too early based on their role.
+        
+        Checks if employees left before coverage period ended based on:
+        - Role's departure_buffer_minutes setting
+        - Last relevant procedure end time
+        - Role's match_to setting
+        
+        Returns:
+            List of validation result dicts
+        """
+        results = []
+        
+        if enriched_shifts.empty or procedures_df.empty:
+            return results
+        
+        # Parse boundary time
+        boundary_time = parse_time(shift_time_boundary)
+        boundary_minutes = boundary_time.hour * 60 + boundary_time.minute if boundary_time else 780
+        
+        # Only process arrivals that have departure times
+        departures = enriched_shifts[enriched_shifts['departure_time'].notna()]
+        
+        for _, arrival in departures.iterrows():
+            shift_date = arrival['shift_date']
+            employee_name = arrival['employee_name']
+            role = arrival.get('role')
+            departure_time = arrival['departure_time']
+            shift_type = arrival.get('scheduled_shift_type') or arrival.get('inferred_shift_type')
+            
+            if pd.isna(role) or not role or role == 'nan':
+                continue
+            
+            if pd.isna(departure_time):
+                continue
+            
+            # Get timing rules for this role
+            role_config = timing_rules.get(role, {})
+            departure_buffer = role_config.get('departure_buffer_minutes', 0)
+            match_to = role_config.get('match_to', 'all_procedures')
+            
+            # Filter procedures for this date and shift type
+            date_procedures = procedures_df[procedures_df['procedure_date'] == shift_date].copy()
+            
+            if date_procedures.empty:
+                continue
+            
+            # Convert procedure times to minutes for filtering by shift type
+            date_procedures['end_minutes'] = date_procedures['end_time'].apply(
+                lambda t: t.hour * 60 + t.minute if pd.notna(t) else None
+            )
+            date_procedures['start_minutes'] = date_procedures['start_time'].apply(
+                lambda t: t.hour * 60 + t.minute if pd.notna(t) else None
+            )
+            
+            # Filter by shift type
+            if shift_type == 'בוקר':
+                date_procedures = date_procedures[date_procedures['start_minutes'] < boundary_minutes]
+            elif shift_type == 'ערב':
+                date_procedures = date_procedures[date_procedures['start_minutes'] >= boundary_minutes]
+            
+            if date_procedures.empty:
+                continue
+            
+            # Apply match_to filter
+            if match_to == 'gastro_procedures':
+                date_procedures = date_procedures[
+                    date_procedures['category'].str.contains('גסטרו', case=False, na=False)
+                ]
+            elif match_to == 'own_procedures':
+                emp_normalized = normalize_employee_name(employee_name)
+                date_procedures = date_procedures[
+                    date_procedures['doctor_normalized'] == emp_normalized
+                ]
+            
+            if date_procedures.empty:
+                continue
+            
+            # Find last procedure end time for this shift
+            last_procedure_end = date_procedures['end_time'].max()
+            if pd.isna(last_procedure_end):
+                continue
+            
+            # Calculate allowed departure time (last_procedure + buffer)
+            last_proc_minutes = last_procedure_end.hour * 60 + last_procedure_end.minute
+            allowed_departure_minutes = last_proc_minutes + departure_buffer
+            
+            # Calculate actual departure minutes
+            departure_minutes = departure_time.hour * 60 + departure_time.minute
+            
+            # Check if left too early
+            if departure_minutes < allowed_departure_minutes:
+                minutes_too_early = allowed_departure_minutes - departure_minutes
+                status = 'EARLY_DEPARTURE'
+                allowed_time = f"{allowed_departure_minutes // 60:02d}:{allowed_departure_minutes % 60:02d}"
+                evidence = (
+                    f"{employee_name} ({role}) left at {departure_time} on {shift_date} ({shift_type}), "
+                    f"but last procedure ended at {last_procedure_end}. "
+                    f"With {departure_buffer} min buffer, should stay until {allowed_time}. "
+                    f"Left {minutes_too_early} min too early."
+                )
+            else:
+                status = 'OK'
+                evidence = (
+                    f"{employee_name} ({role}) left at {departure_time} on {shift_date} ({shift_type}). "
+                    f"Last procedure ended at {last_procedure_end}. "
+                    f"Departure is {departure_buffer} min or more after last procedure - OK."
+                )
+            
+            results.append({
+                'date': shift_date,
+                'shift_type': shift_type,
+                'role': role,
+                'validation_type': 'departure_timing',
+                'expected_count': departure_buffer,
+                'actual_count': departure_minutes - last_proc_minutes,
+                'status': status,
+                'employees_expected': f'Stay until {allowed_departure_minutes // 60:02d}:{allowed_departure_minutes % 60:02d}',
+                'employees_arrived': employee_name,
+                'doctor_name': '',
+                'evidence': evidence,
+            })
+        
+        return results
+    
     def _get_empty_result_df(self) -> pd.DataFrame:
         """Get an empty result DataFrame with correct columns."""
         return pd.DataFrame(columns=[
@@ -782,9 +1201,9 @@ class StaffCoverageValidationBlock(BaseBlock):
         return None
 
 
-# Register the block
+# Register the unified block with new name
 @BlockRegistry.register(
-    name="staff_coverage_validation",
+    name="staff_timing_validation",
     inputs=[
         {"name": "data", "ontology": DataType.CLASSIFIED_DATA, "required": True}
     ],
@@ -793,10 +1212,10 @@ class StaffCoverageValidationBlock(BaseBlock):
     ],
     parameters=[
         {
-            "name": "role_limits",
+            "name": "timing_rules",
             "type": "object",
-            "default": DEFAULT_ROLE_LIMITS,
-            "description": "Role count limits per shift/doctor. Scope can be: per_shift, per_concurrent_doctor"
+            "default": DEFAULT_TIMING_RULES,
+            "description": "Timing rules per role. Each role can have: min_count, max_count, scope, arrival_buffer_minutes, departure_buffer_minutes, match_to"
         },
         {
             "name": "shift_time_boundary",
@@ -817,10 +1236,41 @@ class StaffCoverageValidationBlock(BaseBlock):
             "description": "Expected evening shift end time"
         },
     ],
-    block_class=StaffCoverageValidationBlock,
-    description="Validate staff coverage against schedule and business rules (role counts, gastro nurse per concurrent doctor)",
+    block_class=StaffTimingValidationBlock,
+    description="Unified staff timing validation: role counts, arrival/departure timing, gastro nurse coverage",
+)
+def staff_timing_validation(ctx: BlockContext) -> Dict[str, str]:
+    """Validate staff timing and coverage against schedule and business rules."""
+    return StaffTimingValidationBlock(ctx).run()
+
+
+# Keep backward-compatible alias
+@BlockRegistry.register(
+    name="staff_coverage_validation",
+    inputs=[
+        {"name": "data", "ontology": DataType.CLASSIFIED_DATA, "required": True}
+    ],
+    outputs=[
+        {"name": "result", "ontology": DataType.INSIGHT_RESULT}
+    ],
+    parameters=[
+        {
+            "name": "timing_rules",
+            "type": "object",
+            "default": DEFAULT_TIMING_RULES,
+            "description": "Timing rules per role (backward compatible alias)"
+        },
+        {
+            "name": "shift_time_boundary",
+            "type": "string",
+            "default": "13:00",
+            "description": "Time boundary between morning and evening shifts"
+        },
+    ],
+    block_class=StaffTimingValidationBlock,
+    description="[DEPRECATED] Use staff_timing_validation instead",
 )
 def staff_coverage_validation(ctx: BlockContext) -> Dict[str, str]:
-    """Validate staff coverage against schedule and business rules."""
-    return StaffCoverageValidationBlock(ctx).run()
+    """Backward compatible alias for staff_timing_validation."""
+    return StaffTimingValidationBlock(ctx).run()
 

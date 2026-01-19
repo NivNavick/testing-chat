@@ -4,11 +4,10 @@
 # all applicable insight blocks in parallel branches.
 #
 # Architecture:
-#   upload → preprocess → classify ─┬─► early_arrival ──► export_early_arrival ─┐
+#   upload → preprocess → classify ─┬─► staff_timing ──► export_staff_timing ─┐
 #                                   ├─► expensive_employees ──► export_salary ────┤
 #                                   ├─► manpower_cost ──► export_manpower_cost ───┼─► email_all_reports
-#                                   ├─► gross_profit ──► export_gross_profit ─────┤
-#                                   └─► staff_coverage ──► export_staff_coverage ─┘
+#                                   └─► gross_profit ──► export_gross_profit ─────┘
 #
 # Key Features:
 # - Single classification step handles ALL input files
@@ -18,11 +17,13 @@
 # - All reports sent via email (AWS SES) in a single message with attachments
 #
 # Insights:
-# 1. early_arrival: Detect early employee arrivals (needs: employee_shifts, medical_actions)
+# 1. staff_timing: Unified timing validation (needs: shift_schedule, employee_shifts, medical_actions)
+#    - Role counts (1 recovery nurse per shift, gastro nurses >= concurrent doctors)
+#    - Early arrival detection (arrived too early before first procedure)
+#    - Early departure detection (left before coverage period ended)
 # 2. expensive_employees: Rank employees by cost (needs: employee_monthly_salary)
 # 3. manpower_cost: Shift costs + avg cost per procedure (needs: employee_shifts, employee_compensation)
 # 4. gross_profit: Revenue - physician cost - staff cost (needs: employee_shifts, employee_compensation, medical_actions)
-# 5. staff_coverage: Validate staff roles against schedule (needs: shift_schedule, employee_shifts, medical_actions)
 #
 # Usage:
 #   # Run with shifts + actions + compensation (all financial insights run)
@@ -48,8 +49,6 @@ parameters:
   # Email settings (niv@bubblez.ai must be verified in AWS SES)
   sender_email: niv@bubblez.ai
   recipient_email: nnavick@gmail.com
-  # Early arrival parameters
-  max_early_minutes: 30
   # Expensive employees parameters
   top_n: 10
   include_all: true
@@ -57,10 +56,52 @@ parameters:
   # Manpower cost / gross profit parameters
   default_shift_hours: 8.0
   benefits_loading: 0.25
-  # Staff coverage parameters
+  # Staff timing parameters
   shift_time_boundary: "13:00"
   morning_shift_start: "06:00"
   evening_shift_end: "21:00"
+  # Timing rules per role (configurable)
+  # Each role can have: min_count, max_count, scope, arrival_buffer_minutes, departure_buffer_minutes, match_to
+  timing_rules:
+    אח התאוששות:
+      min_count: 1
+      max_count: 1
+      scope: per_shift
+      arrival_buffer_minutes: 30
+      departure_buffer_minutes: 60   # Can leave 1 hour after last procedure
+      match_to: all_procedures
+    אח התאוששות ערב:
+      min_count: 1
+      max_count: 1
+      scope: per_shift
+      arrival_buffer_minutes: 30
+      departure_buffer_minutes: 60
+      match_to: all_procedures
+    אח גסטרו:
+      min_count: 1
+      max_count: null
+      scope: per_concurrent_doctor
+      arrival_buffer_minutes: 15
+      departure_buffer_minutes: 0
+      match_to: gastro_procedures
+    כע עזר:
+      min_count: 1
+      scope: per_shift
+      arrival_buffer_minutes: 30
+      departure_buffer_minutes: 30
+      match_to: all_procedures
+    כע עזר ערב:
+      min_count: 1
+      scope: per_shift
+      arrival_buffer_minutes: 30
+      departure_buffer_minutes: 30
+      match_to: all_procedures
+    כח עזר:
+      min_count: 1
+      scope: per_shift
+      arrival_buffer_minutes: 30
+      departure_buffer_minutes: 30
+      match_to: all_procedures
 
 # Storage configuration
 storage:
@@ -101,47 +142,49 @@ blocks:
       threshold: 0.5
 
   # ============================================================
-  # BRANCH 1: Early Arrival Analysis
-  # Requires: employee_shifts + medical_actions
+  # BRANCH 1: Staff Timing Validation (Unified)
+  # Requires: shift_schedule + employee_shifts + medical_actions (optional)
+  # Validates: role counts, early arrival, early departure
   # ============================================================
   
-  - id: early_arrival
-    handler: early_arrival_matcher
+  - id: staff_timing
+    handler: staff_timing_validation
     inputs:
       - name: data
         source: classify.classified_data
     parameters:
-      max_early_minutes: "{{max_early_minutes}}"
+      timing_rules: "{{timing_rules}}"
+      shift_time_boundary: "{{shift_time_boundary}}"
+      morning_shift_start: "{{morning_shift_start}}"
+      evening_shift_end: "{{evening_shift_end}}"
 
-  - id: export_early_arrival
+  - id: export_staff_timing
     handler: export_csv
     inputs:
-      - field: employee_name
-        source: early_arrival.result.employee_name
-      - field: employee_id
-        source: early_arrival.result.employee_id
-      - field: shift_date
-        source: early_arrival.result.shift_date
-      - field: location
-        source: early_arrival.result.location
-      - field: arrival_time
-        source: early_arrival.result.arrival_time
-      - field: matched_procedure_time
-        source: early_arrival.result.matched_procedure_time
-      - field: matched_treatment
-        source: early_arrival.result.matched_treatment
-      - field: treating_staff
-        source: early_arrival.result.treating_staff
-      - field: minutes_early
-        source: early_arrival.result.minutes_early
+      - field: date
+        source: staff_timing.result.date
+      - field: shift_type
+        source: staff_timing.result.shift_type
+      - field: role
+        source: staff_timing.result.role
+      - field: validation_type
+        source: staff_timing.result.validation_type
+      - field: expected_count
+        source: staff_timing.result.expected_count
+      - field: actual_count
+        source: staff_timing.result.actual_count
       - field: status
-        source: early_arrival.result.status
+        source: staff_timing.result.status
+      - field: employees_expected
+        source: staff_timing.result.employees_expected
+      - field: employees_arrived
+        source: staff_timing.result.employees_arrived
+      - field: doctor_name
+        source: staff_timing.result.doctor_name
       - field: evidence
-        source: early_arrival.result.evidence
-      - field: wasted_cost
-        source: early_arrival.result.wasted_cost
+        source: staff_timing.result.evidence
     parameters:
-      filename: "early_arrival_report.csv"
+      filename: "staff_timing_report.csv"
       output_dir: "{{output_dir}}"
       unique_name: true
       include_source_column: false
@@ -194,7 +237,7 @@ blocks:
 
   # ============================================================
   # BRANCH 3: Manpower Cost Analysis
-  # Requires: employee_shifts + employee_compensation + medical_actions (optional)
+  # Requires: employee_shifts + employee_monthly_salary + medical_actions (optional)
   # ============================================================
   
   - id: manpower_cost
@@ -297,55 +340,8 @@ blocks:
       include_source_column: false
 
   # ============================================================
-  # BRANCH 5: Staff Coverage Validation
-  # Requires: shift_schedule + employee_shifts + medical_actions (optional)
-  # Validates: 1 recovery nurse per shift, gastro nurses >= concurrent doctors
-  # ============================================================
-  
-  - id: staff_coverage
-    handler: staff_coverage_validation
-    inputs:
-      - name: data
-        source: classify.classified_data
-    parameters:
-      shift_time_boundary: "{{shift_time_boundary}}"
-      morning_shift_start: "{{morning_shift_start}}"
-      evening_shift_end: "{{evening_shift_end}}"
-
-  - id: export_staff_coverage
-    handler: export_csv
-    inputs:
-      - field: date
-        source: staff_coverage.result.date
-      - field: shift_type
-        source: staff_coverage.result.shift_type
-      - field: role
-        source: staff_coverage.result.role
-      - field: validation_type
-        source: staff_coverage.result.validation_type
-      - field: expected_count
-        source: staff_coverage.result.expected_count
-      - field: actual_count
-        source: staff_coverage.result.actual_count
-      - field: status
-        source: staff_coverage.result.status
-      - field: employees_expected
-        source: staff_coverage.result.employees_expected
-      - field: employees_arrived
-        source: staff_coverage.result.employees_arrived
-      - field: doctor_name
-        source: staff_coverage.result.doctor_name
-      - field: evidence
-        source: staff_coverage.result.evidence
-    parameters:
-      filename: "staff_coverage_report.csv"
-      output_dir: "{{output_dir}}"
-      unique_name: true
-      include_source_column: false
-
-  # ============================================================
   # EMAIL ALL REPORTS
-  # Sends all 5 reports in a single email with attachments
+  # Sends all 4 reports in a single email with attachments
   # ============================================================
   
   - id: email_all_reports
@@ -353,11 +349,10 @@ blocks:
     inputs:
       - name: data
         sources:
-          - early_arrival.result
+          - staff_timing.result
           - expensive_employees.result
           - manpower_cost.result
           - gross_profit.result
-          - staff_coverage.result
     parameters:
       sender_email: "{{sender_email}}"
       recipient_email: "{{recipient_email}}"
@@ -368,9 +363,12 @@ blocks:
         
         Please find attached the complete medical insights analysis:
         
-        📊 Report 1: Early Arrival Analysis
-           - Employees who arrived significantly before their shifts
-           - Matched with procedure times and treatments
+        👩‍⚕️ Report 1: Staff Timing Validation
+           - Role count validation (1 recovery nurse per shift)
+           - Early arrival detection (arrived too early before procedures)
+           - Early departure detection (left before coverage ended)
+           - Gastro nurse coverage vs concurrent doctors
+           - Schedule attendance tracking
         
         💰 Report 2: Expensive Employees Ranking
            - Top employees by total compensation cost
@@ -383,11 +381,6 @@ blocks:
         📈 Report 4: Gross Profit Analysis
            - Revenue vs. cost analysis per shift
            - Profit margins and procedure details
-        
-        👩‍⚕️ Report 5: Staff Coverage Validation
-           - Recovery nurse count validation (1 per shift)
-           - Gastro nurse coverage vs concurrent doctors
-           - Schedule attendance tracking
         
         Best regards,
         Automated Medical Insights System
