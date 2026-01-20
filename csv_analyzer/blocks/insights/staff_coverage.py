@@ -170,23 +170,21 @@ def normalize_employee_name(name: str) -> str:
 # Each role can have:
 # - min_count, max_count: Role count limits per shift
 # - scope: "per_shift" or "per_concurrent_doctor"
-# - arrival_buffer_minutes: Must arrive this many minutes before first relevant procedure
-# - early_arrival_tolerance_minutes: Allowed to arrive this many minutes earlier than expected (default: 30)
+# - arrival_buffer_minutes: Can arrive up to X minutes before first relevant procedure
 # - departure_buffer_minutes: Minimum time to stay after last procedure (0 = can leave when procedure ends)
 # - departure_max_minutes: Maximum time allowed to stay after last procedure (null = no limit)
 # - match_to: "all_procedures", "gastro_procedures", or "own_procedures"
-
-# Global default for early arrival tolerance (can be overridden per role)
-DEFAULT_EARLY_ARRIVAL_TOLERANCE = 30
+# - notify_double_shift: If true, flag when employee works this role in both morning and evening shifts
 DEFAULT_TIMING_RULES = {
     "אח התאוששות": {
         "min_count": 1,
         "max_count": 1,
         "scope": "per_shift",
         "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 0,   # Can leave when last procedure ends
-        "departure_max_minutes": 60,     # Must leave within 1 hour after last procedure
-        "match_to": "all_procedures"
+        "departure_buffer_minutes": 0,
+        "departure_max_minutes": 60,
+        "match_to": "all_procedures",
+        "notify_double_shift": True
     },
     "אח התאוששות ערב": {
         "min_count": 1,
@@ -195,39 +193,44 @@ DEFAULT_TIMING_RULES = {
         "arrival_buffer_minutes": 30,
         "departure_buffer_minutes": 0,
         "departure_max_minutes": 60,
-        "match_to": "all_procedures"
+        "match_to": "all_procedures",
+        "notify_double_shift": True
     },
     "אח גסטרו": {
         "min_count": 1,
         "max_count": None,
         "scope": "per_concurrent_doctor",
-        "arrival_buffer_minutes": 15,
+        "arrival_buffer_minutes": 30,
         "departure_buffer_minutes": 0,
-        "match_to": "gastro_procedures"
+        "match_to": "gastro_procedures",
+        "notify_double_shift": True
     },
     "כע עזר": {
         "min_count": 1,
         "max_count": None,
         "scope": "per_shift",
         "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 30,
-        "match_to": "all_procedures"
+        "departure_buffer_minutes": 0,
+        "match_to": "all_procedures",
+        "notify_double_shift": True
     },
     "כע עזר ערב": {
         "min_count": 1,
         "max_count": None,
         "scope": "per_shift",
         "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 30,
-        "match_to": "all_procedures"
+        "departure_buffer_minutes": 0,
+        "match_to": "all_procedures",
+        "notify_double_shift": True
     },
     "כח עזר": {
         "min_count": 1,
         "max_count": None,
         "scope": "per_shift",
         "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 30,
-        "match_to": "all_procedures"
+        "departure_buffer_minutes": 0,
+        "match_to": "all_procedures",
+        "notify_double_shift": True
     },
 }
 
@@ -614,6 +617,13 @@ class StaffTimingValidationBlock(BaseBlock):
             )
             results.extend(departure_validation)
         
+        # 6. Validate double shifts (employees working both morning and evening)
+        if not enriched_shifts.empty:
+            double_shift_validation = self._validate_double_shifts(
+                enriched_shifts, timing_rules
+            )
+            results.extend(double_shift_validation)
+        
         # Convert to DataFrame
         if results:
             result_df = pd.DataFrame(results)
@@ -935,7 +945,8 @@ class StaffTimingValidationBlock(BaseBlock):
         Enrich shift arrivals with role information from schedule.
         
         Joins arrivals with schedule to determine what role each arriving
-        employee was scheduled for.
+        employee was scheduled for. Matches on shift type (morning/evening)
+        to handle employees who work double shifts.
         
         Returns:
             DataFrame with arrival + role information
@@ -944,6 +955,7 @@ class StaffTimingValidationBlock(BaseBlock):
             return pd.DataFrame()
         
         # Use DuckDB for efficient join
+        # Match on date + employee + shift type to correctly handle double shifts
         sql = """
         SELECT 
             a.employee_name,
@@ -958,6 +970,7 @@ class StaffTimingValidationBlock(BaseBlock):
         LEFT JOIN schedule s 
             ON a.shift_date = s.shift_date
             AND a.employee_name_normalized = s.employee_name_normalized
+            AND a.inferred_shift_type = s.shift_type
         WHERE a.arrival_time IS NOT NULL
         """
         
@@ -1265,6 +1278,94 @@ class StaffTimingValidationBlock(BaseBlock):
                 'doctor_name': '',
                 'evidence': evidence,
             })
+        
+        return results
+    
+    def _validate_double_shifts(
+        self,
+        enriched_shifts: pd.DataFrame,
+        timing_rules: Dict[str, Dict],
+    ) -> List[Dict]:
+        """
+        Detect employees who worked both morning and evening shifts on the same day.
+        
+        Only flags roles where notify_double_shift is True in timing_rules.
+        
+        Returns:
+            List of validation result dicts
+        """
+        results = []
+        
+        if enriched_shifts.empty:
+            return results
+        
+        # Get roles that have notify_double_shift enabled
+        notifiable_roles = set()
+        for role, config in timing_rules.items():
+            if config.get('notify_double_shift', False):
+                notifiable_roles.add(role)
+        
+        if not notifiable_roles:
+            return results
+        
+        # Group by date and employee to find double shifts
+        # We look for employees who appear in multiple shift types on the same day
+        shifts_with_roles = enriched_shifts[enriched_shifts['role'].notna() & (enriched_shifts['role'] != 'nan')]
+        
+        if shifts_with_roles.empty:
+            return results
+        
+        # Group by date and normalized employee name
+        grouped = shifts_with_roles.groupby(['shift_date', 'employee_name_normalized'])
+        
+        for (date, emp_norm), group in grouped:
+            # Get unique shift types for this employee on this date
+            shift_types = group['inferred_shift_type'].dropna().unique().tolist()
+            
+            # Check if they worked both morning and evening
+            if 'בוקר' in shift_types and 'ערב' in shift_types:
+                # Get the roles they worked in each shift
+                morning_data = group[group['inferred_shift_type'] == 'בוקר']
+                evening_data = group[group['inferred_shift_type'] == 'ערב']
+                
+                morning_roles = morning_data['role'].dropna().unique().tolist()
+                evening_roles = evening_data['role'].dropna().unique().tolist()
+                
+                # Check if any of their roles have notify_double_shift enabled
+                all_roles = set(morning_roles + evening_roles)
+                notifiable = all_roles & notifiable_roles
+                
+                if notifiable:
+                    # Get employee display name (use first occurrence)
+                    employee_name = group['employee_name'].iloc[0]
+                    
+                    # Get arrival and departure times for evidence
+                    morning_arrival = morning_data['arrival_time'].min() if not morning_data.empty else None
+                    morning_departure = morning_data['departure_time'].max() if not morning_data.empty else None
+                    evening_arrival = evening_data['arrival_time'].min() if not evening_data.empty else None
+                    evening_departure = evening_data['departure_time'].max() if not evening_data.empty else None
+                    
+                    # Build evidence message
+                    evidence = (
+                        f"{employee_name} worked DOUBLE SHIFT on {date}: "
+                        f"Morning ({', '.join(morning_roles)}) {morning_arrival or '?'}-{morning_departure or '?'}, "
+                        f"Evening ({', '.join(evening_roles)}) {evening_arrival or '?'}-{evening_departure or '?'}."
+                    )
+                    
+                    # Add single result per employee per date (combine all roles)
+                    results.append({
+                        'date': date,
+                        'shift_type': ', '.join(sorted(shift_types)),
+                        'role': ', '.join(sorted(all_roles)),
+                        'validation_type': 'double_shift',
+                        'expected_count': 1,
+                        'actual_count': 2,
+                        'status': 'DOUBLE_SHIFT',
+                        'employees_expected': 'Single shift',
+                        'employees_arrived': employee_name,
+                        'doctor_name': '',
+                        'evidence': evidence,
+                    })
         
         return results
     
