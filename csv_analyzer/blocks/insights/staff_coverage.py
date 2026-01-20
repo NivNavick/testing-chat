@@ -171,9 +171,13 @@ def normalize_employee_name(name: str) -> str:
 # - min_count, max_count: Role count limits per shift
 # - scope: "per_shift" or "per_concurrent_doctor"
 # - arrival_buffer_minutes: Must arrive this many minutes before first relevant procedure
+# - early_arrival_tolerance_minutes: Allowed to arrive this many minutes earlier than expected (default: 30)
 # - departure_buffer_minutes: Minimum time to stay after last procedure (0 = can leave when procedure ends)
 # - departure_max_minutes: Maximum time allowed to stay after last procedure (null = no limit)
 # - match_to: "all_procedures", "gastro_procedures", or "own_procedures"
+
+# Global default for early arrival tolerance (can be overridden per role)
+DEFAULT_EARLY_ARRIVAL_TOLERANCE = 30
 DEFAULT_TIMING_RULES = {
     "אח התאוששות": {
         "min_count": 1,
@@ -623,8 +627,25 @@ class StaffTimingValidationBlock(BaseBlock):
         schedule_df: pd.DataFrame,
         shifts_df: pd.DataFrame,
     ) -> List[Dict]:
-        """Check if scheduled employees actually arrived."""
+        """
+        Check if scheduled employees actually arrived.
+        
+        Distinguishes between:
+        - OK: Employee showed up for the scheduled shift
+        - NO_SHOW: We have shift data for this employee, but they didn't show up for this date
+        - NO_DATA: We don't have any shift data for this employee at all
+        """
         results = []
+        
+        # First, get all unique employees that have ANY shift data
+        employees_with_data_sql = """
+        SELECT DISTINCT employee_name_normalized
+        FROM arrivals
+        """
+        employees_with_data = set(
+            self.duckdb.execute(employees_with_data_sql).fetchdf()['employee_name_normalized'].tolist()
+        )
+        self.logger.info(f"Found {len(employees_with_data)} employees with shift data")
         
         # Use DuckDB for efficient matching
         sql = """
@@ -633,12 +654,9 @@ class StaffTimingValidationBlock(BaseBlock):
             s.shift_type,
             s.role,
             s.employee_name as scheduled_employee,
+            s.employee_name_normalized,
             a.employee_name as arrived_employee,
-            a.arrival_time,
-            CASE 
-                WHEN a.employee_name IS NOT NULL THEN 'OK'
-                ELSE 'NO_SHOW'
-            END as status
+            a.arrival_time
         FROM schedule s
         LEFT JOIN arrivals a 
             ON s.shift_date = a.shift_date
@@ -650,16 +668,31 @@ class StaffTimingValidationBlock(BaseBlock):
         
         for _, row in df.iterrows():
             arrival_str = str(row['arrival_time']) if pd.notna(row['arrival_time']) else 'N/A'
+            emp_normalized = row['employee_name_normalized']
+            has_any_shift_data = emp_normalized in employees_with_data
+            showed_up = pd.notna(row['arrived_employee'])
             
-            if row['status'] == 'NO_SHOW':
-                evidence = (
-                    f"Employee {row['scheduled_employee']} was scheduled as {row['role']} "
-                    f"for {row['shift_type']} shift on {row['shift_date']} but did not arrive."
-                )
-            else:
+            if showed_up:
+                status = 'OK'
                 evidence = (
                     f"Employee {row['scheduled_employee']} arrived at {arrival_str} "
                     f"for {row['role']} role on {row['shift_date']}."
+                )
+            elif has_any_shift_data:
+                # We have shift data for this employee, but they didn't show for this date
+                status = 'NO_SHOW'
+                evidence = (
+                    f"Employee {row['scheduled_employee']} was scheduled as {row['role']} "
+                    f"for {row['shift_type']} shift on {row['shift_date']} but did not clock in. "
+                    f"(Shift data exists for this employee on other dates)"
+                )
+            else:
+                # No shift data at all for this employee
+                status = 'NO_DATA'
+                evidence = (
+                    f"Employee {row['scheduled_employee']} was scheduled as {row['role']} "
+                    f"for {row['shift_type']} shift on {row['shift_date']}. "
+                    f"No shift file data available for this employee."
                 )
             
             results.append({
@@ -668,8 +701,8 @@ class StaffTimingValidationBlock(BaseBlock):
                 'role': row['role'],
                 'validation_type': 'schedule_attendance',
                 'expected_count': 1,
-                'actual_count': 1 if row['status'] == 'OK' else 0,
-                'status': row['status'],
+                'actual_count': 1 if status == 'OK' else 0,
+                'status': status,
                 'employees_expected': row['scheduled_employee'],
                 'employees_arrived': row['arrived_employee'] if pd.notna(row['arrived_employee']) else '',
                 'doctor_name': '',
@@ -976,7 +1009,7 @@ class StaffTimingValidationBlock(BaseBlock):
             
             # Get timing rules for this role
             role_config = timing_rules.get(role, {})
-            arrival_buffer = role_config.get('arrival_buffer_minutes', 30)
+            arrival_buffer = role_config.get('arrival_buffer_minutes', 30)  # Can arrive up to X min before first procedure
             match_to = role_config.get('match_to', 'all_procedures')
             
             # Filter procedures for this date and shift type
@@ -1031,19 +1064,20 @@ class StaffTimingValidationBlock(BaseBlock):
                 continue
             
             # Check if arrived too early
+            # gap_minutes = how many minutes before first procedure they arrived
             gap_minutes = first_proc_minutes - arrival_minutes
             
             # Build match explanation
             match_explanation = self._get_match_explanation(match_to, len(date_procedures))
             
             if gap_minutes > arrival_buffer:
-                # Arrived too early
+                # Arrived too early (more than allowed buffer before first procedure)
                 minutes_too_early = gap_minutes - arrival_buffer
                 status = 'EARLY_ARRIVAL'
                 evidence = (
                     f"{employee_name} ({role}) arrived at {arrival_time} on {shift_date} ({shift_type}), "
                     f"but first procedure is at {first_procedure_time}. "
-                    f"Arrived {minutes_too_early} min earlier than the {arrival_buffer} min buffer allows. "
+                    f"Can arrive up to {arrival_buffer} min before, but arrived {gap_minutes} min before ({minutes_too_early} min too early). "
                     f"[{match_explanation}]"
                 )
             else:
@@ -1051,7 +1085,7 @@ class StaffTimingValidationBlock(BaseBlock):
                 evidence = (
                     f"{employee_name} ({role}) arrived at {arrival_time} on {shift_date} ({shift_type}), "
                     f"first procedure at {first_procedure_time}. "
-                    f"Arrival {gap_minutes} min before procedure is within {arrival_buffer} min buffer. "
+                    f"Arrived {gap_minutes} min before (within {arrival_buffer} min allowed) - OK. "
                     f"[{match_explanation}]"
                 )
             

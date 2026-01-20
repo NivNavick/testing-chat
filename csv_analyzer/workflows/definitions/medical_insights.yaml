@@ -60,19 +60,18 @@ parameters:
   shift_time_boundary: "13:00"
   morning_shift_start: "06:00"
   evening_shift_end: "21:00"
-  # Timing rules per role (configurable)
-  # Each role can have: min_count, max_count, scope, arrival_buffer_minutes, departure_buffer_minutes, match_to
   # Timing rules per role:
-  # - departure_buffer_minutes: Minimum time to stay after last procedure (0 = can leave immediately)
-  # - departure_max_minutes: Maximum time allowed after last procedure (null = no limit)
+  # - arrival_buffer_minutes: Can arrive up to X minutes before first procedure (30 = arriving 30 min early is OK)
+  # - departure_buffer_minutes: Must stay at least X minutes after last procedure (0 = can leave immediately)
+  # - departure_max_minutes: Must leave within X minutes after last procedure (null = no limit)
   timing_rules:
     אח התאוששות:
       min_count: 1
       max_count: 1
       scope: per_shift
-      arrival_buffer_minutes: 30
-      departure_buffer_minutes: 0    # Can leave when last procedure ends
-      departure_max_minutes: 60      # Must leave within 1 hour after last procedure
+      arrival_buffer_minutes: 30      # Can arrive up to 30 min before first procedure
+      departure_buffer_minutes: 0     # Can leave when last procedure ends
+      departure_max_minutes: 60       # Must leave within 1 hour after last procedure
       match_to: all_procedures
     אח התאוששות ערב:
       min_count: 1
@@ -86,26 +85,26 @@ parameters:
       min_count: 1
       max_count: null
       scope: per_concurrent_doctor
-      arrival_buffer_minutes: 15
+      arrival_buffer_minutes: 30      # Can arrive up to 30 min before first procedure
       departure_buffer_minutes: 0
       match_to: gastro_procedures
     כע עזר:
       min_count: 1
       scope: per_shift
       arrival_buffer_minutes: 30
-      departure_buffer_minutes: 30
+      departure_buffer_minutes: 0
       match_to: all_procedures
     כע עזר ערב:
       min_count: 1
       scope: per_shift
       arrival_buffer_minutes: 30
-      departure_buffer_minutes: 30
+      departure_buffer_minutes: 0
       match_to: all_procedures
     כח עזר:
       min_count: 1
       scope: per_shift
       arrival_buffer_minutes: 30
-      departure_buffer_minutes: 30
+      departure_buffer_minutes: 0
       match_to: all_procedures
 
 # Storage configuration
