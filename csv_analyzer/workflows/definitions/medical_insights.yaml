@@ -67,8 +67,8 @@ parameters:
   timing_rules:
     אח התאוששות:
       min_count: 1
-      max_count: 1
-      scope: per_shift
+      max_count: null                 # No max - scales with concurrent doctors
+      scope: per_concurrent_doctor    # 1 recovery nurse per doctor working simultaneously
       arrival_buffer_minutes: 30      # Can arrive up to 30 min before first procedure
       departure_buffer_minutes: 0     # Can leave when last procedure ends
       departure_max_minutes: 60       # Must leave within 1 hour after last procedure
@@ -76,8 +76,8 @@ parameters:
       notify_double_shift: true       # Flag when employee works both morning and evening
     אח התאוששות ערב:
       min_count: 1
-      max_count: 1
-      scope: per_shift
+      max_count: null                 # No max - scales with concurrent doctors
+      scope: per_concurrent_doctor    # 1 recovery nurse per doctor working simultaneously
       arrival_buffer_minutes: 30
       departure_buffer_minutes: 0
       departure_max_minutes: 60

@@ -223,8 +223,10 @@ def build_name_mapping(names_list1: List[str], names_list2: List[str], threshold
     return mapping
 
 
-# Default timing rules configuration
-# Each role can have:
+# Timing rules are now fully configured in the workflow YAML.
+# No hardcoded defaults - everything comes from configuration.
+#
+# Each role can have these settings (all configured in workflow YAML):
 # - min_count, max_count: Role count limits per shift
 # - scope: "per_shift" or "per_concurrent_doctor"
 # - arrival_buffer_minutes: Can arrive up to X minutes before first relevant procedure
@@ -232,67 +234,6 @@ def build_name_mapping(names_list1: List[str], names_list2: List[str], threshold
 # - departure_max_minutes: Maximum time allowed to stay after last procedure (null = no limit)
 # - match_to: "all_procedures", "gastro_procedures", or "own_procedures"
 # - notify_double_shift: If true, flag when employee works this role in both morning and evening shifts
-DEFAULT_TIMING_RULES = {
-    "אח התאוששות": {
-        "min_count": 1,
-        "max_count": 1,
-        "scope": "per_shift",
-        "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 0,
-        "departure_max_minutes": 60,
-        "match_to": "all_procedures",
-        "notify_double_shift": True
-    },
-    "אח התאוששות ערב": {
-        "min_count": 1,
-        "max_count": 1,
-        "scope": "per_shift",
-        "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 0,
-        "departure_max_minutes": 60,
-        "match_to": "all_procedures",
-        "notify_double_shift": True
-    },
-    "אח גסטרו": {
-        "min_count": 1,
-        "max_count": None,
-        "scope": "per_concurrent_doctor",
-        "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 0,
-        "match_to": "gastro_procedures",
-        "notify_double_shift": True
-    },
-    "כע עזר": {
-        "min_count": 1,
-        "max_count": None,
-        "scope": "per_shift",
-        "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 0,
-        "match_to": "all_procedures",
-        "notify_double_shift": True
-    },
-    "כע עזר ערב": {
-        "min_count": 1,
-        "max_count": None,
-        "scope": "per_shift",
-        "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 0,
-        "match_to": "all_procedures",
-        "notify_double_shift": True
-    },
-    "כח עזר": {
-        "min_count": 1,
-        "max_count": None,
-        "scope": "per_shift",
-        "arrival_buffer_minutes": 30,
-        "departure_buffer_minutes": 0,
-        "match_to": "all_procedures",
-        "notify_double_shift": True
-    },
-}
-
-# Keep backward compatibility alias
-DEFAULT_ROLE_LIMITS = DEFAULT_TIMING_RULES
 
 
 class StaffTimingValidationBlock(BaseBlock):
@@ -346,7 +287,7 @@ class StaffTimingValidationBlock(BaseBlock):
             Dict with 'result' key containing S3 URI of validation results
         """
         # Get configuration parameters
-        timing_rules = self.get_param("timing_rules", DEFAULT_TIMING_RULES)
+        timing_rules = self.get_param("timing_rules", {})
         shift_time_boundary = self.get_param("shift_time_boundary", "13:00")
         morning_shift_start = self.get_param("morning_shift_start", "06:00")
         evening_shift_end = self.get_param("evening_shift_end", "21:00")
@@ -674,13 +615,25 @@ class StaffTimingValidationBlock(BaseBlock):
         )
         results.extend(role_count_validation)
         
-        # 3. Validate gastro nurse coverage for concurrent doctors
-        if gastro_procedures_df is not None and not gastro_procedures_df.empty:
-            self.duckdb.register("gastro_procedures", gastro_procedures_df)
-            gastro_validation = self._validate_gastro_coverage(
-                schedule_df, shifts_df, gastro_procedures_df, timing_rules
-            )
-            results.extend(gastro_validation)
+        # 3. Validate concurrent coverage for all roles with per_concurrent_doctor scope
+        # This includes אח גסטרו (gastro procedures) and אח התאוששות (all procedures)
+        for role, config in timing_rules.items():
+            if config.get('scope') == 'per_concurrent_doctor':
+                match_to = config.get('match_to', 'all_procedures')
+                
+                # Choose the appropriate procedures table
+                if match_to == 'gastro_procedures' and gastro_procedures_df is not None and not gastro_procedures_df.empty:
+                    self.duckdb.register("concurrent_procedures", gastro_procedures_df)
+                    concurrent_validation = self._validate_concurrent_coverage(
+                        schedule_df, shifts_df, gastro_procedures_df, role, config
+                    )
+                    results.extend(concurrent_validation)
+                elif match_to == 'all_procedures' and all_procedures_df is not None and not all_procedures_df.empty:
+                    self.duckdb.register("concurrent_procedures", all_procedures_df)
+                    concurrent_validation = self._validate_concurrent_coverage(
+                        schedule_df, shifts_df, all_procedures_df, role, config
+                    )
+                    results.extend(concurrent_validation)
         
         # 4. Validate arrival timing (did they arrive too early?)
         if all_procedures_df is not None and not all_procedures_df.empty and not enriched_shifts.empty:
@@ -1010,6 +963,155 @@ class StaffTimingValidationBlock(BaseBlock):
                     'status': status,
                     'employees_expected': f'{max_doctors} (for {max_doctors} concurrent doctors)',
                     'employees_arrived': gastro_nurses,
+                    'doctor_name': sample_doctors,
+                    'evidence': evidence,
+                })
+        
+        return results
+    
+    def _validate_concurrent_coverage(
+        self,
+        schedule_df: pd.DataFrame,
+        shifts_df: pd.DataFrame,
+        procedures_df: pd.DataFrame,
+        role: str,
+        role_config: Dict,
+    ) -> List[Dict]:
+        """
+        Validate coverage for a role that requires per-concurrent-doctor staffing.
+        
+        At any given time, the number of staff for this role must be >= 
+        the number of doctors performing procedures simultaneously.
+        
+        Args:
+            role: The role name (e.g., "אח התאוששות", "אח גסטרו")
+            role_config: Configuration for the role from timing_rules
+        """
+        results = []
+        min_count = role_config.get('min_count', 1)
+        match_to = role_config.get('match_to', 'all_procedures')
+        
+        # Find concurrent doctors using interval overlap in DuckDB
+        sql = """
+        WITH 
+        -- Convert times to minutes for easier comparison
+        procedure_intervals AS (
+            SELECT 
+                procedure_date,
+                doctor,
+                start_time,
+                end_time,
+                EXTRACT(HOUR FROM start_time) * 60 + EXTRACT(MINUTE FROM start_time) as start_min,
+                EXTRACT(HOUR FROM end_time) * 60 + EXTRACT(MINUTE FROM end_time) as end_min
+            FROM concurrent_procedures
+            WHERE start_time IS NOT NULL AND end_time IS NOT NULL
+        ),
+        
+        -- Find all unique time points where procedures start or end
+        time_points AS (
+            SELECT DISTINCT procedure_date, start_min as time_point FROM procedure_intervals
+            UNION
+            SELECT DISTINCT procedure_date, end_min as time_point FROM procedure_intervals
+        ),
+        
+        -- Count concurrent doctors at each time point
+        concurrent_at_points AS (
+            SELECT 
+                t.procedure_date,
+                t.time_point,
+                COUNT(DISTINCT p.doctor) as concurrent_doctors,
+                STRING_AGG(DISTINCT p.doctor, ', ') as doctors
+            FROM time_points t
+            JOIN procedure_intervals p 
+                ON t.procedure_date = p.procedure_date
+                AND t.time_point >= p.start_min 
+                AND t.time_point < p.end_min
+            GROUP BY t.procedure_date, t.time_point
+        ),
+        
+        -- Find max concurrent doctors per date
+        max_concurrent AS (
+            SELECT 
+                procedure_date,
+                MAX(concurrent_doctors) as max_concurrent_doctors,
+                FIRST(doctors) as sample_doctors
+            FROM concurrent_at_points
+            GROUP BY procedure_date
+        )
+        
+        SELECT * FROM max_concurrent
+        ORDER BY procedure_date
+        """
+        
+        try:
+            concurrent_df = self.duckdb.execute(sql).fetchdf()
+        except Exception as e:
+            self.logger.warning(f"Error calculating concurrent doctors for {role}: {e}")
+            return results
+        
+        # Build role pattern for matching (handle variations like "אח התאוששות" and "אח התאוששות ערב")
+        role_base = role.replace(' ערב', '').strip()  # Remove "ערב" suffix for matching
+        
+        # For each date, check if we have enough staff for this role
+        for _, row in concurrent_df.iterrows():
+            proc_date = row['procedure_date']
+            max_doctors = row['max_concurrent_doctors']
+            sample_doctors = row['sample_doctors']
+            
+            # Calculate required count (min_count per doctor)
+            required_count = max_doctors * min_count
+            
+            # Count staff scheduled for this role on this date
+            sql_staff = f"""
+            SELECT 
+                shift_type,
+                COUNT(*) as staff_count,
+                STRING_AGG(employee_name, ', ') as staff_names
+            FROM schedule
+            WHERE shift_date = '{proc_date}'
+              AND (role LIKE '%{role_base}%')
+            GROUP BY shift_type
+            """
+            
+            staff_df = self.duckdb.execute(sql_staff).fetchdf()
+            
+            # Check coverage for each shift type
+            for shift_type in ['בוקר', 'ערב']:
+                staff_for_shift = staff_df[staff_df['shift_type'] == shift_type]
+                
+                if staff_for_shift.empty:
+                    staff_count = 0
+                    staff_names = ''
+                else:
+                    staff_count = int(staff_for_shift.iloc[0]['staff_count'])
+                    staff_names = staff_for_shift.iloc[0]['staff_names']
+                
+                # Determine status
+                if staff_count >= required_count:
+                    status = 'OK'
+                    evidence = (
+                        f"{role} coverage OK on {proc_date} ({shift_type}): "
+                        f"{staff_count} staff for max {max_doctors} concurrent doctors (need {required_count}). "
+                        f"Staff: {staff_names}. Doctors: {sample_doctors}. [match_to={match_to}]"
+                    )
+                else:
+                    status = 'UNDERSTAFFED'
+                    evidence = (
+                        f"INSUFFICIENT {role} coverage on {proc_date} ({shift_type}): "
+                        f"only {staff_count} staff for {max_doctors} concurrent doctors (need {required_count})! "
+                        f"Staff: {staff_names}. Doctors: {sample_doctors}. [match_to={match_to}]"
+                    )
+                
+                results.append({
+                    'date': proc_date,
+                    'shift_type': shift_type,
+                    'role': role,
+                    'validation_type': 'concurrent_coverage',
+                    'expected_count': required_count,
+                    'actual_count': staff_count,
+                    'status': status,
+                    'employees_expected': f'{required_count} (for {max_doctors} concurrent doctors)',
+                    'employees_arrived': staff_names,
                     'doctor_name': sample_doctors,
                     'evidence': evidence,
                 })
@@ -1502,8 +1604,8 @@ class StaffTimingValidationBlock(BaseBlock):
         {
             "name": "timing_rules",
             "type": "object",
-            "default": DEFAULT_TIMING_RULES,
-            "description": "Timing rules per role. Each role can have: min_count, max_count, scope, arrival_buffer_minutes, departure_buffer_minutes, match_to"
+            "default": {},
+            "description": "Timing rules per role. Each role can have: min_count, max_count, scope, arrival_buffer_minutes, departure_buffer_minutes, departure_max_minutes, match_to, notify_double_shift. MUST be configured in workflow YAML."
         },
         {
             "name": "shift_time_boundary",
@@ -1525,7 +1627,7 @@ class StaffTimingValidationBlock(BaseBlock):
         },
     ],
     block_class=StaffTimingValidationBlock,
-    description="Unified staff timing validation: role counts, arrival/departure timing, gastro nurse coverage",
+    description="Unified staff timing validation: role counts, arrival/departure timing, concurrent coverage. All rules configured in workflow YAML.",
 )
 def staff_timing_validation(ctx: BlockContext) -> Dict[str, str]:
     """Validate staff timing and coverage against schedule and business rules."""
@@ -1545,8 +1647,8 @@ def staff_timing_validation(ctx: BlockContext) -> Dict[str, str]:
         {
             "name": "timing_rules",
             "type": "object",
-            "default": DEFAULT_TIMING_RULES,
-            "description": "Timing rules per role (backward compatible alias)"
+            "default": {},
+            "description": "Timing rules per role. MUST be configured in workflow YAML."
         },
         {
             "name": "shift_time_boundary",
