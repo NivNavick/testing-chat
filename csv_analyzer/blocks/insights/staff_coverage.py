@@ -166,6 +166,63 @@ def normalize_employee_name(name: str) -> str:
     return ' '.join(parts).lower()
 
 
+def fuzzy_name_similarity(name1: str, name2: str) -> float:
+    """
+    Calculate similarity ratio between two names using SequenceMatcher.
+    Returns a value between 0.0 (completely different) and 1.0 (identical).
+    """
+    from difflib import SequenceMatcher
+    if not name1 or not name2:
+        return 0.0
+    return SequenceMatcher(None, name1, name2).ratio()
+
+
+def build_name_mapping(names_list1: List[str], names_list2: List[str], threshold: float = 0.85) -> Dict[str, str]:
+    """
+    Build a mapping of similar names across two lists.
+    
+    For each name in list1, finds the best matching name in list2 if similarity >= threshold.
+    Returns a dict mapping normalized names to their canonical (matched) form.
+    
+    This handles:
+    - Exact matches after normalization
+    - Typos/misspellings (e.g., "אנה פרדנקו" vs "אנה פדרנקו")
+    - Name order variations (already handled by normalize_employee_name)
+    """
+    mapping = {}
+    
+    # Normalize all names first
+    norm1 = {normalize_employee_name(n): n for n in names_list1 if n}
+    norm2 = {normalize_employee_name(n): n for n in names_list2 if n}
+    
+    # First pass: exact matches
+    for norm_name in norm1:
+        if norm_name in norm2:
+            mapping[norm_name] = norm_name
+    
+    # Second pass: fuzzy matches for unmatched names
+    unmatched1 = [n for n in norm1 if n not in mapping]
+    unmatched2 = [n for n in norm2 if n not in mapping.values()]
+    
+    for name1 in unmatched1:
+        best_match = None
+        best_score = 0.0
+        
+        for name2 in unmatched2:
+            score = fuzzy_name_similarity(name1, name2)
+            if score >= threshold and score > best_score:
+                best_score = score
+                best_match = name2
+        
+        if best_match:
+            # Map both names to the same canonical form (use the one from list2/schedule)
+            mapping[name1] = best_match
+            # Also ensure the matched name maps to itself
+            mapping[best_match] = best_match
+    
+    return mapping
+
+
 # Default timing rules configuration
 # Each role can have:
 # - min_count, max_count: Role count limits per shift
@@ -563,6 +620,7 @@ class StaffTimingValidationBlock(BaseBlock):
         all_procedures_df: Optional[pd.DataFrame],
         timing_rules: Dict[str, Dict],
         shift_time_boundary: str,
+        fuzzy_name_threshold: float = 0.85,
     ) -> pd.DataFrame:
         """
         Validate all staff timing and coverage rules using DuckDB.
@@ -574,6 +632,28 @@ class StaffTimingValidationBlock(BaseBlock):
         if schedule_df.empty or shifts_df.empty:
             self.logger.warning("Empty schedule or shifts data - cannot validate")
             return self._get_empty_result_df()
+        
+        # Build fuzzy name mapping to handle typos/misspellings
+        schedule_names = schedule_df['employee_name'].unique().tolist() if 'employee_name' in schedule_df.columns else []
+        shift_names = shifts_df['employee_name'].unique().tolist() if 'employee_name' in shifts_df.columns else []
+        
+        name_mapping = build_name_mapping(shift_names, schedule_names, threshold=fuzzy_name_threshold)
+        
+        # Log fuzzy matches found (non-exact matches)
+        fuzzy_matches = [(k, v) for k, v in name_mapping.items() if k != v]
+        if fuzzy_matches:
+            self.logger.info(f"Fuzzy name matches found: {fuzzy_matches}")
+        
+        # Apply canonical names for matching
+        def get_canonical_name(normalized_name: str) -> str:
+            return name_mapping.get(normalized_name, normalized_name)
+        
+        # Add canonical_name column to both dataframes
+        schedule_df = schedule_df.copy()
+        shifts_df = shifts_df.copy()
+        
+        schedule_df['canonical_name'] = schedule_df['employee_name_normalized'].apply(get_canonical_name)
+        shifts_df['canonical_name'] = shifts_df['employee_name_normalized'].apply(get_canonical_name)
         
         # Register tables with DuckDB
         self.duckdb.register("schedule", schedule_df)
@@ -647,13 +727,13 @@ class StaffTimingValidationBlock(BaseBlock):
         """
         results = []
         
-        # First, get all unique employees that have ANY shift data
+        # First, get all unique employees that have ANY shift data (using canonical names)
         employees_with_data_sql = """
-        SELECT DISTINCT employee_name_normalized
+        SELECT DISTINCT canonical_name
         FROM arrivals
         """
         employees_with_data = set(
-            self.duckdb.execute(employees_with_data_sql).fetchdf()['employee_name_normalized'].tolist()
+            self.duckdb.execute(employees_with_data_sql).fetchdf()['canonical_name'].tolist()
         )
         self.logger.info(f"Found {len(employees_with_data)} employees with shift data")
         
@@ -664,13 +744,13 @@ class StaffTimingValidationBlock(BaseBlock):
             s.shift_type,
             s.role,
             s.employee_name as scheduled_employee,
-            s.employee_name_normalized,
+            s.canonical_name,
             a.employee_name as arrived_employee,
             a.arrival_time
         FROM schedule s
         LEFT JOIN arrivals a 
             ON s.shift_date = a.shift_date
-            AND s.employee_name_normalized = a.employee_name_normalized
+            AND s.canonical_name = a.canonical_name
         ORDER BY s.shift_date, s.shift_type, s.role
         """
         
@@ -678,8 +758,8 @@ class StaffTimingValidationBlock(BaseBlock):
         
         for _, row in df.iterrows():
             arrival_str = str(row['arrival_time']) if pd.notna(row['arrival_time']) else 'N/A'
-            emp_normalized = row['employee_name_normalized']
-            has_any_shift_data = emp_normalized in employees_with_data
+            emp_canonical = row['canonical_name']
+            has_any_shift_data = emp_canonical in employees_with_data
             showed_up = pd.notna(row['arrived_employee'])
             
             if showed_up:
@@ -969,7 +1049,7 @@ class StaffTimingValidationBlock(BaseBlock):
         FROM arrivals a
         LEFT JOIN schedule s 
             ON a.shift_date = s.shift_date
-            AND a.employee_name_normalized = s.employee_name_normalized
+            AND a.canonical_name = s.canonical_name
             AND a.inferred_shift_type = s.shift_type
         WHERE a.arrival_time IS NOT NULL
         """
@@ -1316,7 +1396,9 @@ class StaffTimingValidationBlock(BaseBlock):
             return results
         
         # Group by date and normalized employee name
-        grouped = shifts_with_roles.groupby(['shift_date', 'employee_name_normalized'])
+        # Use canonical_name if available, fall back to employee_name_normalized
+        group_col = 'canonical_name' if 'canonical_name' in shifts_with_roles.columns else 'employee_name_normalized'
+        grouped = shifts_with_roles.groupby(['shift_date', group_col])
         
         for (date, emp_norm), group in grouped:
             # Get unique shift types for this employee on this date

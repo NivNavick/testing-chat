@@ -284,7 +284,7 @@ class StructureDetector:
         Check if a row looks like metadata rather than headers/data.
         
         Metadata rows typically:
-        - Have few non-empty columns
+        - Have few non-empty columns relative to total columns
         - Contain date ranges, names, locations
         - Don't look like typical column headers
         """
@@ -293,8 +293,10 @@ class StructureDetector:
         if not non_empty:
             return False
         
-        # If most columns are empty, likely metadata
-        if len(non_empty) <= 3 and len(cols) > 5:
+        # If less than 40% of columns are filled, likely metadata
+        # (e.g., 4 out of 17 = 23% -> metadata, 10 out of 16 = 62% -> not metadata)
+        fill_ratio = len(non_empty) / len(cols) if cols else 0
+        if fill_ratio < 0.4 and len(cols) > 5:
             return True
         
         # Check first cell for metadata patterns
@@ -307,8 +309,8 @@ class StructureDetector:
         
         # Location-like pattern
         if self.LOCATION_PATTERN.search(first_cell):
-            # But not if it looks like a header
-            if len(non_empty) <= 3:
+            # But not if it's too populated (likely a header row)
+            if fill_ratio < 0.4:
                 return True
         
         return False
